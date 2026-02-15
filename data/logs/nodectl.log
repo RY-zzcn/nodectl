@@ -1,0 +1,84 @@
+time="2026-02-15 20:01:16" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:01:16" level=INFO source=main.go:13 msg="nodectl 主程序启动成功" version=v1.0.0-dev
+time="2026-02-15 20:01:16" level=WARN source=main.go:16 msg=检测到节点响应延迟过高 node_name=US-LAX-01 ping_ms=280
+time="2026-02-15 20:01:16" level=ERROR source=main.go:22 msg="加载 geo 数据库失败" file=data/geo.db err="database is locked"
+time="2026-02-15 20:08:24" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:08:24" level=INFO source=internal/database/database.go:98 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:08:24" level=INFO source=main.go:26 msg=成功插入测试节点 uuid=5c234960-526d-4527-9914-1d2fd697802b install_id=Ty1ImSdIkeHJ4xfN
+time="2026-02-15 20:29:54" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:29:54" level=INFO source=internal/database/defaults.go:53 msg=已生成全新的系统加密密钥
+time="2026-02-15 20:29:54" level=WARN source=internal/database/defaults.go:72 msg=已创建默认管理员账号！ 用户名=admin 密码=admin 提示=请登录后尽快修改！
+time="2026-02-15 20:29:54" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:29:54" level=INFO source=internal/server/server.go:74 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:34:48" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:34:48" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:34:48" level=INFO source=internal/server/server.go:97 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:36:21" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:36:21" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:36:21" level=INFO source=internal/server/server.go:97 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:38:25" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:38:25" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:38:25" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:38:33" level=WARN source=internal/server/server.go:52 msg="登录失败: 密码错误" 尝试用户名=admin IP=[::1]:55872
+time="2026-02-15 20:38:37" level=INFO source=internal/server/server.go:86 msg=管理员登录成功 用户名=admin IP=[::1]:55872
+time="2026-02-15 20:45:15" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:45:15" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:45:15" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:45:20" level=WARN source=internal/server/server.go:52 msg="登录失败: 密码错误" 尝试用户名=admin IP=[::1]:56131
+time="2026-02-15 20:45:21" level=WARN source=internal/server/server.go:52 msg="登录失败: 密码错误" 尝试用户名=admin IP=[::1]:56131
+time="2026-02-15 20:45:26" level=INFO source=internal/server/server.go:86 msg=管理员登录成功 用户名=admin IP=[::1]:56131
+time="2026-02-15 20:46:55" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:46:55" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:46:55" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:48:28" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:48:28" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:48:28" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:48:44" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:48:44" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:48:44" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:50:29" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:50:29" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:50:29" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:52:30" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:52:30" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:52:30" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 20:56:26" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 20:56:26" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 20:56:26" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:03:58" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:03:58" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:03:58" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:10:39" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:10:39" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:10:39" level=INFO source=internal/server/server.go:108 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:18:53" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:18:53" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:18:53" level=INFO source=internal/server/server.go:186 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:23:38" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:23:38" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:23:38" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:23:59" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:23:59" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:23:59" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:24:14" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:24:14" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:24:14" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:28:51" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:28:51" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:28:51" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:29:11" level=INFO source=internal/server/server.go:161 msg=管理员密码修改成功 IP=[::1]:57487
+time="2026-02-15 21:29:17" level=INFO source=internal/server/server.go:80 msg=管理员登录成功 用户名=admin IP=[::1]:57487
+time="2026-02-15 21:36:01" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:36:01" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:36:01" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:49:53" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:49:53" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:49:53" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:56:37" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 21:56:37" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 21:56:37" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-15 21:56:47" level=INFO source=internal/server/server.go:105 msg=管理员已安全退出 IP=[::1]:57858
+time="2026-02-15 21:56:48" level=INFO source=internal/server/server.go:80 msg=管理员登录成功 用户名=admin IP=[::1]:57858
+time="2026-02-15 22:00:52" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-15 22:00:52" level=INFO source=internal/database/database.go:115 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-15 22:00:52" level=INFO source=internal/server/server.go:177 msg="Web 服务已启动" 地址=http://localhost:8080
