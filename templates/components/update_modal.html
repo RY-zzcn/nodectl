@@ -71,10 +71,13 @@
     }
     .top-version-badge.has-update:hover { background: #ffe5e5; }
     
+    /* [核心] !important 强制覆盖 index.html 中为了防闪烁加的 display: none */
     .update-arrow-icon {
-        display: none; animation: floatUp 1.5s ease-in-out infinite;
+        animation: floatUp 1.5s ease-in-out infinite;
     }
-    .top-version-badge.has-update .update-arrow-icon { display: flex; }
+    .top-version-badge.has-update .update-arrow-icon { 
+        display: flex !important; 
+    }
 
     @keyframes floatUp {
         0%, 100% { transform: translateY(0); }
@@ -107,21 +110,19 @@
 <script>
     const GITHUB_API_BASE = "https://api.github.com/repos/hobin66/nodectl/releases";
     
-    // 获取后端原始版本号，并处理开发环境的默认值
     let RAW_VERSION = "{{.Version}}";
     if (RAW_VERSION === "dev" || RAW_VERSION === "") {
-        RAW_VERSION = "dev";
+        RAW_VERSION = "v1.0.0";
     }
-    // 全局清洗：强制移除版本号开头的 v
     const DISPLAY_VERSION = RAW_VERSION.replace(/^v/, '');
 
-    // 分页与滚动状态管理
+    // 状态管理
     let currentPage = 1;
     let hasMore = true;
     let isFetching = false;
     let allReleases = [];
 
-    // 语义化对比核心逻辑 (内部自动忽略 v 前缀)
+    // 版本比对
     function isNewVersionAvailable(current, latest) {
         if (!current || !latest) return false;
         const cleanCurrent = current.replace(/^v/, '');
@@ -157,12 +158,16 @@
             }
             
             const data = await res.json();
-            
             if (data.length < 3) hasMore = false;
 
-            if (data.length === 0 && page === 1) {
-                statusEl.innerHTML = `目前没有任何版本更新记录<br><span style="font-size:11px;color:#aaa;">(GitHub 仓库中尚未发布正式的 Release)</span>`;
-                return;
+            // 【核心修复】如果是第一页，强制清空容器，防止并发点击时发生数据重复累加
+            if (page === 1) {
+                document.getElementById('releaseList').innerHTML = "";
+                allReleases = [];
+                if (data.length === 0) {
+                    statusEl.innerHTML = `目前没有任何版本更新记录<br><span style="font-size:11px;color:#aaa;">(GitHub 仓库中尚未发布正式的 Release)</span>`;
+                    return;
+                }
             }
 
             allReleases = allReleases.concat(data);
@@ -212,7 +217,6 @@
         items.forEach(release => {
             const date = new Date(release.published_at).toLocaleDateString();
             const displayName = (release.name && release.name !== release.tag_name) ? ` - ${release.name}` : '';
-            // 清洗：去除列表中版本号开头的 v
             const displayTag = release.tag_name.replace(/^v/, ''); 
             
             html += `
@@ -230,8 +234,9 @@
 
     function openUpdateModal() {
         document.getElementById('updateModal').classList.add('active');
+        // 只有在数据为空且没有正在请求的时候，才触发拉取
         if (allReleases.length === 0 && !isFetching && hasMore) {
-            loadReleases(currentPage);
+            loadReleases(1);
         }
     }
 
@@ -240,19 +245,16 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-        // [核心改动] 强制覆盖顶部徽章里的文字为 "无 v" 版本的数字
+        // 【核心修复】精准替换版本号文字，并触发平滑淡入，彻底消除闪烁
+        const badgeText = document.getElementById('versionText');
+        if (badgeText) {
+            badgeText.innerText = DISPLAY_VERSION;
+            badgeText.style.opacity = '1';
+        }
+
         const badge = document.getElementById('topVersionBadge');
-        if (badge) {
-            for (let node of badge.childNodes) {
-                if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== "") {
-                    node.nodeValue = DISPLAY_VERSION + " ";
-                    break;
-                }
-            }
-            // 同步修改未触发更新时的悬浮提示文本
-            if (!badge.classList.contains('has-update')) {
-                badge.title = "当前版本: " + DISPLAY_VERSION;
-            }
+        if (badge && !badge.classList.contains('has-update')) {
+            badge.title = "当前版本: " + DISPLAY_VERSION;
         }
 
         const bodyContainer = document.getElementById('updateBody');
@@ -264,7 +266,12 @@
             });
         }
 
-        setTimeout(() => loadReleases(1), 1000);
+        // 延迟 1 秒静默拉取
+        setTimeout(() => {
+            if (allReleases.length === 0 && !isFetching) {
+                loadReleases(1);
+            }
+        }, 1000);
     });
 </script>
 {{end}}

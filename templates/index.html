@@ -647,8 +647,8 @@
                 NodeCTL
             </a>
             <div id="topVersionBadge" class="top-version-badge" onclick="openUpdateModal()" title="当前版本: {{.Version}}">
-                {{.Version}}
-                <svg class="update-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <span id="versionText" style="opacity: 0; transition: opacity 0.3s;">{{.Version}}</span>
+                <svg class="update-arrow-icon" style="display: none;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="12" y1="19" x2="12" y2="5"></line>
                     <polyline points="5 12 12 5 19 12"></polyline>
                 </svg>
