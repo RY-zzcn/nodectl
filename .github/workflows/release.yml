@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p bin
           # 动态注入版本号到 internal/version.Version 变量中
-          go build -ldflags="-s -w -X 'nodectl/internal/version.Version=${{ github.event.inputs.version }}'" -o bin/nodectl-${{ matrix.goos }}-${{ matrix.goarch }} ./main.go
+          go build -trimpath -ldflags="-s -w -X 'nodectl/internal/version.Version=${{ github.event.inputs.version }}'" -o bin/nodectl-${{ matrix.goos }}-${{ matrix.goarch }} ./main.go
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

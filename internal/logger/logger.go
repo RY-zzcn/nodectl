@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings" // [新增] 引入 strings 包
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -26,13 +27,7 @@ func Init() {
 
 	multiWriter := io.MultiWriter(os.Stdout, logFile)
 
-	// 获取当前工作目录，用于计算相对路径
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "" // 降级处理
-	}
-
-	// 2. 配置 slog 拦截器 (核心魔法在这里)
+	// 2. 配置 slog 拦截器 (修复 Docker 下路径过长的问题)
 	opts := &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: true,
@@ -42,16 +37,27 @@ func Init() {
 				return slog.String(slog.TimeKey, a.Value.Time().Format("2006-01-02 15:04:05"))
 			}
 
-			// 格式化路径：从绝对路径改为相对路径，并将 Windows 的反斜杠转换为斜杠
+			// [核心修复] 智能格式化源码路径，剥离宿主机的绝对路径干扰
 			if a.Key == slog.SourceKey {
 				source, ok := a.Value.Any().(*slog.Source)
-				if ok && cwd != "" {
-					relPath, err := filepath.Rel(cwd, source.File)
-					if err == nil {
-						// 拼接成 "目录/文件.go:行号" 的精简格式
-						formattedSource := fmt.Sprintf("%s:%d", filepath.ToSlash(relPath), source.Line)
-						return slog.String(slog.SourceKey, formattedSource)
+				if ok {
+					file := filepath.ToSlash(source.File)
+
+					// 智能截取路径：寻找项目的特征目录
+					if idx := strings.Index(file, "/internal/"); idx != -1 {
+						file = file[idx+1:] // 只保留 "internal/..." 开始的路径
+					} else if strings.HasSuffix(file, "main.go") {
+						file = "main.go" // 根目录的 main.go 直接显示
+					} else {
+						// 兜底方案：只保留路径的最后两级
+						parts := strings.Split(file, "/")
+						if len(parts) > 2 {
+							file = strings.Join(parts[len(parts)-2:], "/")
+						}
 					}
+
+					formattedSource := fmt.Sprintf("%s:%d", file, source.Line)
+					return slog.String(slog.SourceKey, formattedSource)
 				}
 			}
 

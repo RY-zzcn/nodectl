@@ -169,13 +169,13 @@ select_protocols() {
                     ;;
                 
                 # 处理 token 参数
-                --token|--id)
+                --token|--id|-t)
                     if [[ -n "${2:-}" ]]; then
                         INSTALL_ID="$2"
                         info "-> 指定安装ID: $INSTALL_ID"
                         shift 
                     else
-                        warn "--token 参数后面必须跟 ID 字符串"
+                        warn "-t/--token 参数后面必须跟 ID 字符串"
                     fi
                     ;;
 

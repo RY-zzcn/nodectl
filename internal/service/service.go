@@ -6,6 +6,9 @@ import (
 	_ "embed"
 	"fmt"
 	"nodectl/internal/database"
+	"nodectl/internal/logger"
+	"os"
+	"path/filepath"
 	"text/template"
 
 	"gorm.io/gorm"
@@ -97,7 +100,7 @@ func RenderInstallScript() (string, error) {
 		configMap[c.Key] = c.Value
 	}
 
-	// [修改] 拼接出完整的 Report URL
+	// 拼接出完整的 Report URL
 	panelURL := configMap["panel_url"]
 	reportURL := ""
 	if panelURL != "" {
@@ -114,10 +117,27 @@ func RenderInstallScript() (string, error) {
 		"PortSocks5":  configMap["proxy_port_socks5"],
 		"Socks5User":  configMap["proxy_socks5_user"],
 		"Socks5Pass":  configMap["proxy_socks5_pass"],
-		"ReportURL":   reportURL, // [填入] 模板中的 REPORT_URL="{{.ReportURL}}" 现在有值了
+		"ReportURL":   reportURL,
 	}
 
-	tmpl, err := template.New("install_script").Parse(SingboxScriptTpl)
+	// ==========================================
+	// [核心修改] 模板加载逻辑：内嵌优先 vs 外部覆盖
+	// ==========================================
+	tplContent := SingboxScriptTpl // 默认使用打包在二进制里的 embed 模板
+
+	// 定义外部调试模板的路径 (data/debug/singbox.tpl)
+	debugPath := filepath.Join("data", "debug", "singbox.tpl")
+
+	// 尝试读取外部文件
+	if content, err := os.ReadFile(debugPath); err == nil {
+		// 如果文件存在且有权限读取，则直接覆盖 tplContent
+		tplContent = string(content)
+		// 打印一条提示日志，方便你在控制台/Docker logs 中确认热更新生效
+		logger.Log.Info("【调试模式】已拦截并使用外部安装模板", "path", debugPath)
+	}
+
+	// 解析最终决定的模板内容
+	tmpl, err := template.New("install_script").Parse(tplContent)
 	if err != nil {
 		return "", fmt.Errorf("解析脚本模板失败: %v", err)
 	}
