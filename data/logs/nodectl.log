@@ -435,3 +435,6 @@ time="2026-02-16 15:17:25" level=INFO source=internal/server/server.go:44 msg="W
 time="2026-02-16 16:14:08" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
 time="2026-02-16 16:14:08" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
 time="2026-02-16 16:14:08" level=INFO source=internal/server/server.go:44 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 16:27:59" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 16:27:59" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 16:27:59" level=INFO source=internal/server/server.go:44 msg="Web 服务已启动" 地址=http://localhost:8080

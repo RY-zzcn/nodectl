@@ -2,6 +2,7 @@ package database
 
 import (
 	"crypto/rand"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -78,6 +79,11 @@ func (SysConfig) TableName() string {
 
 // InitDB 初始化数据库连接并同步表结构
 func InitDB() {
+
+	if err := os.MkdirAll("data", os.ModePerm); err != nil {
+		logger.Log.Error("创建 data 目录失败", "err", err.Error())
+		panic("目录初始化失败")
+	}
 	dbPath := filepath.Join("data", "nodectl.db")
 
 	// 1. 打开 SQLite 数据库
