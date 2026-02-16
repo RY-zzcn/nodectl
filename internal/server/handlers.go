@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -540,7 +541,7 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 	database.DB.Where("key IN ?", []string{
 		"panel_url", "sub_token", "proxy_port_ss", "proxy_port_hy2", "proxy_port_tuic",
 		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
-		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass",
+		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "pref_use_emoji_flag",
 	}).Find(&configs)
 
 	data := make(map[string]string)
@@ -571,7 +572,7 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	validKeys := map[string]bool{
 		"panel_url": true, "sub_token": true, "proxy_port_ss": true, "proxy_port_hy2": true,
 		"proxy_port_tuic": true, "proxy_port_reality": true, "proxy_reality_sni": true,
-		"proxy_ss_method": true, "proxy_port_socks5": true, "proxy_socks5_user": true, "proxy_socks5_pass": true,
+		"proxy_ss_method": true, "proxy_port_socks5": true, "proxy_socks5_user": true, "proxy_socks5_pass": true, "pref_use_emoji_flag": true,
 	}
 
 	for k, v := range req {
@@ -645,4 +646,133 @@ func apiGetGeoStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// handlers.go 末尾追加
+
+// apiGetClashSettings 获取前端弹窗所需的数据
+func apiGetClashSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	activeModules := service.GetActiveClashModules()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"data": map[string]interface{}{
+			"all_modules":    service.SupportedClashModules,
+			"active_modules": activeModules,
+		},
+	})
+}
+
+// apiSaveClashSettings 保存前端提交的规则配置
+func apiSaveClashSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Modules []string `json:"modules"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "数据解析失败")
+		return
+	}
+
+	if err := service.SaveActiveClashModules(req.Modules); err != nil {
+		sendJSON(w, "error", "保存失败")
+		return
+	}
+
+	sendJSON(w, "success", "Clash 规则组合保存成功")
+}
+
+// 在 handlers.go 中补充以下代码
+
+// verifySubToken 辅助函数：校验请求中的 Token
+func verifySubToken(r *http.Request) bool {
+	token := r.URL.Query().Get("token")
+	var config database.SysConfig
+	database.DB.Where("key = ?", "sub_token").First(&config)
+	return token != "" && token == config.Value
+}
+
+// getBaseURL 获取当前请求的基础 URL (用于拼接内部订阅地址)
+func getBaseURL(r *http.Request) string {
+	var config database.SysConfig
+	database.DB.Where("key = ?", "panel_url").First(&config)
+	if config.Value != "" {
+		return strings.TrimRight(config.Value, "/")
+	}
+
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	host := r.Host
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+// apiSubClash 输出最终的 Clash 订阅模板
+func apiSubClash(w http.ResponseWriter, r *http.Request) {
+	if !verifySubToken(r) {
+		http.Error(w, "Invalid Token", http.StatusForbidden)
+		return
+	}
+
+	baseURL := getBaseURL(r)
+	token := r.URL.Query().Get("token")
+
+	// 构造发给 Clash 模板的内部抓取地址
+	// 注意：这里的 /sub/raw/1 对应直连(RoutingType=1)，/sub/raw/2 对应落地(RoutingType=2)
+	// 这个映射需要和你数据库的设计保持一致
+	relayURL := fmt.Sprintf("%s/sub/raw/2?token=%s", baseURL, token) // 中转/落地
+	exitURL := fmt.Sprintf("%s/sub/raw/1?token=%s", baseURL, token)  // 直连
+
+	// 调用上一节写的模板渲染函数
+	yamlContent, err := service.RenderClashConfig(relayURL, exitURL)
+	if err != nil {
+		http.Error(w, "模板生成失败", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="clash_meta_config.yaml"`)
+	w.Write([]byte(yamlContent))
+}
+
+// apiSubRaw 输出纯节点列表 (对应 Python 的 0.yaml 和 1.yaml)
+func apiSubRaw(w http.ResponseWriter, r *http.Request) {
+	if !verifySubToken(r) {
+		http.Error(w, "Invalid Token", http.StatusForbidden)
+		return
+	}
+
+	// 提取请求池类型 (1=直连, 2=落地)
+	pathParts := strings.Split(r.URL.Path, "/")
+	typeStr := pathParts[len(pathParts)-1]
+	routingType := 1
+	if typeStr == "2" {
+		routingType = 2
+	}
+
+	// [新增] 从数据库获取国旗偏好设置
+	var flagConfig database.SysConfig
+	database.DB.Where("key = ?", "pref_use_emoji_flag").First(&flagConfig)
+	useFlag := flagConfig.Value != "false" // 只要不是显式的 "false"，都默认为开启
+
+	// 传入 useFlag 参数进行渲染
+	yamlContent, err := service.GenerateRawNodesYAML(routingType, useFlag)
+	if err != nil {
+		http.Error(w, "节点生成失败", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
+	w.Write([]byte(yamlContent))
 }

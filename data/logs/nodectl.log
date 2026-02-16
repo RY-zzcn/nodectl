@@ -516,3 +516,18 @@ time="2026-02-16 21:40:48" level=INFO source=main.go:17 msg="Nodectl Core 正在
 time="2026-02-16 21:40:48" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
 time="2026-02-16 21:40:48" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
 time="2026-02-16 21:40:48" level=INFO source=internal/server/server.go:50 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-17 02:45:33" level=INFO source=internal/logger/logger.go:73 msg=日志组件初始化完成 模块=logger
+time="2026-02-17 02:45:34" level=INFO source=main.go:17 msg="Nodectl Core 正在启动" 版本号=dev
+time="2026-02-17 02:45:34" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-17 02:45:34" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
+time="2026-02-17 02:45:34" level=INFO source=internal/server/server.go:52 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-17 02:49:21" level=INFO source=internal/logger/logger.go:73 msg=日志组件初始化完成 模块=logger
+time="2026-02-17 02:49:21" level=INFO source=main.go:17 msg="Nodectl Core 正在启动" 版本号=dev
+time="2026-02-17 02:49:21" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-17 02:49:21" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
+time="2026-02-17 02:49:21" level=INFO source=internal/server/server.go:52 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-17 03:16:28" level=INFO source=internal/logger/logger.go:73 msg=日志组件初始化完成 模块=logger
+time="2026-02-17 03:16:28" level=INFO source=main.go:17 msg="Nodectl Core 正在启动" 版本号=dev
+time="2026-02-17 03:16:28" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-17 03:16:28" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
+time="2026-02-17 03:16:28" level=INFO source=internal/server/server.go:56 msg="Web 服务已启动" 地址=http://localhost:8080

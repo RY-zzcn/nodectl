@@ -36,10 +36,16 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/reorder-nodes", middleware.Auth(apiReorderNodes))
 	mux.HandleFunc("/api/get-settings", middleware.Auth(apiGetSettings))
 	mux.HandleFunc("/api/update-settings", middleware.Auth(apiUpdateSettings))
+	mux.HandleFunc("/api/clash/settings", middleware.Auth(apiGetClashSettings))
+	mux.HandleFunc("/api/clash/save", middleware.Auth(apiSaveClashSettings))
 
 	// [新增] 公开路由 (不需要 middleware.Auth)
 	mux.HandleFunc("/api/public/install-script", apiPublicScript) // 获取脚本
 	mux.HandleFunc("/api/callback/report", apiCallbackReport)     // 脚本上报
+	// [新增] 客户端订阅接口 (公开，依靠 URL Token 鉴权)
+	mux.HandleFunc("/sub/clash", apiSubClash)
+	mux.HandleFunc("/sub/raw/1", apiSubRaw) // 1=直连池
+	mux.HandleFunc("/sub/raw/2", apiSubRaw) // 2=落地池
 
 	// [新增] GeoIP 更新接口
 	mux.HandleFunc("/api/update-geoip", middleware.Auth(apiUpdateGeoIP))

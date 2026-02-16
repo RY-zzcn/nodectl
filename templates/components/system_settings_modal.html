@@ -167,6 +167,33 @@
         padding: 9px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s;
     }
     .btn-sys-save:hover { background: #0062cc; }
+
+
+    /* ================= iOS 风格开关 ================= */
+    .toggle-switch {
+        position: relative; display: inline-block; width: 44px; height: 24px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+        position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #e5e5ea; transition: .3s; border-radius: 24px;
+    }
+    .toggle-slider:before {
+        position: absolute; content: ""; height: 20px; width: 20px;
+        left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-slider { background-color: #34c759; }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+    
+    .pref-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 15px; background: #f9f9fc; border: 1px solid #eee; border-radius: 12px;
+        margin-bottom: 15px;
+    }
+    .pref-info { display: flex; flex-direction: column; gap: 4px; }
+    .pref-title { font-size: 14px; font-weight: 600; color: #333; }
+    .pref-desc { font-size: 12px; color: #888; }
 </style>
 
 <div class="sys-modal-overlay" id="systemSettingsModal">
@@ -198,12 +225,15 @@
             </div>
 
             <div id="tab-pref" class="sys-tab-content">
-                <div style="text-align: center; color: #999; padding-top: 50px;">
-                    <svg style="width: 48px; height: 48px; opacity: 0.2;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                    <p style="margin-top: 10px; font-size: 13px;">更多个性化设置即将推出...</p>
+                <div class="pref-row">
+                    <div class="pref-info">
+                        <span class="pref-title">🌍 节点名称显示国旗</span>
+                        <span class="pref-desc">在最终生成的订阅文件中，自动为节点名称添加国家 Emoji 前缀 (如 🇺🇸、🇭🇰)</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="sys_pref_flag" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
             </div>
 
@@ -269,8 +299,9 @@
 
         // 底部按钮控制
         const saveBtn = document.getElementById('btnSaveSys');
-        if (tabName === 'basic') {
+        if (tabName === 'basic' || tabName === 'pref') {
             saveBtn.style.display = 'block';
+            saveBtn.innerText = '保存设置'; // 统一文案
         } else {
             saveBtn.style.display = 'none';
         }
@@ -288,9 +319,8 @@
     async function openSystemSettingsModal() {
         sysModal.classList.add('active');
         switchSysTab('basic'); 
-
         hasCheckedGeo = false; 
-        renderGeoBtn('checking'); // 重置按钮为检查状态
+        renderGeoBtn('checking'); 
 
         try {
             const res = await fetch('/api/get-settings');
@@ -299,10 +329,12 @@
                 const data = result.data;
                 document.getElementById('sys_panel_url').value = data.panel_url || '';
                 document.getElementById('sys_sub_token').value = data.sub_token || '';
+                
+                // [新增] 读取开关状态 (默认为 true)
+                const useFlag = data.pref_use_emoji_flag !== 'false';
+                document.getElementById('sys_pref_flag').checked = useFlag;
             }
-        } catch(e) {
-            console.error("加载配置失败", e);
-        }
+        } catch(e) { console.error("加载配置失败", e); }
     }
 
     function closeSystemSettingsModal() {
@@ -418,7 +450,8 @@
     async function saveSystemSettings() {
         const payload = {
             "panel_url": document.getElementById('sys_panel_url').value.trim(),
-            "sub_token": document.getElementById('sys_sub_token').value.trim()
+            "sub_token": document.getElementById('sys_sub_token').value.trim(),
+            "pref_use_emoji_flag": document.getElementById('sys_pref_flag').checked ? "true" : "false"
         };
 
         if(!payload.sub_token) {

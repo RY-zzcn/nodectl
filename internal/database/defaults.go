@@ -34,7 +34,10 @@ func initBasicSettings() {
 
 	defaultConfigs := []SysConfig{
 		{Key: "panel_url", Value: "", Description: "面板外部访问地址"},
-		{Key: "sub_token", Value: defaultToken, Description: "订阅访问 Token"}, // [新增] 订阅 Token 初始化
+		{Key: "sub_token", Value: defaultToken, Description: "订阅访问 Token"},
+		// [新增] 初始化 Clash 分流规则的存储 Key
+		{Key: "clash_active_modules", Value: "", Description: "Clash 分流规则启用列表"},
+		{Key: "pref_use_emoji_flag", Value: "true", Description: "订阅节点是否添加国旗前缀"},
 	}
 
 	for _, config := range defaultConfigs {

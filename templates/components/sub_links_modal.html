@@ -1,0 +1,152 @@
+{{define "sub_links_modal.html"}}
+<style>
+    /* ================= 订阅链接弹窗专用样式 ================= */
+    .link-modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        z-index: 3000; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.3s ease;
+    }
+    .link-modal-overlay.active { display: flex; opacity: 1; }
+    
+    .link-modal-card {
+        background: #ffffff; width: 100%; max-width: 550px; border-radius: 16px; 
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        transform: scale(0.95); transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+    .link-modal-overlay.active .link-modal-card { transform: scale(1); }
+
+    .link-header { 
+        padding: 20px 25px 15px; border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between; align-items: center;
+    }
+    .link-title { font-size: 16px; font-weight: 700; color: #1d1d1f; display: flex; align-items: center; gap: 8px; }
+    .link-close { cursor: pointer; color: #999; transition: color 0.2s; background: none; border: none; padding: 5px; }
+    .link-close:hover { color: #333; }
+
+    .link-body { padding: 25px; overflow-y: auto; max-height: 60vh; background: #fafbfc; }
+
+    .sub-item-card {
+        background: white; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .sub-item-card:last-child { margin-bottom: 0; }
+    
+    .sub-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .sub-item-title { font-size: 14px; font-weight: 600; color: #333; }
+    .sub-item-desc { font-size: 12px; color: #888; }
+
+    .sub-input-group {
+        display: flex; gap: 8px; margin-top: 10px; background: #f5f5f7; padding: 6px; border-radius: 8px; border: 1px solid #e5e5ea;
+    }
+    .sub-input-group input {
+        flex: 1; border: none; background: transparent; font-family: monospace; font-size: 12px; color: #555; padding: 0 8px; outline: none;
+    }
+    .btn-copy-sub {
+        background: #007aff; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; white-space: nowrap;
+    }
+    .btn-copy-sub:hover { background: #0062cc; }
+    .btn-copy-sub.copied { background: #34c759; }
+</style>
+
+<div class="link-modal-overlay" id="subLinksModal">
+    <div class="link-modal-card">
+        <div class="link-header">
+            <div class="link-title">🔗 获取订阅链接</div>
+            <button class="link-close" onclick="closeSubLinksModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        
+        <div class="link-body" id="subLinksContainer">
+            <div style="text-align: center; color: #888; padding: 20px;">正在生成链接...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const subModal = document.getElementById('subLinksModal');
+
+    async function openSubLinksModal() {
+        subModal.classList.add('active');
+        const container = document.getElementById('subLinksContainer');
+        container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">正在加载配置...</div>';
+
+        try {
+            // 复用现有的获取系统配置 API
+            const res = await fetch('/api/get-settings');
+            const result = await res.json();
+            
+            if(result.status === 'success') {
+                const data = result.data;
+                const token = data.sub_token || '';
+                // 如果未设置面板 URL，则自动使用当前浏览器访问的地址
+                let baseUrl = data.panel_url ? data.panel_url.replace(/\/+$/, '') : window.location.origin;
+
+                const links = [
+                    {
+                        title: "😼 Clash Meta 订阅 (推荐)",
+                        desc: "包含完整分流规则与策略组的 YAML 配置文件",
+                        url: `${baseUrl}/sub/clash?token=${token}`
+                    },
+                    {
+                        title: "🎯 直连节点池 (Raw)",
+                        desc: "仅包含直连节点的 YAML 列表 (供外部工具引用)",
+                        url: `${baseUrl}/sub/raw/1?token=${token}`
+                    },
+                    {
+                        title: "🚀 落地节点池 (Raw)",
+                        desc: "仅包含落地节点的 YAML 列表 (供外部工具引用)",
+                        url: `${baseUrl}/sub/raw/2?token=${token}`
+                    }
+                ];
+
+                container.innerHTML = links.map((item, index) => `
+                    <div class="sub-item-card">
+                        <div class="sub-item-header">
+                            <span class="sub-item-title">${item.title}</span>
+                        </div>
+                        <div class="sub-item-desc">${item.desc}</div>
+                        <div class="sub-input-group">
+                            <input type="text" id="sub_link_${index}" value="${item.url}" readonly>
+                            <button class="btn-copy-sub" id="btn_copy_${index}" onclick="copySubLink('sub_link_${index}', 'btn_copy_${index}')">复制</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div style="text-align: center; color: #d74242; padding: 20px;">配置加载失败</div>';
+            }
+        } catch(e) {
+            container.innerHTML = '<div style="text-align: center; color: #d74242; padding: 20px;">网络异常，请稍后重试</div>';
+        }
+    }
+
+    function closeSubLinksModal() {
+        subModal.classList.remove('active');
+    }
+
+    function copySubLink(inputId, btnId) {
+        const input = document.getElementById(inputId);
+        const btn = document.getElementById(btnId);
+        
+        input.select();
+        input.setSelectionRange(0, 99999); // 兼容移动端
+        
+        try {
+            document.execCommand('copy');
+            const originalText = btn.innerText;
+            btn.innerText = '已复制!';
+            btn.classList.add('copied');
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove('copied');
+            }, 2000);
+        } catch (err) {
+            alert('复制失败，请手动选择文本复制');
+        }
+        // 清除选中状态
+        window.getSelection().removeAllRanges();
+    }
+</script>
+{{end}}

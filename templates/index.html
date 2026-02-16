@@ -468,8 +468,8 @@
             /* 3. 快捷规则按钮保持一行四列，缩小间隙 */
             .rule-actions { 
                 display: grid; 
-                grid-template-columns: repeat(4, 1fr); 
-                gap: 8px; 
+                grid-template-columns: repeat(5, 1fr); /* [修改] 原为 4，现改为 5 */
+                gap: 6px; /* [修改] 稍微把间隙缩小以容纳更多按钮 */
             }
             
             /* 4. 页面内容两侧缩减留白 */
@@ -767,9 +767,10 @@
                     <a href="/editor/direct" class="btn-edit-rule"><span class="rule-icon">🎯</span><span class="rule-name">直连规则</span></a>
                     <a href="/editor/outbound" class="btn-edit-rule"><span class="rule-icon">⚡</span><span class="rule-name">自定义出站</span></a>
                     
-                    <a href="javascript:void(0)" onclick="openGlobalSettingsModal()" class="btn-edit-rule"><span class="rule-icon">📜</span><span class="rule-name">SingBox 配置</span></a>
+                    <a href="javascript:void(0)" onclick="openGlobalSettingsModal()" class="btn-edit-rule"><span class="rule-icon">📜</span><span class="rule-name">SingBox</span></a>
                     
-                    <a href="/editor/clash" class="btn-edit-rule"><span class="rule-icon">⚙️</span><span class="rule-name">Clash 模板</span></a>
+                    <a href="javascript:void(0)" onclick="openClashModal()" class="btn-edit-rule"><span class="rule-icon">⚙️</span><span class="rule-name">Clash 模板</span></a>
+                    <a href="javascript:void(0)" onclick="openSubLinksModal()" class="btn-edit-rule"><span class="rule-icon">🔗</span><span class="rule-name">订阅链接</span></a>
                 </div>
                 <p style="text-align: center; font-size: 12px; color: #999; margin-top: 15px;">
                     点击图标在线编辑分流规则、脚本或配置文件模板
@@ -1082,6 +1083,7 @@
     {{template "global_settings_modal.html" .}}
     {{template "system_settings_modal.html" .}}
     {{template "update_modal.html" .}}
-
+    {{template "clash_template_modal.html" .}}
+    {{template "sub_links_modal.html" .}}
 </body>
 </html>

@@ -1,0 +1,76 @@
+<div id="clashTemplateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; width: 90%; max-width: 500px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+        <h3 style="margin-bottom: 20px; color: #333; display: flex; align-items: center; gap: 8px;">
+            ⚙️ Clash 分流规则组合
+        </h3>
+        
+        <p style="font-size: 13px; color: #666; margin-bottom: 15px;">请勾选你想要在最终订阅文件中启用的分流规则组：</p>
+        
+        <div id="clashModulesContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-height: 400px; overflow-y: auto; padding: 10px 5px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 20px;">
+            </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="closeClashModal()" style="padding: 8px 16px; border-radius: 6px; border: 1px solid #ccc; background: white; cursor: pointer;">取消</button>
+            <button onclick="saveClashSettings()" style="padding: 8px 16px; border-radius: 6px; border: none; background: #007aff; color: white; cursor: pointer;">保存配置</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function openClashModal() {
+        document.getElementById('clashTemplateModal').style.display = 'flex';
+        try {
+            const res = await fetch('/api/clash/settings');
+            const result = await res.json();
+            if (result.status === 'success') {
+                renderClashModules(result.data.all_modules, result.data.active_modules);
+            }
+        } catch (e) {
+            alert('加载规则列表失败');
+        }
+    }
+
+    function closeClashModal() {
+        document.getElementById('clashTemplateModal').style.display = 'none';
+    }
+
+    function renderClashModules(allModules, activeModules) {
+        const container = document.getElementById('clashModulesContainer');
+        container.innerHTML = '';
+        
+        const activeSet = new Set(activeModules || []);
+
+        allModules.forEach(mod => {
+            const isChecked = activeSet.has(mod.id) ? 'checked' : '';
+            const html = `
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; padding: 8px; background: #f9f9fc; border-radius: 6px; border: 1px solid #e1e1e8;">
+                    <input type="checkbox" class="clash-module-cb" value="${mod.id}" ${isChecked}>
+                    <span>${mod.icon} ${mod.name}</span>
+                </label>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    async function saveClashSettings() {
+        const checkboxes = document.querySelectorAll('.clash-module-cb:checked');
+        const selectedModules = Array.from(checkboxes).map(cb => cb.value);
+
+        try {
+            const res = await fetch('/api/clash/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modules: selectedModules })
+            });
+            const result = await res.json();
+            if (result.status === 'success') {
+                alert('保存成功！');
+                closeClashModal();
+            } else {
+                alert('保存失败: ' + result.message);
+            }
+        } catch (e) {
+            alert('网络错误');
+        }
+    }
+</script>
