@@ -1,0 +1,270 @@
+{{define "update_modal.html"}}
+<style>
+    /* 更新弹窗遮罩与容器 */
+    .update-modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.4); 
+        backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        z-index: 4000; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.3s ease;
+    }
+    .update-modal-overlay.active { display: flex; opacity: 1; }
+    
+    .update-modal-card {
+        background: #ffffff; width: 100%; max-width: 500px; 
+        border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        transform: scale(0.95); transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        display: flex; flex-direction: column; max-height: 80vh; overflow: hidden;
+    }
+    .update-modal-overlay.active .update-modal-card { transform: scale(1); }
+
+    .update-header {
+        padding: 20px 25px 15px; border-bottom: 1px solid #f0f0f5;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .update-title { font-size: 18px; color: #1d1d1f; font-weight: 700; display: flex; align-items: center; gap: 8px;}
+    
+    .update-close-btn {
+        background: transparent; border: none; color: #86868b;
+        cursor: pointer; padding: 4px; border-radius: 6px; display: flex; transition: 0.2s;
+    }
+    .update-close-btn:hover { background: #e5e5ea; color: #1d1d1f; }
+
+    /* 更新日志区域 */
+    .update-body {
+        padding: 0; flex: 1; overflow-y: auto;
+        scrollbar-width: thin; scrollbar-color: #e5e5ea transparent;
+    }
+    .update-body::-webkit-scrollbar { width: 6px; }
+    .update-body::-webkit-scrollbar-thumb { background: #e5e5ea; border-radius: 4px; }
+
+    .release-item {
+        padding: 20px 25px; border-bottom: 1px solid #f5f5f7;
+    }
+    .release-item:last-child { border-bottom: none; }
+    
+    .release-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+    }
+    .release-version { font-size: 16px; font-weight: 700; color: #007aff; }
+    .release-date { font-size: 12px; color: #86868b; }
+    
+    .release-body {
+        font-size: 13px; color: #333; line-height: 1.6;
+        white-space: pre-wrap; word-wrap: break-word;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    
+    /* 顶部版本标签样式 */
+    .top-version-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: #f0f0f5; color: #555; padding: 4px 10px;
+        border-radius: 20px; font-size: 12px; font-weight: 600;
+        cursor: pointer; transition: all 0.2s; user-select: none;
+        margin-left: 10px; vertical-align: middle;
+    }
+    .top-version-badge:hover { background: #e5e5ea; }
+    
+    /* 有更新时的红底样式 */
+    .top-version-badge.has-update {
+        background: #fff0f0; color: #d73a49; border: 1px solid #ffdfdf;
+    }
+    .top-version-badge.has-update:hover { background: #ffe5e5; }
+    
+    .update-arrow-icon {
+        display: none; animation: floatUp 1.5s ease-in-out infinite;
+    }
+    .top-version-badge.has-update .update-arrow-icon { display: flex; }
+
+    @keyframes floatUp {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+    }
+    
+    /* 底部加载指示器 */
+    .update-loading { padding: 20px; text-align: center; color: #86868b; font-size: 12px; line-height: 1.6;}
+</style>
+
+<div class="update-modal-overlay" id="updateModal">
+    <div class="update-modal-card">
+        <div class="update-header">
+            <div class="update-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#007aff;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                更新日志
+            </div>
+            <button class="update-close-btn" onclick="closeUpdateModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        
+        <div class="update-body" id="updateBody">
+            <div id="releaseList"></div>
+            <div id="loadingStatus" class="update-loading" style="display: none;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const GITHUB_API_BASE = "https://api.github.com/repos/hobin66/nodectl/releases";
+    
+    // 获取后端原始版本号，并处理开发环境的默认值
+    let RAW_VERSION = "{{.Version}}";
+    if (RAW_VERSION === "dev" || RAW_VERSION === "") {
+        RAW_VERSION = "dev";
+    }
+    // 全局清洗：强制移除版本号开头的 v
+    const DISPLAY_VERSION = RAW_VERSION.replace(/^v/, '');
+
+    // 分页与滚动状态管理
+    let currentPage = 1;
+    let hasMore = true;
+    let isFetching = false;
+    let allReleases = [];
+
+    // 语义化对比核心逻辑 (内部自动忽略 v 前缀)
+    function isNewVersionAvailable(current, latest) {
+        if (!current || !latest) return false;
+        const cleanCurrent = current.replace(/^v/, '');
+        const cleanLatest = latest.replace(/^v/, '');
+        const curParts = cleanCurrent.split('.').map(Number);
+        const latParts = cleanLatest.split('.').map(Number);
+        for (let i = 0; i < Math.max(curParts.length, latParts.length); i++) {
+            const curVal = curParts[i] || 0;
+            const latVal = latParts[i] || 0;
+            if (latVal > curVal) return true; 
+            if (latVal < curVal) return false;
+        }
+        return false;
+    }
+
+    async function loadReleases(page) {
+        if (isFetching || !hasMore) return;
+        isFetching = true;
+
+        const statusEl = document.getElementById('loadingStatus');
+        statusEl.style.display = "block";
+        statusEl.innerHTML = page === 1 ? "正在拉取数据..." : "正在加载历史记录...";
+
+        try {
+            const res = await fetch(`${GITHUB_API_BASE}?per_page=3&page=${page}`);
+            
+            if (!res.ok) {
+                if (res.status === 403) statusEl.innerHTML = "请求过于频繁 (触发防刷限制)，请稍后再试。";
+                else if (res.status === 404) statusEl.innerHTML = "未找到发布记录。";
+                else statusEl.innerHTML = `请求失败: HTTP ${res.status}`;
+                hasMore = false;
+                return;
+            }
+            
+            const data = await res.json();
+            
+            if (data.length < 3) hasMore = false;
+
+            if (data.length === 0 && page === 1) {
+                statusEl.innerHTML = `目前没有任何版本更新记录<br><span style="font-size:11px;color:#aaa;">(GitHub 仓库中尚未发布正式的 Release)</span>`;
+                return;
+            }
+
+            allReleases = allReleases.concat(data);
+
+            if (page === 1 && data.length > 0) {
+                const latestRelease = data[0];
+                if (isNewVersionAvailable(RAW_VERSION, latestRelease.tag_name)) {
+                    const badge = document.getElementById('topVersionBadge');
+                    if (badge) {
+                        badge.classList.add('has-update');
+                        const cleanLatest = latestRelease.tag_name.replace(/^v/, '');
+                        badge.title = "发现新版本: " + cleanLatest + "，点击查看";
+                    }
+                }
+            }
+
+            renderAppend(data);
+
+            if (hasMore) {
+                statusEl.innerHTML = "下滑加载更多历史记录...";
+            } else {
+                statusEl.innerHTML = "已经到底啦，没有更多更新记录了";
+            }
+            currentPage++;
+
+        } catch (e) {
+            console.error("加载更新失败:", e);
+            statusEl.innerHTML = "网络连接失败，无法连接到 GitHub API。";
+            hasMore = false;
+        } finally {
+            isFetching = false;
+        }
+    }
+
+    function parseReleaseBody(body) {
+        if (!body) return "无详细更新说明";
+        let html = body.replace(/### (.*)/g, '<strong>$1</strong>');
+        html = html.replace(/## (.*)/g, '<strong style="font-size:14px;color:#1d1d1f;">$1</strong>');
+        html = html.replace(/^\* (.*)/gm, '• $1');
+        html = html.replace(/^- (.*)/gm, '• $1');
+        return html;
+    }
+
+    function renderAppend(items) {
+        const list = document.getElementById('releaseList');
+        let html = "";
+        items.forEach(release => {
+            const date = new Date(release.published_at).toLocaleDateString();
+            const displayName = (release.name && release.name !== release.tag_name) ? ` - ${release.name}` : '';
+            // 清洗：去除列表中版本号开头的 v
+            const displayTag = release.tag_name.replace(/^v/, ''); 
+            
+            html += `
+                <div class="release-item">
+                    <div class="release-header">
+                        <span class="release-version">${displayTag}${displayName}</span>
+                        <span class="release-date">${date}</span>
+                    </div>
+                    <div class="release-body">${parseReleaseBody(release.body)}</div>
+                </div>
+            `;
+        });
+        list.insertAdjacentHTML('beforeend', html);
+    }
+
+    function openUpdateModal() {
+        document.getElementById('updateModal').classList.add('active');
+        if (allReleases.length === 0 && !isFetching && hasMore) {
+            loadReleases(currentPage);
+        }
+    }
+
+    function closeUpdateModal() {
+        document.getElementById('updateModal').classList.remove('active');
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // [核心改动] 强制覆盖顶部徽章里的文字为 "无 v" 版本的数字
+        const badge = document.getElementById('topVersionBadge');
+        if (badge) {
+            for (let node of badge.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== "") {
+                    node.nodeValue = DISPLAY_VERSION + " ";
+                    break;
+                }
+            }
+            // 同步修改未触发更新时的悬浮提示文本
+            if (!badge.classList.contains('has-update')) {
+                badge.title = "当前版本: " + DISPLAY_VERSION;
+            }
+        }
+
+        const bodyContainer = document.getElementById('updateBody');
+        if (bodyContainer) {
+            bodyContainer.addEventListener('scroll', function() {
+                if (this.scrollTop + this.clientHeight >= this.scrollHeight - 20) {
+                    if (hasMore && !isFetching) loadReleases(currentPage);
+                }
+            });
+        }
+
+        setTimeout(() => loadReleases(1), 1000);
+    });
+</script>
+{{end}}
