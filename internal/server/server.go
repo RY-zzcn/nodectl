@@ -27,9 +27,17 @@ func Start(tmplFS embed.FS) {
 
 	// ========== API 路由 (API Routes) ==========
 	mux.HandleFunc("/api/change-password", middleware.Auth(apiChangePassword))
+	mux.HandleFunc("/api/update-node", middleware.Auth(apiUpdateNode))
 	mux.HandleFunc("/api/add-node", middleware.Auth(apiAddNode))
 	mux.HandleFunc("/api/get-nodes", middleware.Auth(apiGetNodes))
 	mux.HandleFunc("/api/delete-node", middleware.Auth(apiDeleteNode))
+	mux.HandleFunc("/api/reorder-nodes", middleware.Auth(apiReorderNodes))
+	mux.HandleFunc("/api/get-settings", middleware.Auth(apiGetSettings))
+	mux.HandleFunc("/api/update-settings", middleware.Auth(apiUpdateSettings))
+
+	// [新增] 公开路由 (不需要 middleware.Auth)
+	mux.HandleFunc("/api/public/install-script", apiPublicScript) // 获取脚本
+	mux.HandleFunc("/api/callback/report", apiCallbackReport)     // 脚本上报
 
 	// 3. 启动服务
 	port := "8080"

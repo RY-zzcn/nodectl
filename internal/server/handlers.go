@@ -93,8 +93,49 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data := map[string]interface{}{"Title": "Nodectl 总览"}
+	// SupportedProtocols 注入到模板数据中
+	data := map[string]interface{}{
+		"Title":     "Nodectl 总览",
+		"Protocols": database.SupportedProtocols,
+	}
 	tmpl.ExecuteTemplate(w, "index.html", data)
+}
+
+func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		UUID          string            `json:"uuid"`
+		Name          string            `json:"name"`
+		RoutingType   int               `json:"routing_type"`
+		IsBlocked     bool              `json:"is_blocked"`
+		Links         map[string]string `json:"links"`
+		DisabledLinks []string          `json:"disabled_links"` // [新增] 接收前端传来的禁用列表
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+
+	if req.UUID == "" {
+		sendJSON(w, "error", "节点 UUID 不能为空")
+		return
+	}
+
+	// [修改] 调用 Service 时传入 req.DisabledLinks
+	err := service.UpdateNode(req.UUID, req.Name, req.RoutingType, req.Links, req.IsBlocked, req.DisabledLinks)
+	if err != nil {
+		logger.Log.Error("更新节点失败", "err", err.Error())
+		sendJSON(w, "error", "数据库更新失败")
+		return
+	}
+
+	logger.Log.Info("节点更新成功", "UUID", req.UUID)
+	sendJSON(w, "success", "节点更新成功")
 }
 
 // logoutHandler 处理安全退出逻辑
@@ -217,21 +258,52 @@ func apiGetNodes(w http.ResponseWriter, r *http.Request) {
 	var directNodes []database.NodePool
 	var landNodes []database.NodePool
 
-	// 按时间倒序查询
-	database.DB.Where("routing_type = ?", 1).Order("created_at DESC").Find(&directNodes)
-	database.DB.Where("routing_type = ?", 2).Order("created_at DESC").Find(&landNodes)
+	database.DB.Where("routing_type = ?", 1).Order("sort_index ASC, created_at DESC").Find(&directNodes)
+	database.DB.Where("routing_type = ?", 2).Order("sort_index ASC, created_at DESC").Find(&landNodes)
 
-	// 构建返回的 JSON 结构
+	// [新增] 顺便获取面板 URL 传给前端，供安装脚本拼接使用
+	var panelURLConfig database.SysConfig
+	database.DB.Where("key = ?", "panel_url").First(&panelURLConfig)
+
 	response := map[string]interface{}{
 		"status": "success",
 		"data": map[string]interface{}{
 			"direct_nodes": directNodes,
 			"land_nodes":   landNodes,
+			"panel_url":    panelURLConfig.Value, // [新增字段]
 		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// [新增] apiReorderNodes 处理拖拽排序和分组切换
+func apiReorderNodes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 接收数据：目标分组 ID 和该分组内所有节点 UUID 的新顺序
+	var req struct {
+		TargetRoutingType int      `json:"target_routing_type"`
+		NodeUUIDs         []string `json:"node_uuids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+
+	// 调用 Service 更新顺序
+	err := service.ReorderNodes(req.TargetRoutingType, req.NodeUUIDs)
+	if err != nil {
+		logger.Log.Error("更新排序失败", "err", err.Error())
+		sendJSON(w, "error", "保存排序失败")
+		return
+	}
+
+	sendJSON(w, "success", "排序已更新")
 }
 
 // apiDeleteNode 接收 JSON 请求，处理删除节点操作
@@ -266,4 +338,107 @@ func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("节点已删除", "UUID", req.UUID)
 	sendJSON(w, "success", "节点已删除")
+}
+
+// [修改] apiPublicScript 返回渲染后的安装脚本
+func apiPublicScript(w http.ResponseWriter, r *http.Request) {
+	// 调用 Service 层进行模板渲染 (填充端口等信息)
+	scriptContent, err := service.RenderInstallScript()
+	if err != nil {
+		logger.Log.Error("脚本渲染失败", "err", err.Error())
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(scriptContent))
+}
+
+// [新增] apiCallbackReport 处理节点上报 (无需 Cookie，靠 install_id 鉴权)
+func apiCallbackReport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 定义上报的数据结构
+	var report struct {
+		InstallID string `json:"install_id"`
+		// 你可以根据脚本上报的内容增加字段，比如 IPv4, Version 等
+		// IPV4 string `json:"ipv4"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
+		sendJSON(w, "error", "数据格式错误")
+		return
+	}
+
+	if report.InstallID == "" {
+		sendJSON(w, "error", "缺少 InstallID")
+		return
+	}
+
+	// 验证 InstallID 是否存在
+	var node database.NodePool
+	if err := database.DB.Where("install_id = ?", report.InstallID).First(&node).Error; err != nil {
+		sendJSON(w, "error", "无效的 InstallID")
+		return
+	}
+
+	// 更新逻辑 (示例：更新最后在线时间，或者 IP)
+	// database.DB.Model(&node).Update("updated_at", time.Now())
+
+	sendJSON(w, "success", "上报成功")
+}
+
+// [新增] apiGetSettings 获取全局节点代理设置
+func apiGetSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var configs []database.SysConfig
+	database.DB.Where("key IN ?", []string{
+		"panel_url", "proxy_port_ss", "proxy_port_hy2", "proxy_port_tuic",
+		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
+		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass",
+	}).Find(&configs)
+
+	data := make(map[string]string)
+	for _, c := range configs {
+		data[c.Key] = c.Value
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"data":   data,
+	})
+}
+
+// [新增] apiUpdateSettings 保存全局节点代理设置
+func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+
+	// 遍历保存，增加简单的白名单过滤防止污染数据库其他配置项
+	validKeys := map[string]bool{
+		"panel_url": true, "proxy_port_ss": true, "proxy_port_hy2": true,
+		"proxy_port_tuic": true, "proxy_port_reality": true, "proxy_reality_sni": true,
+		"proxy_ss_method": true, "proxy_port_socks5": true, "proxy_socks5_user": true, "proxy_socks5_pass": true,
+	}
+
+	for k, v := range req {
+		if validKeys[k] {
+			database.DB.Model(&database.SysConfig{}).Where("key = ?", k).Update("value", v)
+		}
+	}
+	sendJSON(w, "success", "设置已保存")
 }

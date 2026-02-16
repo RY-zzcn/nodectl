@@ -287,3 +287,133 @@ time="2026-02-16 08:25:08" level=INFO source=internal/database/database.go:116 m
 time="2026-02-16 08:25:08" level=INFO source=internal/server/server.go:36 msg="Web 服务已启动" 地址=http://localhost:8080
 time="2026-02-16 08:25:28" level=INFO source=internal/server/handlers.go:206 msg=节点添加成功 Name=node-5cib RoutingType=1
 time="2026-02-16 08:25:32" level=INFO source=internal/server/handlers.go:206 msg=节点添加成功 Name=node-z8wr RoutingType=1
+time="2026-02-16 08:37:48" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 08:37:48" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 08:37:48" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 08:39:39" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 08:39:39" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 08:39:39" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 08:39:48" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 09:58:19" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 09:58:19" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 09:58:19" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 09:59:03" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:26:51" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 10:26:51" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 10:26:51" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 10:26:56" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:27:40" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:29:42" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 10:29:42" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 10:29:42" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 10:29:47" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:29:49" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:30:24" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:30:28" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:30:39" level=ERROR source=internal/server/handlers.go:128 msg=更新节点失败 err="sql: converting argument $1 type: unsupported type map[string]string, a map"
+time="2026-02-16 10:31:58" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 10:31:58" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 10:31:58" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 10:32:02" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=404c6b8f-28c6-4d38-b8a6-51736647a6c9
+time="2026-02-16 10:32:38" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=09b3e6e1-c025-47d6-b32c-5a28f4c0c3a9
+time="2026-02-16 10:32:40" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=789d7ca8-e933-4914-aad1-ae76530ed278
+time="2026-02-16 10:32:42" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=9f5b1fe8-4558-4a76-a113-c007ed96c289
+time="2026-02-16 10:32:49" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=404c6b8f-28c6-4d38-b8a6-51736647a6c9
+time="2026-02-16 10:33:25" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 10:33:25" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 10:33:25" level=INFO source=internal/server/server.go:37 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 10:33:43" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=789d7ca8-e933-4914-aad1-ae76530ed278
+time="2026-02-16 10:33:45" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=09b3e6e1-c025-47d6-b32c-5a28f4c0c3a9
+time="2026-02-16 10:33:46" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=9f5b1fe8-4558-4a76-a113-c007ed96c289
+time="2026-02-16 10:44:20" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 10:44:20" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 10:44:20" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 10:45:06" level=INFO source=internal/server/handlers.go:133 msg=节点更新成功 UUID=9f5b1fe8-4558-4a76-a113-c007ed96c289
+time="2026-02-16 10:49:27" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-inhi RoutingType=1
+time="2026-02-16 10:49:29" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-g9fq RoutingType=1
+time="2026-02-16 10:49:31" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-2mbc RoutingType=1
+time="2026-02-16 10:49:34" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-p4p2 RoutingType=1
+time="2026-02-16 10:49:36" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-dj8g RoutingType=1
+time="2026-02-16 10:49:41" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-zcn1 RoutingType=2
+time="2026-02-16 10:49:44" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-2zx7 RoutingType=2
+time="2026-02-16 10:49:46" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-46xu RoutingType=2
+time="2026-02-16 10:51:00" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 10:51:00" level=INFO source=internal/database/database.go:116 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 10:51:00" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 10:53:11" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-gjcx RoutingType=1
+time="2026-02-16 10:53:16" level=INFO source=internal/server/handlers.go:335 msg=节点已删除 UUID=09b3e6e1-c025-47d6-b32c-5a28f4c0c3a9
+time="2026-02-16 10:53:18" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-ln5a RoutingType=1
+time="2026-02-16 10:53:23" level=INFO source=internal/server/handlers.go:243 msg=节点添加成功 Name=node-zid2 RoutingType=1
+time="2026-02-16 11:14:11" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:14:11" level=INFO source=internal/database/database.go:117 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:14:11" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:14:18" level=INFO source=internal/server/handlers.go:134 msg=节点更新成功 UUID=c96304a2-165e-47bc-bae1-09ec74ca09bc
+time="2026-02-16 11:17:31" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:17:31" level=INFO source=internal/database/database.go:117 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:17:31" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:17:36" level=INFO source=internal/server/handlers.go:134 msg=节点更新成功 UUID=1791a6a5-b09b-439e-8ef3-88469a942389
+time="2026-02-16 11:17:42" level=INFO source=internal/server/handlers.go:134 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:23:06" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:23:06" level=INFO source=internal/database/database.go:117 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:23:06" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:23:26" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:23:26" level=INFO source=internal/database/database.go:117 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:23:26" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:23:54" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:23:54" level=INFO source=internal/database/database.go:117 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:23:54" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:39:22" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:39:23" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:39:23" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:39:58" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:40:09" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:45:13" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:45:13" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:45:13" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:45:29" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:45:38" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:48:07" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:51:45" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:51:45" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:51:45" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:53:06" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:53:09" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:53:51" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:58:23" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 11:58:23" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 11:58:23" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 11:58:30" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:58:33" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 11:58:46" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 12:00:13" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 12:00:41" level=INFO source=internal/server/handlers.go:137 msg=节点更新成功 UUID=d16227a6-c906-4432-974c-08befef08979
+time="2026-02-16 12:05:33" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 12:05:33" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 12:05:33" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 12:09:50" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 12:09:50" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 12:09:50" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 12:15:37" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 12:15:37" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 12:15:37" level=INFO source=internal/server/server.go:38 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 13:11:05" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 13:11:05" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 13:11:05" level=INFO source=internal/server/server.go:42 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 13:11:25" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 13:11:25" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 13:11:25" level=INFO source=internal/server/server.go:42 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 13:11:38" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 13:11:38" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 13:11:38" level=INFO source=internal/server/server.go:42 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 13:17:47" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 13:17:47" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 13:17:47" level=INFO source=internal/server/server.go:42 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 13:54:52" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 13:54:52" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 13:54:52" level=INFO source=internal/server/server.go:42 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 14:17:05" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 14:17:05" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 14:17:05" level=INFO source=internal/server/server.go:42 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-16 14:37:41" level=INFO source=internal/logger/logger.go:67 msg=日志组件初始化完成 模块=logger
+time="2026-02-16 14:37:41" level=INFO source=internal/database/database.go:118 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-16 14:37:41" level=INFO source=internal/server/server.go:44 msg="Web 服务已启动" 地址=http://localhost:8080

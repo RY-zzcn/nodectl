@@ -1,0 +1,250 @@
+{{define "global_settings_modal.html"}}
+<style>
+    .gs-modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.4); 
+        backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        z-index: 3000; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.2s ease;
+    }
+    .gs-modal-overlay.active { display: flex; opacity: 1; }
+    
+    .gs-modal-card {
+        background: #ffffff; width: 100%; max-width: 650px; 
+        border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        transform: scale(0.95); transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        border: 1px solid #e5e5ea; display: flex; flex-direction: column;
+        max-height: 90vh; /* 防止内容过长超出屏幕 */
+    }
+    .gs-modal-overlay.active .gs-modal-card { transform: scale(1); }
+
+    .gs-header {
+        padding: 16px 20px; border-bottom: 1px solid #f0f0f5;
+        display: flex; justify-content: space-between; align-items: center;
+        background: #fafbfc; border-radius: 12px 12px 0 0;
+    }
+
+    .gs-title { font-size: 16px; color: #1d1d1f; font-weight: 600; display: flex; align-items: center; gap: 8px;}
+    
+    .gs-close-btn {
+        background: transparent; border: none; color: #86868b;
+        cursor: pointer; padding: 4px; border-radius: 6px; display: flex; transition: 0.2s;
+    }
+    .gs-close-btn:hover { background: #e5e5ea; color: #1d1d1f; }
+
+    .gs-body { 
+        padding: 20px; background: #ffffff; 
+        overflow-y: auto; flex: 1;
+    }
+
+    /* 设置组样式 */
+    .gs-group {
+        border: 1px solid #e5e5ea; border-radius: 8px;
+        padding: 16px; margin-bottom: 16px; background: #fafbfc;
+    }
+    .gs-group-title {
+        font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .gs-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+    .gs-input-box { display: flex; flex-direction: column; gap: 6px; }
+    .gs-input-box label { font-size: 12px; color: #666; font-weight: 500;}
+    .gs-input-box input {
+        padding: 8px 12px; border: 1px solid #d1d1d6; border-radius: 6px;
+        font-size: 13px; color: #1d1d1f; transition: border-color 0.2s;
+    }
+    .gs-input-box input:focus { border-color: #007aff; outline: none; }
+
+    .gs-footer {
+        padding: 16px 20px; border-top: 1px solid #f0f0f5;
+        display: flex; justify-content: flex-end; gap: 12px; background: #fafbfc;
+        border-radius: 0 0 12px 12px;
+    }
+    
+    .btn-gs-save {
+        background: #007aff; color: #fff; border: none; padding: 8px 24px; 
+        border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s;
+    }
+    .btn-gs-save:hover { background: #0062cc; }
+    .btn-gs-cancel {
+        background: #fff; color: #555; border: 1px solid #d1d5da;
+        padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s;
+    }
+    .btn-gs-cancel:hover { background: #f6f8fa; color: #333; }
+
+    @media (max-width: 600px) {
+        .gs-grid-2 { grid-template-columns: 1fr; gap: 10px;}
+        .gs-body { padding: 15px; }
+    }
+</style>
+
+<div class="gs-modal-overlay" id="globalSettingsModal">
+    <div class="gs-modal-card">
+        <div class="gs-header">
+            <div class="gs-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #007aff;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                全局节点参数配置
+            </div>
+            <button class="gs-close-btn" onclick="closeGlobalSettingsModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        
+        <div class="gs-body">
+            <div class="gs-group">
+                <div class="gs-group-title">🔗 核心互联配置</div>
+                <div class="gs-input-box">
+                    <label>面板外部访问地址 (用于下发节点一键安装命令时的状态上报)</label>
+                    <input type="text" id="gs_panel_url" placeholder="例如: https://www.yourdomain.com:8092">
+                </div>
+            </div>
+
+            <div class="gs-group">
+                <div class="gs-group-title">🔹 VLESS Reality 默认配置</div>
+                <div class="gs-grid-2">
+                    <div class="gs-input-box">
+                        <label>默认监听端口</label>
+                        <input type="number" id="gs_proxy_port_reality" placeholder="20004">
+                    </div>
+                    <div class="gs-input-box">
+                        <label>目标 SNI 域名 (回源伪装)</label>
+                        <input type="text" id="gs_proxy_reality_sni" placeholder="www.bing.com">
+                    </div>
+                </div>
+            </div>
+
+            <div class="gs-group">
+                <div class="gs-group-title">🔹 Shadowsocks 默认配置</div>
+                <div class="gs-grid-2">
+                    <div class="gs-input-box">
+                        <label>默认监听端口</label>
+                        <input type="number" id="gs_proxy_port_ss" placeholder="20001">
+                    </div>
+                    <div class="gs-input-box">
+                        <label>加密方式</label>
+                        <input type="text" id="gs_proxy_ss_method" placeholder="aes-128-gcm">
+                    </div>
+                </div>
+            </div>
+
+            <div class="gs-group">
+                <div class="gs-group-title">🔹 Hysteria2 & TUIC 默认配置</div>
+                <div class="gs-grid-2">
+                    <div class="gs-input-box">
+                        <label>HY2 默认监听端口 (UDP)</label>
+                        <input type="number" id="gs_proxy_port_hy2" placeholder="20002">
+                    </div>
+                    <div class="gs-input-box">
+                        <label>TUIC 默认监听端口 (UDP)</label>
+                        <input type="number" id="gs_proxy_port_tuic" placeholder="20003">
+                    </div>
+                </div>
+            </div>
+
+            <div class="gs-group">
+                <div class="gs-group-title">🔹 SOCKS5 默认配置</div>
+                <div class="gs-grid-2" style="grid-template-columns: 0.8fr 1fr 1fr;">
+                    <div class="gs-input-box">
+                        <label>默认监听端口</label>
+                        <input type="number" id="gs_proxy_port_socks5" placeholder="20005">
+                    </div>
+                    <div class="gs-input-box">
+                        <label>默认用户名</label>
+                        <input type="text" id="gs_proxy_socks5_user" placeholder="admin">
+                    </div>
+                    <div class="gs-input-box">
+                        <label>默认密码</label>
+                        <input type="text" id="gs_proxy_socks5_pass" placeholder="123456">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="gs-footer">
+            <button class="btn-gs-cancel" onclick="closeGlobalSettingsModal()">取消</button>
+            <button class="btn-gs-save" onclick="saveGlobalSettings()" id="btnSaveGs">保存配置</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const gsModal = document.getElementById('globalSettingsModal');
+
+    // 打开配置弹窗并从后端加载数据
+    async function openGlobalSettingsModal() {
+        gsModal.classList.add('active');
+        const btnSave = document.getElementById('btnSaveGs');
+        btnSave.innerText = "加载中...";
+        btnSave.disabled = true;
+
+        try {
+            const res = await fetch('/api/get-settings');
+            const result = await res.json();
+            if(result.status === 'success') {
+                const data = result.data;
+                document.getElementById('gs_panel_url').value = data.panel_url || '';
+                document.getElementById('gs_proxy_port_ss').value = data.proxy_port_ss || '';
+                document.getElementById('gs_proxy_ss_method').value = data.proxy_ss_method || '';
+                document.getElementById('gs_proxy_port_hy2').value = data.proxy_port_hy2 || '';
+                document.getElementById('gs_proxy_port_tuic').value = data.proxy_port_tuic || '';
+                document.getElementById('gs_proxy_port_reality').value = data.proxy_port_reality || '';
+                document.getElementById('gs_proxy_reality_sni').value = data.proxy_reality_sni || '';
+                document.getElementById('gs_proxy_port_socks5').value = data.proxy_port_socks5 || '';
+                document.getElementById('gs_proxy_socks5_user').value = data.proxy_socks5_user || '';
+                document.getElementById('gs_proxy_socks5_pass').value = data.proxy_socks5_pass || '';
+            }
+        } catch(e) {
+            console.error("加载配置失败", e);
+        } finally {
+            btnSave.innerText = "保存配置";
+            btnSave.disabled = false;
+        }
+    }
+
+    function closeGlobalSettingsModal() {
+        gsModal.classList.remove('active');
+    }
+
+    // 提交保存修改
+    async function saveGlobalSettings() {
+        const payload = {
+            "panel_url": document.getElementById('gs_panel_url').value,
+            "proxy_port_ss": document.getElementById('gs_proxy_port_ss').value,
+            "proxy_ss_method": document.getElementById('gs_proxy_ss_method').value,
+            "proxy_port_hy2": document.getElementById('gs_proxy_port_hy2').value,
+            "proxy_port_tuic": document.getElementById('gs_proxy_port_tuic').value,
+            "proxy_port_reality": document.getElementById('gs_proxy_port_reality').value,
+            "proxy_reality_sni": document.getElementById('gs_proxy_reality_sni').value,
+            "proxy_port_socks5": document.getElementById('gs_proxy_port_socks5').value,
+            "proxy_socks5_user": document.getElementById('gs_proxy_socks5_user').value,
+            "proxy_socks5_pass": document.getElementById('gs_proxy_socks5_pass').value
+        };
+
+        const btnSave = document.getElementById('btnSaveGs');
+        btnSave.innerText = "保存中...";
+        btnSave.disabled = true;
+
+        try {
+            const response = await fetch('/api/update-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                // 更新缓存在全局的面板 URL
+                window.panelUrl = payload.panel_url; 
+                closeGlobalSettingsModal();
+            } else {
+                alert("保存失败: " + result.message);
+            }
+        } catch (error) {
+            alert('网络错误，请稍后重试');
+        } finally {
+            btnSave.innerText = "保存配置";
+            btnSave.disabled = false;
+        }
+    }
+</script>
+{{end}}

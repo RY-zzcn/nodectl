@@ -11,6 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// SupportedProtocols 定义系统支持的节点协议列表 (全局变量，供前端和逻辑使用)
+var SupportedProtocols = []string{"vless", "hy2", "socks", "tuic", "ss"}
+
 // initDefaultConfigs 初始化默认的系统配置参数
 func initDefaultConfigs() {
 	// 1. 初始化普通基础设置
@@ -18,16 +21,19 @@ func initDefaultConfigs() {
 
 	// 2. 初始化核心安全设置 (加密密钥、默认账号密码)
 	initAuthSettings()
+
+	// 3. 初始化singbox安装脚本模板参数
+	initProxySettings()
 }
 
 func initBasicSettings() {
 	defaultConfigs := []SysConfig{
-		{Key: "panel_title", Value: "Nodectl 核心控制台", Description: "网站面板标题"},
+		// [新增] 面板的外部访问地址，用于脚本向上级回传状态
+		{Key: "panel_url", Value: "", Description: "面板外部访问地址"},
 	}
 
 	for _, config := range defaultConfigs {
-		err := DB.Where(SysConfig{Key: config.Key}).FirstOrCreate(&config).Error
-		if err != nil {
+		if err := DB.Where(SysConfig{Key: config.Key}).FirstOrCreate(&config).Error; err != nil {
 			logger.Log.Error("初始化普通配置失败", "key", config.Key, "err", err.Error())
 		}
 	}
@@ -70,5 +76,25 @@ func initAuthSettings() {
 		DB.Create(&SysConfig{Key: "admin_password", Value: string(hashedPassword), Description: "管理员密码(Bcrypt加密)"})
 
 		logger.Log.Warn("已创建默认管理员账号！", "用户名", "admin", "密码", "admin", "提示", "请登录后尽快修改！")
+	}
+}
+
+func initProxySettings() {
+	defaultConfigs := []SysConfig{
+		{Key: "proxy_port_ss", Value: "20001", Description: "SS 默认监听端口"},
+		{Key: "proxy_port_hy2", Value: "20002", Description: "HY2 默认监听端口"},
+		{Key: "proxy_port_tuic", Value: "20003", Description: "TUIC 默认监听端口"},
+		{Key: "proxy_port_reality", Value: "20004", Description: "Reality 默认监听端口"},
+		{Key: "proxy_reality_sni", Value: "www.bing.com", Description: "Reality 默认 SNI 域名"},
+		{Key: "proxy_ss_method", Value: "aes-128-gcm", Description: "SS 默认加密方式"},
+		{Key: "proxy_port_socks5", Value: "20005", Description: "Socks5 默认监听端口"},
+		{Key: "proxy_socks5_user", Value: "admin", Description: "Socks5 默认用户名"},
+		{Key: "proxy_socks5_pass", Value: "123456", Description: "Socks5 默认密码"},
+	}
+
+	for _, config := range defaultConfigs {
+		if err := DB.Where(SysConfig{Key: config.Key}).FirstOrCreate(&config).Error; err != nil {
+			logger.Log.Error("初始化代理配置失败", "key", config.Key, "err", err.Error())
+		}
 	}
 }
