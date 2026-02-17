@@ -73,7 +73,6 @@
             display: inline-block; 
         }
 
-        /* 右上角触发按钮 */
         .user-btn { 
             display: flex; 
             align-items: center; 
@@ -108,7 +107,6 @@
             transform: rotate(180deg); 
         }
 
-        /* 下拉面板 */
         .dropdown-content { 
             display: none; 
             position: absolute; 
@@ -127,7 +125,6 @@
             animation: fadeInDown 0.2s ease-out forwards; 
         }
 
-        /* 隐形连接桥，防止鼠标移开时立刻消失 */
         .dropdown-content::before { 
             content: ''; 
             position: absolute; 
@@ -141,7 +138,6 @@
             display: flex; 
         }
 
-        /* 下拉菜单项 */
         .dropdown-item { 
             padding: 10px 12px; 
             text-decoration: none; 
@@ -169,7 +165,6 @@
             background: #f0f0f5; 
         }
 
-        /* 退出登录专属警告色 */
         .logout-item { 
             color: #e30000; 
             margin-top: 4px; 
@@ -196,7 +191,6 @@
             opacity: 0.8; 
         }
 
-        /* 菜单淡入动画 */
         @keyframes fadeInDown { 
             from { opacity: 0; transform: translateY(-8px) scale(0.98); } 
             to { opacity: 1; transform: translateY(0) scale(1); } 
@@ -213,7 +207,6 @@
             margin: 0 auto; 
         }
 
-        /* 上半部分：总览和快捷操作的网格比例 (约 4:6) */
         .top-section-grid { 
             display: grid; 
             grid-template-columns: 3.82fr 6.18fr; 
@@ -221,7 +214,6 @@
             margin-bottom: 25px; 
         }
 
-        /* 通用白色大卡片 */
         .sub-card { 
             background: white; 
             border-radius: 12px; 
@@ -235,7 +227,6 @@
             flex-direction: column; 
         }
 
-        /* 卡片头部标题区 */
         .card-header { 
             display: flex; 
             justify-content: space-between; 
@@ -285,7 +276,6 @@
             margin-top: 5px; 
         }
         
-        /* 统计数字主题色 */
         .text-blue { color: #007aff; } 
         .text-green { color: #34c759; } 
         .text-yellow { color: #f5a623; } 
@@ -294,7 +284,6 @@
         /* =========================================================
            6. 右侧面板：快捷操作按钮 (Action Buttons)
            ========================================================= */
-        /* 顶部右侧小按钮公共样式 */
         .btn-custom-common { 
             height: 30px; 
             font-size: 13px; 
@@ -312,24 +301,12 @@
             text-decoration: none; 
         }
 
-        /* 订阅设置 (紫色) */
-        .btn-color-purple { 
-            background-color: #6c5ce7; 
-        } 
-        .btn-color-purple:hover { 
-            background-color: #5a4bcf; 
-        }
+        .btn-color-purple { background-color: #6c5ce7; } 
+        .btn-color-purple:hover { background-color: #5a4bcf; }
 
-        /* 节点管理 (蓝色) */
-        .btn-color-blue { 
-            background-color: #007aff; 
-        } 
-        .btn-color-blue:hover { 
-            background-color: #0062cc; 
-        }
+        .btn-color-blue { background-color: #007aff; } 
+        .btn-color-blue:hover { background-color: #0062cc; }
 
-
-        /* 底部规则编辑的并排方块容器 */
         .rule-actions { 
             display: flex; 
             gap: 15px; 
@@ -338,7 +315,6 @@
             justify-content: center; 
         }
 
-        /* 大方块按钮 */
         .btn-edit-rule { 
             display: flex; 
             flex-direction: column; 
@@ -363,22 +339,12 @@
             transform: translateY(-2px); 
         }
 
-        .rule-icon { 
-            font-size: 20px; 
-            margin-bottom: 5px; 
-        }
-
-        .rule-name { 
-            font-size: 12px; 
-            font-weight: normal; 
-            text-align: center; 
-            line-height: 1.3;
-        }
+        .rule-icon { font-size: 20px; margin-bottom: 5px; }
+        .rule-name { font-size: 12px; font-weight: normal; text-align: center; line-height: 1.3;}
 
         /* =========================================================
            7. 内部双栏面板布局 (Node Columns - 节点列表管理区)
            ========================================================= */
-        /* 下半部分双列等宽网格 */
         .node-columns-grid {
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -386,9 +352,8 @@
             flex: 1;
         }
 
-        /* 内部小面板基础样式：恢复淡灰底色，无背景透明度覆盖 */
         .node-column-panel {
-            background: #fafbfc; /* 恢复原本的浅灰底色 */
+            background: #fafbfc; 
             border-radius: 8px;
             padding: 15px;
             display: flex;
@@ -396,31 +361,14 @@
             min-height: 450px;
         }
 
-        /* 直连节点 (主题绿)：使用主题色虚线框 */
-        .node-column-panel.theme-green { 
-            border: 1px dashed rgba(52, 199, 89, 0.6); 
-        }
+        .node-column-panel.theme-green { border: 1px dashed rgba(52, 199, 89, 0.6); }
+        .node-column-panel.theme-yellow { border: 1px dashed rgba(245, 166, 35, 0.6); }
 
-        /* 落地节点 (主题黄)：使用主题色虚线框 */
-        .node-column-panel.theme-yellow { 
-            border: 1px dashed rgba(245, 166, 35, 0.6); 
-        }
+        .column-header { margin-bottom: 15px; padding-bottom: 10px; }
 
-        /* 内部面板的头部 */
-        .column-header {
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-        }
-
-        /* 标题下方的彩色分割实线 */
-        .theme-green .column-header { 
-            border-bottom: 2px solid #34c759; 
-        }
-        .theme-yellow .column-header { 
-            border-bottom: 2px solid #f5a623; 
-        }
+        .theme-green .column-header { border-bottom: 2px solid #34c759; }
+        .theme-yellow .column-header { border-bottom: 2px solid #f5a623; }
         
-        /* 列表容器，预留滚动条 */
         .node-list-container {
             flex: 1;
             display: flex;
@@ -444,55 +392,29 @@
         /* =========================================================
            9. 移动端适配响应式 (Mobile Media Queries)
            ========================================================= */
-        /* =========================================================
-           9. 移动端适配响应式 (Mobile Media Queries) - [已优化]
-           ========================================================= */
         @media (max-width: 768px) { 
-            /* 1. 顶部布局单列化 */
-            .top-section-grid { 
-                grid-template-columns: 1fr; 
-            } 
-            
-            /* 2. 缩小导航栏左右留白 */
-            .top-navbar { 
-                padding: 0 8px; 
-            } 
-            
-            /* 3. 快捷规则按钮保持一行四列，缩小间隙 */
+            .top-section-grid { grid-template-columns: 1fr; } 
+            .top-navbar { padding: 0 8px; } 
             .rule-actions { 
                 display: grid; 
-                grid-template-columns: repeat(4, 1fr); /* [修改] 原为 4，现改为 5 */
-                gap: 6px; /* [修改] 稍微把间隙缩小以容纳更多按钮 */
+                grid-template-columns: repeat(4, 1fr); 
+                gap: 6px; 
             }
-            
-            /* 4. 页面内容两侧缩减留白 */
-            .main-content { 
-                padding: 15px 10px; /*稍微增加一点侧边距防误触*/
-            } 
-            
-            /* 5. 取消大卡片强制高度 */
-            .sub-card { 
-                padding: 15px; 
-                min-height: auto; 
-            }
-            
-            /* 6. 优化顶部四个方块 */
+            .main-content { padding: 15px 10px; } 
+            .sub-card { padding: 15px; min-height: auto; }
             .rule-name { font-size: 11px; } 
             .rule-icon { font-size: 20px; margin-bottom: 5px; } 
             .btn-edit-rule { height: 65px; min-width: 0; } 
 
-            /* 7. 节点双栏在手机端强制上下堆叠 */
             .node-columns-grid {
                 grid-template-columns: 1fr;
-                gap: 20px; /* 拉大上下两个面板的间距 */
+                gap: 20px; 
             }
 
-            /* 8. 彻底解绑“节点管理”最外层大卡片背景 */
             #node-manager-card {
                 background: transparent; border: none; box-shadow: none; padding: 0;              
             }
             
-            /* 9. 添加按钮独立成白色小条 */
             #node-manager-card > .card-header {
                 background: white; border-radius: 12px; padding: 12px 15px;
                 border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -500,42 +422,26 @@
             }
             #node-manager-card > .card-header .card-title { display: none; }
 
-            /* [关键修改 10]：节点面板样式重构 
-               - 去掉 PC 端的 min-height: 450px
-               - 改为自适应高度
-            */
             .node-column-panel {
-                min-height: auto !important; /* 覆盖 PC 端高度 */
+                min-height: auto !important; 
                 background: white !important;
                 border: 1px solid #eee !important;
                 border-radius: 12px;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.05);
                 display: flex;
                 flex-direction: column;
-                /* 稍微给面板一点内边距，让列表不贴边 */
                 padding: 12px; 
             }
 
-            /* [关键修改 11]：节点列表容器限制
-               - min-height: 80px (保证至少能放下一个节点，留出拖拽放入的空位)
-               - max-height: 380px (大约 5 个节点的高度，超过则滚动)
-               - 隐藏滚动条但保留功能
-            */
             .node-list-container {
-                min-height: 80px;  /* 核心：保证空列表时也能拖入 */
-                max-height: 380px; /* 核心：限制最大高度，约等于5条数据 */
-                overflow-y: auto;  /* 允许内部滚动 */
-                
-                /* iOS 平滑滚动支持 */
+                min-height: 80px;  
+                max-height: 380px; 
+                overflow-y: auto;  
                 -webkit-overflow-scrolling: touch; 
-                
-                /* 隐藏 Firefox 滚动条 */
                 scrollbar-width: none; 
-                /* 隐藏 IE/Edge 滚动条 */
                 -ms-overflow-style: none; 
             }
 
-            /* 隐藏 Chrome/Safari/Webkit 滚动条 */
             .node-list-container::-webkit-scrollbar {
                 display: none;
             }
@@ -559,58 +465,65 @@
             border-color: #d1d1d6;
             transform: translateY(-1px);
         }
+        
         .node-info {
             display: flex;
             flex-direction: column;
+            justify-content: center;
             gap: 4px;
         }
+        
+        .node-name-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
         .node-name {
             font-size: 14px;
             font-weight: 600;
             color: #1d1d1f;
         }
-        .node-meta {
-            font-size: 11px;
-            color: #86868b;
-            font-family: monospace; /* 让 Install ID 显得更有科技感 */
+
+        /* 标签栏样式 */
+        .node-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 2px;
         }
+
+        .proto-tag {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            line-height: 1.3;
+        }
+
         .node-status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #34c759; /* 预留一个绿色的状态圆点 */
+            background: #34c759; 
         }
 
-        /* [新增] 屏蔽节点的特殊样式 */
         .node-item.is-blocked {
-            border: 1px dashed #d74242;       /* 红色虚线边框 */
-            background: #fff5f5;              /* 极淡的红色背景 */
-            opacity: 0.8;                     /* 稍微降低透明度 */
+            border: 1px dashed #d74242;       
+            background: #fff5f5;              
+            opacity: 0.8;                     
         }
         
         .node-item.is-blocked .node-name {
             color: #d74242;
-            text-decoration: line-through;    /* 可选：增加删除线增强屏蔽感 */
-        }
-        
-
-        /* 屏蔽列表的标题分隔 */
-        .block-list-divider {
-            margin: 20px 0 10px 0;
-            padding-top: 15px;
-            border-top: 1px dashed #e5e5ea;
-            font-size: 13px;
-            color: #999;
-            font-weight: 600;
-            text-align: center;
-            display: none; /* 默认隐藏，有数据时JS控制显示 */
+            text-decoration: line-through;    
         }
 
-        /* [新增] 拖拽手柄样式 */
+        /* 拖拽手柄样式 */
         .drag-handle {
             cursor: grab;
             color: #ccc;
-            padding: 4px 8px 4px 0; /* 右侧留点空隙 */
+            padding: 4px 8px 4px 0; 
             display: flex;
             align-items: center;
             transition: color 0.2s;
@@ -622,19 +535,18 @@
             cursor: grabbing;
         }
         
-        /* 拖拽时的幽灵样式 (SortableJS Class) */
         .sortable-ghost {
             opacity: 0.4;
             background: #f0f7ff;
             border: 1px dashed #007aff;
         }
 
-        /* [修改] 协议统计标签栏样式 - 精致小字版 */
+        /* 协议统计标签栏样式 */
         .proto-stats-bar {
             display: flex; 
             flex-wrap: wrap; 
-            justify-content: center; /* 居中对齐 */
-            gap: 8px;                /* 缩小间距以匹配更小的字号 */
+            justify-content: center; 
+            gap: 8px;                
             margin-top: 15px; 
             padding-top: 15px; 
             border-top: 1px dashed #eee; 
@@ -642,12 +554,11 @@
 
         .proto-badge {
             background: #f5f5f7; 
-            border-radius: 6px;      /* 圆角稍微调小 */
-            /* 上右下左 padding，整体更紧凑 */
+            border-radius: 6px;      
             padding: 3px 3px 3px 8px; 
-            font-size: 12px;         /* [修改] 字号从 13px 缩小到 11px */
-            color: #666;             /* 颜色稍微调淡一点点，更显精致 */
-            font-weight: 400;        /* [修改] 取消加粗 (原为 600) */
+            font-size: 12px;         
+            color: #666;             
+            font-weight: 400;        
             display: flex; 
             align-items: center; 
             border: 1px solid transparent; 
@@ -661,20 +572,19 @@
             transform: translateY(-1px); 
         }
 
-        /* 数字计数器：白色立体内嵌框 (适配小字号) */
         .proto-count {
             background-color: #ffffff; 
             color: #1d1d1f;            
-            font-weight: 700;          /* 数字保持适当加粗以保证可读性 */
-            font-size: 11px;           /* [修改] 数字也缩小到 11px */
-            padding: 1px 5px;          /* 缩小内边距 */
-            border-radius: 4px;        /* 缩小圆角 */
-            margin-left: 6px;          /* 缩小间距 */
-            box-shadow: 0 1px 2px rgba(0,0,0,0.08); /* 阴影调淡 */
-            min-width: 18px;           /* 最小宽度调小 */
+            font-weight: 700;          
+            font-size: 11px;           
+            padding: 1px 5px;          
+            border-radius: 4px;        
+            margin-left: 6px;          
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08); 
+            min-width: 18px;           
             text-align: center;
-            height: 18px;              /* 固定高度确保对齐 */
-            line-height: 16px;         /* 垂直居中 */
+            height: 18px;              
+            line-height: 16px;         
         }
     </style>
 </head>
@@ -687,13 +597,6 @@
                 </svg>
                 NodeCTL
             </a>
-            <div id="topVersionBadge" class="top-version-badge" onclick="openUpdateModal()" title="当前版本: {{.Version}}">
-                <span id="versionText" style="opacity: 0; transition: opacity 0.3s;">{{.Version}}</span>
-                <svg class="update-arrow-icon" style="display: none;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="19" x2="12" y2="5"></line>
-                    <polyline points="5 12 12 5 19 12"></polyline>
-                </svg>
-            </div>
         </div>
         <div class="user-menu">
             <button class="user-btn">
@@ -757,9 +660,7 @@
                 </div>
                 <div class="rule-actions">
                     <a href="javascript:void(0)" onclick="openCustomRulesModal()" class="btn-edit-rule"><span class="rule-icon">⚡</span><span class="rule-name">自定义规则</span></a>
-                    
                     <a href="javascript:void(0)" onclick="openGlobalSettingsModal()" class="btn-edit-rule"><span class="rule-icon">📜</span><span class="rule-name">SingBox</span></a>
-                    
                     <a href="javascript:void(0)" onclick="openClashModal()" class="btn-edit-rule"><span class="rule-icon">⚙️</span><span class="rule-name">Clash 模板</span></a>
                     <a href="javascript:void(0)" onclick="openSubLinksModal()" class="btn-edit-rule"><span class="rule-icon">🔗</span><span class="rule-name">订阅链接</span></a>
                 </div>
@@ -769,39 +670,81 @@
             </div>
         </div>
 
-    <div class="sub-card" id="node-manager-card">
-                <div class="card-header">
-                    <span class="card-title">🌐 节点列表管理</span>
-                    <button class="btn-custom-common btn-color-blue" onclick="openAddNodeModal()">+ 添加节点</button>
+        <div class="sub-card" id="node-manager-card">
+            <div class="card-header">
+                <span class="card-title">🌐 节点列表管理</span>
+                <button class="btn-custom-common btn-color-blue" onclick="openAddNodeModal()">+ 添加节点</button>
+            </div>
+
+            <div class="node-columns-grid">
+                <div class="node-column-panel theme-green">
+                    <div class="column-header">
+                        <span class="card-title" style="color: #333; font-size: 15px;">直连节点</span>
+                    </div>
+                    <div class="node-list-container" id="direct-nodes-list"></div>
                 </div>
 
-                <div class="node-columns-grid">
-                    <div class="node-column-panel theme-green">
-                        <div class="column-header">
-                            <span class="card-title" style="color: #333; font-size: 15px;">直连节点</span>
-                        </div>
-                        <div class="node-list-container" id="direct-nodes-list"></div>
+                <div class="node-column-panel theme-yellow">
+                    <div class="column-header">
+                        <span class="card-title" style="color: #333; font-size: 15px;">落地节点</span>
                     </div>
-
-                    <div class="node-column-panel theme-yellow">
-                        <div class="column-header">
-                            <span class="card-title" style="color: #333; font-size: 15px;">落地节点</span>
-                        </div>
-                        <div class="node-list-container" id="land-nodes-list"></div>
-                        </div>
-                    </div>
+                    <div class="node-list-container" id="land-nodes-list"></div>
                 </div>
             </div>
-        </main>
+        </div>
+    </main>
 
     <footer class="main-footer">Nodectl Core &copy; 2026</footer>
 
     <script>
-        // 页面加载完成后立即拉取节点数据
         document.addEventListener('DOMContentLoaded', loadNodesList);
 
-        // [新增] 全局变量存储所有节点数据，Key 为 UUID
         window.allNodesData = {};
+
+        // 备用调色盘 (用于未知的新协议)
+        const tagColorPalette = [
+            { bg: '#dcfce7', text: '#16a34a' }, // Green
+            { bg: '#fce7f3', text: '#db2777' }, // Pink
+            { bg: '#cffafe', text: '#0d9488' }, // Cyan
+            { bg: '#e0f2fe', text: '#2563eb' }, // Blue
+            { bg: '#fef9c3', text: '#d97706' }, // Yellow
+            { bg: '#f3e8ff', text: '#7c3aed' }, // Purple
+            { bg: '#ffedd5', text: '#ca8a04' }, // Orange
+            { bg: '#fee2e2', text: '#dc2626' }, // Red
+            { bg: '#ccfbf1', text: '#059669' }, // Teal
+            { bg: '#e0e7ff', text: '#4f46e5' }  // Indigo
+        ];
+
+        // 核心硬编码映射：确保默认的几个主流协议绝不撞色，色彩对比强烈
+        const fixedProtoColors = {
+            'ss': { bg: '#e0f2fe', text: '#2563eb' },      // 经典蓝
+            'hy2': { bg: '#ffedd5', text: '#ea580c' },     // 活力橙
+            'vless': { bg: '#f3e8ff', text: '#9333ea' },   // 优雅紫
+            'tuic': { bg: '#fee2e2', text: '#dc2626' },    // 醒目红
+            'socks': { bg: '#ccfbf1', text: '#0d9488' },   // 青色
+            'socks5': { bg: '#ccfbf1', text: '#0d9488' },  // 青色
+            'trojan': { bg: '#fef9c3', text: '#ca8a04' },  // 黄色
+            'vmess': { bg: '#dcfce7', text: '#16a34a' }    // 绿色
+        };
+
+        // 增强版色彩分配引擎
+        function getProtoColor(protoName) {
+            const key = protoName.toLowerCase();
+            
+            // 1. 优先命中硬编码的预设色彩
+            if (fixedProtoColors[key]) {
+                return fixedProtoColors[key];
+            }
+            
+            // 2. 对于未知的新协议，使用增强后的哈希算法防止短字符串碰撞
+            let hash = 0;
+            for (let i = 0; i < key.length; i++) {
+                // 引入更复杂的位移扰动，打散短字符串的规律
+                hash = key.charCodeAt(i) + ((hash << 5) - hash) + (hash >> 2);
+                hash = hash & hash; // 转换为 32位 整数
+            }
+            return tagColorPalette[Math.abs(hash) % tagColorPalette.length];
+        }
 
         async function loadNodesList() {
             try {
@@ -811,7 +754,6 @@
                 if (result.status === 'success') {
                     window.allNodesData = {};
                     
-                    // 缓存数据 (后端现在只返回 direct_nodes 和 land_nodes)
                     const cacheNodes = (nodes) => {
                         if(nodes) nodes.forEach(n => window.allNodesData[n.uuid] = n);
                     };
@@ -819,16 +761,10 @@
                     cacheNodes(result.data.land_nodes);
                     window.panelUrl = result.data.panel_url;
 
-                    // 初始化拖拽 (需要在渲染前还是后？通常渲染后)
-                    // 先渲染列表
                     renderNodes('direct-nodes-list', result.data.direct_nodes, '#34c759');
                     renderNodes('land-nodes-list', result.data.land_nodes, '#f5a623');
                     
-                    // 渲染完成后初始化拖拽
                     initDragAndDrop();
-
-                    // [删除] 移除了对 block_nodes 和 block-divider 的操作代码
-                    // 因为现在屏蔽节点直接混排在直连/落地列表中
                 } else {
                     showErrorState('direct-nodes-list');
                     showErrorState('land-nodes-list');
@@ -839,46 +775,29 @@
             }
         }
 
-        // [新增] 拖拽初始化函数
         function initDragAndDrop() {
             const directList = document.getElementById('direct-nodes-list');
             const landList = document.getElementById('land-nodes-list');
 
-            // 配置通用选项
             const sortableOptions = {
-                group: 'active-nodes', // 允许在这个组名之间互相拖拽
-                handle: '.drag-handle', // 只有点击这个图标才能拖拽
-                animation: 150,         // 动画速度
-                ghostClass: 'sortable-ghost', // 拖拽时的样式类名
+                group: 'active-nodes', 
+                handle: '.drag-handle', 
+                animation: 150,         
+                ghostClass: 'sortable-ghost', 
                 onEnd: function (evt) {
-                    // 拖拽结束时的回调
-                    const itemEl = evt.item;  // 被拖拽的元素
-                    const newIndex = evt.newIndex; // 新的索引
-                    const toList = evt.to;    // 目标列表容器
+                    const toList = evt.to;    
                     
-                    // 只有当位置改变或列表改变时才触发 API
-                    // if (evt.newIndex === evt.oldIndex && evt.to === evt.from) return; 
-                    // 上面这一行注释掉，因为即使位置没变，为了保险起见（防止前端索引和后端不一致），也可以触发一次重排，或者根据需求开启
-
-                    // 1. 确定目标分组 ID
-                    let targetRoutingType = 1; // 默认为直连
+                    let targetRoutingType = 1; 
                     if (toList.id === 'land-nodes-list') {
-                        targetRoutingType = 2; // 如果拖到了落地组
+                        targetRoutingType = 2; 
                     }
 
-                    // 2. 获取目标列表内所有节点的 UUID (按新顺序)
                     const nodeItems = toList.querySelectorAll('.node-item');
                     const uuidList = Array.from(nodeItems).map(el => el.getAttribute('data-uuid'));
-
-                    // 如果列表里有“暂无数据”的提示 div，uuid 会是 null，需要过滤掉
                     const cleanUUIDs = uuidList.filter(id => id);
 
-                    // 3. 发送请求给后端
                     saveNodeOrder(targetRoutingType, cleanUUIDs);
                     
-                    // 特殊处理：如果是跨列表拖拽，还需要更新源列表的排序（防止出现空隙），
-                    // 虽然 UpdateNodeOrder 只处理了目标列表，但源列表剩下的节点顺序相对没变，SortIndex 留空隙通常不影响排序显示。
-                    // 为了严谨，如果跨列表，最好也把源列表的新顺序发一遍。
                     if (evt.from !== evt.to) {
                         let sourceRoutingType = 1;
                         if (evt.from.id === 'land-nodes-list') sourceRoutingType = 2;
@@ -886,21 +805,15 @@
                         const sourceItems = evt.from.querySelectorAll('.node-item');
                         const sourceUUIDs = Array.from(sourceItems).map(el => el.getAttribute('data-uuid')).filter(id => id);
                         
-                        // 稍微延迟一下发送源列表更新，避免并发冲突
                         setTimeout(() => {
                             saveNodeOrder(sourceRoutingType, sourceUUIDs);
                         }, 200);
                         
-                        // 处理UI：如果源列表空了，显示暂无数据
                         if (sourceUUIDs.length === 0) {
-                            evt.from.innerHTML = `<div style="text-align: center; color: #999; font-size: 13px; margin-top: 30px;">暂无节点数据</div>`;
+                            evt.from.innerHTML = `<div style="text-align: center; color: #999; font-size: 13px; margin-top: 30px;" class="empty-tip">暂无节点数据</div>`;
                         }
                     }
                     
-                    // 处理UI：如果目标列表之前是空的（有暂无数据提示），需要移除那个提示
-                    const emptyTip = toList.querySelector('.empty-tip'); // 假设之前给暂无数据加了这个类，或者直接判断
-                    // 简单粗暴的方法：Render函数会清空重建，但拖拽是DOM操作。
-                    // 可以在这里手动移除非 .node-item 的元素
                     Array.from(toList.children).forEach(child => {
                         if (!child.classList.contains('node-item') && !child.classList.contains('sortable-ghost')) {
                             child.remove();
@@ -909,19 +822,13 @@
                 }
             };
 
-            // 分别初始化直连和落地列表
-            // 先销毁旧的实例（防止多次加载导致绑定重复），这里简单处理，SortableJS 会自动处理
-            // 建议将 sortable 实例存在全局变量里以便销毁，简单起见直接 New 也行
             if (directList) new Sortable(directList, sortableOptions);
             if (landList) new Sortable(landList, sortableOptions);
-            
-            // 屏蔽列表不初始化 Sortable，或者初始化但不给 group，使其无法拖入拖出
         }
 
-        // [新增] 调用 API 保存顺序
         async function saveNodeOrder(routingType, uuids) {
             try {
-                const response = await fetch('/api/reorder-nodes', {
+                await fetch('/api/reorder-nodes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -929,24 +836,19 @@
                         node_uuids: uuids 
                     })
                 });
-                // 可以在这里处理错误提示，或者静默失败
-            } catch (e) {
-                console.error("排序保存失败", e);
-            }
+            } catch (e) { console.error("排序保存失败", e); }
         }
 
-        // 显示加载错误的辅助函数
         function showErrorState(containerId) {
             const container = document.getElementById(containerId);
             if (container) {
                 container.innerHTML = `<div style="text-align: center; color: #d74242; font-size: 13px; margin-top: 30px;">数据加载失败</div>`;
             }
         }
-
-        // ------------------- [核心渲染逻辑] -------------------
     
-        // 渲染节点列表
-// 渲染节点列表
+        // =========================================================
+        // 核心优化：节点列表项渲染逻辑
+        // =========================================================
         function renderNodes(containerId, nodes, dotColor) {
             const container = document.getElementById(containerId);
             container.innerHTML = ''; 
@@ -959,18 +861,35 @@
             nodes.forEach(node => {
                 const item = document.createElement('div');
                 item.className = 'node-item';
-                // 绑定 UUID
                 item.setAttribute('data-uuid', node.uuid);
                 
-                // [新增] 如果节点被屏蔽 (is_blocked = true)，添加 CSS 类
-                if (node.is_blocked) {
-                    item.classList.add('is-blocked');
-                }
-
-                // 状态点颜色：如果屏蔽，强制显示红色；否则显示传入的颜色(绿/黄)
+                if (node.is_blocked) item.classList.add('is-blocked');
                 const finalDotColor = node.is_blocked ? '#d74242' : dotColor;
                 
-                // 拖拽手柄
+                // 1. 处理跨平台国旗显示 (调用外部 flagcdn 接口转换图片)
+                let flagHTML = `<span style="margin-right: 8px; font-size: 16px; display: inline-block; width: 22px; text-align: center;">🌐</span>`;
+                if (node.region && node.region.trim() !== '') {
+                    // flagcdn 要求使用全小写的 2 位 ISO 缩写 (如 cn, hk, us)
+                    const isoCode = node.region.trim().toLowerCase();
+                    flagHTML = `<img src="https://flagcdn.com/w20/${isoCode}.png" alt="${isoCode}" style="width: 22px; height: 16px; object-fit: cover; margin-right: 8px; border-radius: 2px; box-shadow: 0 0 2px rgba(0,0,0,0.15);">`;
+                }
+
+                // 2. 动态生成启用的协议标签 (应用全新的自动调色盘算法)
+                const linksMap = node.links || {};
+                const disabledArr = node.disabled_links || [];
+                const activeProtos = Object.keys(linksMap).filter(p => !disabledArr.includes(p));
+                
+                let tagsHTML = '';
+                if (activeProtos.length > 0) {
+                    tagsHTML = activeProtos.map(proto => {
+                        const color = getProtoColor(proto);
+                        return `<span class="proto-tag" style="background-color: ${color.bg}; color: ${color.text};">${proto}</span>`;
+                    }).join('');
+                } else {
+                    tagsHTML = `<span style="font-size:11px; color:#ccc;">暂无有效协议</span>`;
+                }
+
+                // 3. 拖拽手柄
                 let dragHandleHTML = `
                     <div class="drag-handle">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -981,13 +900,16 @@
                     </div>
                 `;
 
-                // [修改内容] 在按钮组中加入了 "生成部署脚本" (下载图标) 按钮
+                // 4. 组装 DOM 
                 item.innerHTML = `
                     <div style="display:flex; align-items:center;">
                         ${dragHandleHTML}
                         <div class="node-info">
-                            <div class="node-name">${node.name}</div>
-                            <div class="node-meta">ID: ${node.install_id}</div>
+                            <div class="node-name-wrapper">
+                                ${flagHTML}
+                                <span class="node-name">${node.name}</span>
+                            </div>
+                            <div class="node-tags">${tagsHTML}</div>
                         </div>
                     </div>
                     
@@ -995,11 +917,7 @@
                         <div class="node-status-dot" style="background: ${finalDotColor}; margin-right: 5px;"></div>
                         
                         <button type="button" onclick="openScriptModal('${node.uuid}')" style="background: transparent; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center; color: #007aff;" title="生成部署脚本">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                         </button>
 
                         <button type="button" onclick="openEditModal('${node.uuid}')" style="background: transparent; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center; color: #007aff;" title="编辑节点">
@@ -1015,53 +933,37 @@
             });
         }
 
-        // ------------------- [删除弹窗逻辑] -------------------
-
         // 打开删除确认弹窗
         function openDeleteModal(uuid) {
-            console.log("准备删除节点 UUID:", uuid); // 调试日志
             currentDeleteUUID = uuid;
-            
             const modal = document.getElementById('deleteModal');
-            if(modal) {
-                modal.style.display = 'flex';
-            } else {
-                alert("错误：弹窗组件未加载，请检查页面代码。");
-            }
+            if(modal) modal.style.display = 'flex';
         }
 
         // 关闭删除弹窗
         function closeDeleteModal() {
             currentDeleteUUID = null;
             const modal = document.getElementById('deleteModal');
-            if(modal) {
-                modal.style.display = 'none';
-            }
+            if(modal) modal.style.display = 'none';
         }
 
-        // 确认删除 (点击弹窗红色按钮时触发)
+        // 确认删除
         async function confirmDeleteNode() {
             if (!currentDeleteUUID) return;
-
             try {
                 const response = await fetch('/api/delete-node', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ uuid: currentDeleteUUID })
                 });
-                
                 const result = await response.json();
-                
                 if (result.status === 'success') {
                     closeDeleteModal();
-                    loadNodesList(); // 刷新列表
+                    loadNodesList(); 
                 } else {
                     alert('删除失败: ' + result.message);
                 }
-            } catch (error) {
-                console.error('删除请求出错:', error);
-                alert('网络错误，请稍后重试');
-            }
+            } catch (error) { alert('网络错误，请稍后重试'); }
         }
 
     </script>
