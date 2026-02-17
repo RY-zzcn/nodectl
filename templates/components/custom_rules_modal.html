@@ -115,7 +115,7 @@
     .cr-item-row:hover { background: #f0f0f5; border-color: #e5e5ea; }
     
     .cr-item-remark {
-        flex: 0 0 60px; width: 60px; min-width: 0; /* 强制锁定 60px */
+        flex: 0 0 60px; width: 90px; min-width: 0; /* 强制锁定 90px */
         font-size: 12px; color: #666; background: transparent; border: 1px solid transparent; 
         outline: none; padding: 4px 6px; border-radius: 4px; transition: 0.2s;
     }
@@ -169,8 +169,8 @@
             padding: 10px 15px; border-top: 1px dashed #cce4ff; margin-top: 5px; 
             background: #f9f9fc; border-radius: 8px; flex: none; 
         }
-        /* 多组分流出站：限制 40vh */
-        .cr-tab-proxy .rule-items-container { max-height: 38vh; }
+        /* 多组分流出站：限制 36vh */
+        .cr-tab-proxy .rule-items-container { max-height: 36vh; }
 
         /* 全局直连出站：限制 50vh */
         .cr-tab-direct .rule-items-container { max-height: 50vh; }
@@ -215,7 +215,7 @@
                 </div>
                 <div class="rule-items-container no-scrollbar" id="directItemsContainer"></div>
                 <div class="cr-add-row">
-                    <input type="text" id="directNewInput" class="cr-add-input" placeholder="输入域名或IP (如: baidu.com 或 192.168.1.1)" onkeydown="if(event.key==='Enter') addDirectItem()">
+                    <input type="text" id="directNewInput" class="cr-add-input" placeholder="输入域名或IP" onkeydown="if(event.key==='Enter') addDirectItem()">
                     <button class="cr-btn-parse" onclick="addDirectItem()">解析写入</button>
                 </div>
             </div>
@@ -249,7 +249,8 @@
                 let text = line.replace(/^[#\/]+\s*/, '');
                 currentRemark = currentRemark ? currentRemark + ' ' + text : text;
             } else {
-                items.push({ remark: currentRemark, rule: line });
+                // 【修改点】此处调用 cleanDisplayRule，只让用户看到 clean 的内容
+                items.push({ remark: currentRemark, rule: cleanDisplayRule(line) });
                 currentRemark = '';
             }
         }
@@ -261,25 +262,60 @@
         let lines = [];
         for(let item of items) {
             if(item.remark) lines.push('# ' + item.remark);
-            if(item.rule) lines.push(item.rule);
+            if(item.rule) {
+                // 【修改点】此处调用 restoreFullRule，存入数据库前把前缀加回去
+                lines.push(restoreFullRule(item.rule));
+            }
         }
         return lines.join('\n');
     }
 
-    // --- 前端智能格式化引擎 (包含清洗) ---
-    function autoFormatRule(raw) {
-        raw = raw.trim();
-        if(raw.includes(',')) return raw;
+    // --- [修改] 显示层与输入清洗：移除前缀、协议、路径和端口 ---
+    function cleanDisplayRule(raw) {
+        if (!raw) return '';
         
-        raw = raw.replace(/^[a-zA-Z]+:\/\//, '');
+        let val = raw.trim();
+
+        // 1. 去除可能误复制的协议头 (http://, https://)
+        val = val.replace(/^[a-zA-Z]+:\/\//, '');
+
+        // 2. 移除 DOMAIN-SUFFIX, IP-CIDR, 等规则前缀
+        val = val.replace(/^(DOMAIN-SUFFIX|IP-CIDR|IP-CIDR6|DOMAIN|DOMAIN-KEYWORD),/, '');
+
+        // 3. 移除路径 (例如 www.baidu.com/index.html -> www.baidu.com)
+        // split('/') 取第一部分，这也顺便处理了结尾的 /
+        val = val.split('/')[0];
+
+        // 4. 【核心修复】移除端口 (例如 :8086)
+        // 逻辑：只有当字符串包含点 "." (代表是域名或IPv4) 时，才去匹配结尾的 :数字
+        // 这样做是为了防止误伤 IPv6 地址 (如 2001:db8::1 结尾也是 :数字)
+        if (val.includes('.') && /:\d+$/.test(val)) {
+            val = val.replace(/:\d+$/, '');
+        }
+        
+        return val;
+    }
+
+    // --- [重写] 数据层：保存时自动补全前缀 (替代原 autoFormatRule) ---
+    function restoreFullRule(raw) {
+        raw = raw.trim();
+        if (!raw) return '';
+        
+        // 如果已经有逗号(用户手动指定了类型)，则保持原样
+        if (raw.includes(',')) return raw;
+        
+        raw = raw.replace(/^[a-zA-Z]+:\/\//, ''); // 移除 http:// 等协议头
+        
+        // 判断是否为 IP
         const isIP = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)(?:\/\d{1,2})?$/.test(raw);
         const isIPv6 = /^([0-9a-fA-F:]+)(?:\/\d{1,3})?$/.test(raw);
         
         if(isIP || isIPv6) {
-            if(!raw.includes('/')) raw += raw.includes(':') ? '/128' : '/32';
+            if(!raw.includes('/')) raw += raw.includes(':') ? '/128' : '/32'; // 补全掩码
             return 'IP-CIDR,' + raw;
         }
         
+        // 默认为域名后缀
         raw = raw.split('/')[0].split('?')[0];
         return 'DOMAIN-SUFFIX,' + raw;
     }
@@ -370,7 +406,11 @@
         const input = document.getElementById('directNewInput');
         const raw = input.value.trim();
         if(!raw) return;
-        directItems.push({ remark: '', rule: autoFormatRule(raw) });
+        
+        // 【修改点】存入 directItems 的是“干净”的数据 (cleanDisplayRule)
+        // 之前这里调用的是 autoFormatRule，现在改用 cleanDisplayRule
+        directItems.push({ remark: '', rule: cleanDisplayRule(raw) });
+        
         input.value = '';
         renderDirectItems();
         triggerAutoSave();
@@ -565,9 +605,17 @@
         const input = document.getElementById('proxyNewInput');
         const raw = input.value.trim();
         if(!raw) return;
-        currentProxyItems.push({ remark: '', rule: autoFormatRule(raw) });
+        
+        // 【修改点】同上，只存清洗后的内容
+        currentProxyItems.push({ remark: '', rule: cleanDisplayRule(raw) });
+        
         input.value = '';
         renderProxyItems();
+        
+        // 保持滚动逻辑不变
+        const container = document.getElementById('proxyItemsContainer');
+        if(container) setTimeout(() => container.scrollTop = container.scrollHeight, 50);
+
         triggerAutoSave();
     }
 
