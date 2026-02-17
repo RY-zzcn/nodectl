@@ -13,7 +13,7 @@
     }
     .edit-modal-overlay.active { display: flex; opacity: 1; }
     
-    /* [优化] 窄模式调整为 360px，展开后依然 800px，释放右侧空间 */
+    /* 窄模式 380px，展开后 800px */
     .edit-modal-card {
         background: #ffffff; width: 100%; max-width: 380px; height: 550px; border-radius: 12px; 
         box-shadow: 0 20px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;
@@ -36,7 +36,7 @@
     .edit-form-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     .edit-body { flex: 1; display: flex; flex-direction: row; background: #fff; overflow: hidden; }
 
-    /* ================= 左侧面板 (调整为 360px) ================= */
+    /* ================= 左侧面板 (调整为 380px) ================= */
     .edit-left-col {
         width: 380px; flex-shrink: 0; padding: 25px;
         border-right: 1px solid transparent; transition: border-color 0.3s;
@@ -46,16 +46,19 @@
     .edit-section { margin-bottom: 24px; }
     .section-label { display: block; font-size: 13px; font-weight: 600; color: #888; margin-bottom: 10px; }
 
+    /* 统一所有输入组件的盒模型，确保完全满宽对齐 */
     .title-input {
-        width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 600;
+        width: 100%; box-sizing: border-box; 
+        padding: 8px 12px; font-size: 15px; font-weight: 600;
         border: 1px solid #d1d1d6; border-radius: 8px;
         outline: none; transition: border 0.2s; color: #1d1d1f; background: #fafbfc;
     }
     .title-input:focus { border-color: #007aff; background: #fff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
     .title-input::placeholder { color: #ccc; font-weight: 400; }
 
-    /* 路由类型分段控制器 */
+    /* [优化] 路由类型分段控制器：实体按钮变色 */
     .segmented-control {
+        width: 100%; box-sizing: border-box;
         background: #f5f5f7; padding: 4px; border-radius: 8px; display: flex; gap: 4px; border: 1px solid #e5e5ea;
     }
     .segment-option {
@@ -64,14 +67,18 @@
         border-radius: 6px; transition: all 0.2s; font-weight: 600;
     }
     .segment-option:hover { color: #333; }
-    .segment-option.active { background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .segment-option.active[data-type="1"] { color: #34c759; } 
-    .segment-option.active[data-type="2"] { color: #f5a623; } 
-    .segment-option.active[data-type="3"] { color: #d74242; } 
+    
+    /* 激活态：按钮填充色块，文字反白 */
+    .segment-option.active { box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #fff; }
+    .segment-option.active[data-type="1"] { background: #34c759; } /* 直连：纯绿 */
+    .segment-option.active[data-type="2"] { background: #f5a623; } /* 落地：纯黄 */
+    .segment-option.active[data-type="3"] { background: #d74242; } /* 屏蔽：纯红 */
+    .segment-option.active:hover { color: #fff; } /* 防止 hover 覆盖白色字体 */
 
-    /* IP 输入框样式 */
+    /* IP 输入框样式：满宽对齐 */
     .ip-input {
-        width: 100%; padding: 10px 12px; font-size: 13px; font-weight: 500; font-family: monospace;
+        width: 100%; box-sizing: border-box;
+        padding: 10px 12px; font-size: 13px; font-weight: 500; font-family: monospace;
         border: 1px solid #d1d1d6; border-radius: 8px;
         outline: none; transition: border 0.2s; color: #333; background: #fafbfc;
     }
@@ -82,13 +89,14 @@
 
     /* 左侧添加协议按钮 */
     .btn-add-protocol-left {
-        width: 100%; padding: 12px; border: 1px dashed #007aff; border-radius: 8px;
+        width: 100%; box-sizing: border-box;
+        padding: 12px; border: 1px dashed #007aff; border-radius: 8px;
         background: #f0f7ff; color: #007aff; font-size: 13px; font-weight: 600;
         cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
     }
     .btn-add-protocol-left:hover { background: #e0efff; }
 
-    /* ================= 右侧协议配置面板 (占比提升至 440px) ================= */
+    /* ================= 右侧协议配置面板 ================= */
     .edit-right-col { 
         flex: 1; padding: 25px 30px; display: none; flex-direction: column; background: #fff;
     }
@@ -104,7 +112,7 @@
     .protocol-card:hover { border-color: #d1d1d6; }
     .protocol-card.disabled { opacity: 0.6; background: #f9f9fc; }
 
-    /* [新增] 折叠交互样式 */
+    /* 折叠交互样式 */
     .card-header-row {
         display: flex; align-items: center; justify-content: space-between;
         padding: 12px 15px; background: #fafbfc; 
@@ -152,7 +160,7 @@
     .protocol-card.expanded .card-body-row { display: block; } /* 展开时显示 */
     
     .protocol-textarea {
-        width: 100%; border: none; padding: 12px 15px; 
+        width: 100%; border: none; padding: 12px 15px; box-sizing: border-box;
         font-size: 12px; line-height: 1.5; color: #333;
         font-family: Menlo, Monaco, "Courier New", monospace; 
         background: transparent; outline: none;
@@ -216,9 +224,9 @@
 
                     <div id="ipEditContainer"></div>
 
-                    <div class="edit-section" style="margin-top: 30px;">
+                    <div class="edit-section" style="margin-top: 30px;" id="addProtocolSection">
                         <label class="section-label">包含的代理协议</label>
-                        <button type="button" class="btn-add-protocol-left" onclick="showAddProtocolMenu()">
+                        <button type="button" class="btn-add-protocol-left" id="btnAddProtocolBtn" onclick="showAddProtocolMenu()">
                             <span>+</span> 添加协议
                         </button>
                     </div>
@@ -336,11 +344,26 @@
         setTimeout(() => { editModalCard.classList.remove('has-content'); }, 300);
     }
 
+    // [优化] 包含标题在内的整块隐藏机制
     function updateLayoutState() {
         if (container.children.length > 0) {
             editModalCard.classList.add('has-content');
         } else {
             editModalCard.classList.remove('has-content');
+        }
+
+        // 检查剩余可添加的协议数量
+        const existingProtos = new Set();
+        container.querySelectorAll('.protocol-card').forEach(card => {
+            existingProtos.add(card.getAttribute('data-proto'));
+        });
+        const availableProtos = GLOBAL_SUPPORTED_PROTOCOLS.filter(p => !existingProtos.has(p));
+        
+        const addSection = document.getElementById('addProtocolSection');
+        if (availableProtos.length === 0) {
+            addSection.style.display = 'none'; // 全部添加完则隐藏整个区块（包含标题）
+        } else {
+            addSection.style.display = 'block';
         }
     }
 
@@ -403,6 +426,13 @@
 
     // 渲染卡片：增加 isNew 参数控制是否默认展开
     function renderProtocolCard(proto, linkValue, isEnabled, isNew = false) {
+        // [优化] 如果是新增并展开，先强制收起其他的卡片
+        if (isNew) {
+            document.querySelectorAll('#protocolRowsContainer .protocol-card').forEach(c => {
+                c.classList.remove('expanded');
+            });
+        }
+
         const div = document.createElement('div');
         div.className = `protocol-card ${isEnabled ? '' : 'disabled'} ${isNew ? 'expanded' : ''}`;
         div.setAttribute('data-proto', proto);
@@ -443,12 +473,20 @@
         }
     }
 
-    // 折叠/展开点击逻辑
+    // [优化] 折叠/展开点击逻辑：互斥展开 (Accordion 手风琴模式)
     window.toggleCardExpand = function(headerEl) {
         const card = headerEl.closest('.protocol-card');
-        card.classList.toggle('expanded');
-        // 展开时计算文本框高度
-        if (card.classList.contains('expanded')) {
+        const wasExpanded = card.classList.contains('expanded');
+        
+        // 第一步：强制收起所有卡片
+        document.querySelectorAll('#protocolRowsContainer .protocol-card').forEach(c => {
+            c.classList.remove('expanded');
+        });
+
+        // 第二步：如果刚才点击的那张卡片原本没展开，现在把它展开
+        if (!wasExpanded) {
+            card.classList.add('expanded');
+            // 展开时自动计算文本框高度
             const textarea = card.querySelector('textarea');
             autoResizeTextarea(textarea);
         }
