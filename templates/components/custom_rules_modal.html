@@ -270,30 +270,86 @@
         return lines.join('\n');
     }
 
-    // --- [修改] 显示层与输入清洗：移除前缀、协议、路径和端口 ---
+    // --- [修改] 显示层与输入清洗：移除前缀、端口，并【立即补全】CIDR掩码 ---
     function cleanDisplayRule(raw) {
         if (!raw) return '';
         
         let val = raw.trim();
 
-        // 1. 去除可能误复制的协议头 (http://, https://)
+        // 1. 去除可能误复制的协议头
         val = val.replace(/^[a-zA-Z]+:\/\//, '');
 
-        // 2. 移除 DOMAIN-SUFFIX, IP-CIDR, 等规则前缀
+        // 2. 移除规则前缀
         val = val.replace(/^(DOMAIN-SUFFIX|IP-CIDR|IP-CIDR6|DOMAIN|DOMAIN-KEYWORD),/, '');
 
-        // 3. 移除路径 (例如 www.baidu.com/index.html -> www.baidu.com)
-        // split('/') 取第一部分，这也顺便处理了结尾的 /
-        val = val.split('/')[0];
+        // 3. 移除路径但保留 CIDR
+        const slashIndex = val.indexOf('/');
+        if (slashIndex > -1) {
+            const afterSlash = val.substring(slashIndex + 1);
+            if (!/^\d+$/.test(afterSlash)) {
+                val = val.substring(0, slashIndex); // 是路径，切掉
+            }
+        }
 
-        // 4. 【核心修复】移除端口 (例如 :8086)
-        // 逻辑：只有当字符串包含点 "." (代表是域名或IPv4) 时，才去匹配结尾的 :数字
-        // 这样做是为了防止误伤 IPv6 地址 (如 2001:db8::1 结尾也是 :数字)
+        // 4. 移除端口 (防止误伤 IPv6)
         if (val.includes('.') && /:\d+$/.test(val)) {
             val = val.replace(/:\d+$/, '');
         }
+
+        // 5. 【核心修复】如果清洗后剩下的是纯 IP，立即补全显示 /32 或 /128
+        // 判断 IPv4 (简单正则：四组数字)
+        const isIPv4 = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/.test(val);
+        // 判断 IPv6 (简单正则：包含冒号且没有点，或者符合IPv6格式)
+        const isIPv6 = /^([0-9a-fA-F:]+)$/.test(val) && val.includes(':');
+
+        if (isIPv4) {
+            val += '/32';
+        } else if (isIPv6) {
+            val += '/128';
+        }
         
         return val;
+    }
+
+    // --- [修改] 全局查重工具：增加 fromTab 参数 ('direct' 或 'proxy') ---
+    function checkDuplicateGlobal(rule, fromTab) {
+        // 1. 检查直连列表
+        if (directItems.some(item => item.rule === rule)) {
+            return "全局直连";
+        }
+
+        // 2. 检查所有分流策略组
+        for (const group of proxyRules) {
+            let isMatch = false;
+
+            // 优先检查内存中正在编辑的数据 (currentProxyItems)
+            // 因为 content 字段可能还没更新
+            if (currentProxyId && group.id === currentProxyId) {
+                if (currentProxyItems.some(item => item.rule === rule)) {
+                    isMatch = true;
+                }
+            } else {
+                // 其他组检查 content 字符串
+                const lines = (group.content || '').split('\n');
+                for (const line of lines) {
+                    if (cleanDisplayRule(line.trim()) === rule) {
+                        isMatch = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isMatch) {
+                // 【核心修复】只有当来源是 proxy tab 且 ID 匹配时，才提示 "当前组"
+                // 如果是在直连页面触发的查重，即使它被选中，也直接显示组名，不显示 "当前组"
+                if (fromTab === 'proxy' && currentProxyId && group.id === currentProxyId) {
+                    return `当前组 (${group.name})`;
+                }
+                return group.name; 
+            }
+        }
+
+        return null;
     }
 
     // --- [重写] 数据层：保存时自动补全前缀 (替代原 autoFormatRule) ---
@@ -402,14 +458,37 @@
         container.scrollTop = container.scrollHeight;
     }
 
+    // --- [修改] 显示重复警告 (支持显示来源) ---
+    function showDuplicateTip(sourceName) {
+        const indicator = document.getElementById('saveIndicator');
+        
+        clearTimeout(autoSaveTimer);
+        
+        // 显示具体的来源名称
+        indicator.innerHTML = `<span style="color:#ff3b30; display:flex; align-items:center; gap:4px; white-space:nowrap;">⚠️ 已存在: ${sourceName}</span>`;
+        indicator.style.opacity = '1';
+
+        setTimeout(() => {
+            indicator.style.opacity = '0';
+        }, 2500); //稍微延长一点时间让用户看清
+    }
+
     function addDirectItem() {
         const input = document.getElementById('directNewInput');
         const raw = input.value.trim();
         if(!raw) return;
         
-        // 【修改点】存入 directItems 的是“干净”的数据 (cleanDisplayRule)
-        // 之前这里调用的是 autoFormatRule，现在改用 cleanDisplayRule
-        directItems.push({ remark: '', rule: cleanDisplayRule(raw) });
+        const finalRule = cleanDisplayRule(raw);
+
+        // 【修改点】传入 'direct' 标识
+        const duplicateSource = checkDuplicateGlobal(finalRule, 'direct');
+        
+        if (duplicateSource) {
+            showDuplicateTip(duplicateSource);
+            return; 
+        }
+
+        directItems.push({ remark: '', rule: finalRule });
         
         input.value = '';
         renderDirectItems();
@@ -606,16 +685,21 @@
         const raw = input.value.trim();
         if(!raw) return;
         
-        // 【修改点】同上，只存清洗后的内容
-        currentProxyItems.push({ remark: '', rule: cleanDisplayRule(raw) });
+        const finalRule = cleanDisplayRule(raw);
+
+        // 【修改点】传入 'proxy' 标识
+        const duplicateSource = checkDuplicateGlobal(finalRule, 'proxy');
+
+        if (duplicateSource) {
+            showDuplicateTip(duplicateSource);
+            return; 
+        }
+        
+        currentProxyItems.push({ remark: '', rule: finalRule });
         
         input.value = '';
-        renderProxyItems();
+        renderProxyItems(); // 渲染并自动滚动
         
-        // 保持滚动逻辑不变
-        const container = document.getElementById('proxyItemsContainer');
-        if(container) setTimeout(() => container.scrollTop = container.scrollHeight, 50);
-
         triggerAutoSave();
     }
 

@@ -154,14 +154,25 @@ func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error)
 	// 将切片用逗号连接成字符串，例如: "CN_域,Microsoft_域" 或 "CN_域"
 	dnsPolicyStr := strings.Join(dnsPolicyList, ",")
 
+	// 提前获取所有自定义分流组
+	allCustomProxies := GetCustomProxyRules()
+	var validCustomProxies []CustomProxyRule
+
+	// 遍历检查，只有当解析后确实存在有效规则时，才加入到最终的渲染列表中
+	for _, p := range allCustomProxies {
+		if strings.TrimSpace(ParseCustomRules(p.Content)) != "" {
+			validCustomProxies = append(validCustomProxies, p)
+		}
+	}
+
 	data := ClashTemplateData{
 		RelaySubURL:             exitURL,
 		ExitSubURL:              relayURL,
 		ActiveModules:           finalActiveMods,
 		BaseURL:                 baseURL,
 		Token:                   token,
-		CustomProxies:           GetCustomProxyRules(),
-		NameserverPolicyRuleSet: dnsPolicyStr, // [关键] 将生成的字符串传递给模板
+		CustomProxies:           validCustomProxies, // 替换为过滤后的有效分组
+		NameserverPolicyRuleSet: dnsPolicyStr,
 	}
 
 	tmpl, err := template.New("clash").Parse(ClashTemplateStr)
@@ -258,7 +269,8 @@ func GetCustomDirectRules() string {
 }
 
 func SaveCustomDirectRules(content string) error {
-	return database.DB.Where(database.SysConfig{Key: "clash_custom_direct_raw"}).
-		Assign(database.SysConfig{Value: content}).
-		FirstOrCreate(&database.SysConfig{}).Error
+	// 使用 .Update("value", content) 强制指定更新字段，绕过空字符串忽略机制
+	return database.DB.Model(&database.SysConfig{}).
+		Where("key = ?", "clash_custom_direct_raw").
+		Update("value", content).Error
 }
