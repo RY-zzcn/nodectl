@@ -62,6 +62,26 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 		}
 	}
 
+	// [新增修复逻辑] ---------------------------------------------------------
+	// 如果遍历完数据库后，proxyList 依然为空（说明用户没配节点，或节点都被禁用了）
+	// 强制插入一个 "直连" 类型的占位节点，防止客户端报错，并实现自动直连
+	if len(proxyList) == 0 {
+		var name string
+		if routingType == 1 {
+			name = "⚠️ 无中转-自动直连"
+		} else {
+			name = "⚠️ 无落地-自动直连"
+		}
+
+		fallbackNode := &ClashNode{
+			Name:              name,
+			Type:              "direct", // 使用 direct 类型，Clash 会将其视为直连
+			UDP:               true,
+			ClientFingerprint: "chrome", // 随便带个指纹让它看起来更像正常节点
+		}
+		proxyList = append(proxyList, fallbackNode)
+	}
+
 	provider := ClashProvider{Proxies: proxyList}
 
 	// 1. 使用 Encoder 设置缩进为 2 空格 (解决默认4空格的问题)

@@ -101,7 +101,7 @@ dns:
     - https://doh.pub/dns-query#🇨🇳 大陆&h3=false
     - https://dns.alidns.com/dns-query#🇨🇳 大陆&h3=true
   nameserver-policy:
-    "RULE-SET:CN_域,Microsoft_域,Apple_域":
+    "RULE-SET:{{.NameserverPolicyRuleSet}}":
        - https://doh.pub/dns-query#🇨🇳 大陆&h3=false
        - https://dns.alidns.com/dns-query#🇨🇳 大陆&h3=true
   nameserver:

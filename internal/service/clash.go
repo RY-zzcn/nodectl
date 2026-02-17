@@ -110,12 +110,13 @@ func SaveActiveClashModules(modules []string) error {
 // ---------------------------------------------------------
 
 type ClashTemplateData struct {
-	RelaySubURL   string
-	ExitSubURL    string
-	BaseURL       string
-	Token         string
-	ActiveModules []ClashModuleDef
-	CustomProxies []CustomProxyRule
+	RelaySubURL             string
+	ExitSubURL              string
+	BaseURL                 string
+	Token                   string
+	ActiveModules           []ClashModuleDef
+	CustomProxies           []CustomProxyRule
+	NameserverPolicyRuleSet string // 用于存储动态生成的 DNS 策略字符串，例如 "CN_域,Apple_域"
 }
 
 func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error) {
@@ -130,19 +131,37 @@ func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error)
 	allModules := append(builtin, custom...)
 
 	var finalActiveMods []ClashModuleDef
+
+	// [修复点] 初始化 dnsPolicyList，并包含基础规则 "CN_域"
+	dnsPolicyList := []string{"CN_域"}
+
 	for _, m := range allModules {
 		if activeMap[m.Name] {
 			finalActiveMods = append(finalActiveMods, m)
+
+			// 检查当前启用的模块是否是需要在 DNS 策略中特殊处理的模块
+			// 只有当用户勾选了 Apple，才将其加入 DNS 策略
+			if m.Name == "Apple" {
+				dnsPolicyList = append(dnsPolicyList, "Apple_域")
+			}
+			// 只有当用户勾选了 Microsoft，才将其加入 DNS 策略
+			if m.Name == "Microsoft" {
+				dnsPolicyList = append(dnsPolicyList, "Microsoft_域")
+			}
 		}
 	}
 
+	// 将切片用逗号连接成字符串，例如: "CN_域,Microsoft_域" 或 "CN_域"
+	dnsPolicyStr := strings.Join(dnsPolicyList, ",")
+
 	data := ClashTemplateData{
-		RelaySubURL:   relayURL,
-		ExitSubURL:    exitURL,
-		ActiveModules: finalActiveMods,
-		BaseURL:       baseURL,
-		Token:         token,
-		CustomProxies: GetCustomProxyRules(),
+		RelaySubURL:             relayURL,
+		ExitSubURL:              exitURL,
+		ActiveModules:           finalActiveMods,
+		BaseURL:                 baseURL,
+		Token:                   token,
+		CustomProxies:           GetCustomProxyRules(),
+		NameserverPolicyRuleSet: dnsPolicyStr, // [关键] 将生成的字符串传递给模板
 	}
 
 	tmpl, err := template.New("clash").Parse(ClashTemplateStr)
