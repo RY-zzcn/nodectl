@@ -305,7 +305,7 @@
             importBtnHtml = `
                 <a href="${clashUrl}" class="btn-sub-action btn-import">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    一键导入 Clash
+                    导入 Clash
                 </a>
             `;
         } else if (formatKey === 'v2ray') {
@@ -314,7 +314,7 @@
             importBtnHtml = `
                 <a href="${subUrl}" class="btn-sub-action btn-import" title="支持 Shadowrocket 等主流手机客户端">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    一键导入 App
+                    导入 App
                 </a>
             `;
         }
@@ -334,7 +334,7 @@
             <div class="${gridClass}">
                 <button class="btn-sub-action btn-copy" id="btnCopySubLink" onclick="copyCurrentSubLink()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    一键复制链接
+                    复制链接
                 </button>
                 ${importBtnHtml}
             </div>
@@ -444,7 +444,7 @@
             document.execCommand('copy');
             showCopySuccess(btn);
         } catch (err) {
-            alert('一键复制失败，请直接在上方框内长按手动复制链接');
+            alert('复制失败，请直接在上方框内长按手动复制链接');
         }
     }
 
