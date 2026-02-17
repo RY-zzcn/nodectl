@@ -5,16 +5,17 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
-	"nodectl/internal/database"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"nodectl/internal/database"
+	"nodectl/internal/logger"
 
 	"gopkg.in/yaml.v3"
 )
 
 // ClashProvider 是用于生成 0.yaml / 1.yaml 的根结构
-// [修复] 将原先的 map 替换为严格结构体 *ClashNode
 type ClashProvider struct {
 	Proxies []*ClashNode `yaml:"proxies"`
 }
@@ -26,6 +27,7 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 	// 按照 SortIndex 排序获取节点
 	if err := database.DB.Where("routing_type = ? AND is_blocked = ?", routingType, false).
 		Order("sort_index ASC").Find(&nodes).Error; err != nil {
+		logger.Log.Error("从数据库获取 Raw 节点列表失败", "error", err, "routing_type", routingType)
 		return "", err
 	}
 
@@ -56,6 +58,7 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
 	if err := encoder.Encode(&provider); err != nil {
+		logger.Log.Error("YAML 序列化节点数据失败", "error", err, "routing_type", routingType)
 		return "", err
 	}
 	encoder.Close()
@@ -71,6 +74,7 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 		return string(rune(code))
 	})
 
+	logger.Log.Debug("Raw 节点 YAML 组装完成", "routing_type", routingType, "proxy_count", len(proxyList))
 	return yamlStr, nil
 }
 
@@ -84,12 +88,13 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// [新增] GenerateV2RaySubBase64 生成通用 Base64 订阅 (包含直连和落地)
+// GenerateV2RaySubBase64 生成通用 Base64 订阅 (包含直连和落地)
 func GenerateV2RaySubBase64(useFlag bool) (string, error) {
 	var nodes []database.NodePool
 	// 取出直连(1)和落地(2)的节点，排除被屏蔽的
 	if err := database.DB.Where("routing_type IN ? AND is_blocked = ?", []int{1, 2}, false).
 		Order("sort_index ASC").Find(&nodes).Error; err != nil {
+		logger.Log.Error("从数据库获取全量聚合节点失败", "error", err)
 		return "", err
 	}
 
@@ -125,5 +130,6 @@ func GenerateV2RaySubBase64(useFlag bool) (string, error) {
 	rawStr := strings.Join(lines, "\n")
 	b64Str := base64.StdEncoding.EncodeToString([]byte(rawStr))
 
+	logger.Log.Debug("V2Ray Base64 订阅组装完成", "link_count", len(lines))
 	return b64Str, nil
 }

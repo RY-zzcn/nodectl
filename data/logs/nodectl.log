@@ -721,3 +721,105 @@ time="2026-02-17 08:16:33" level=INFO source=main.go:17 msg="Nodectl Core 正在
 time="2026-02-17 08:16:33" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
 time="2026-02-17 08:16:33" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
 time="2026-02-17 08:16:33" level=INFO source=internal/server/server.go:61 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-17 08:30:39" level=INFO source=internal/logger/logger.go:73 msg=日志组件初始化完成 模块=logger
+time="2026-02-17 08:30:39" level=INFO source=main.go:17 msg="Nodectl Core 正在启动" 版本号=dev
+time="2026-02-17 08:30:39" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-17 08:30:39" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
+time="2026-02-17 08:30:39" level=INFO source=internal/server/server.go:61 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-17 08:30:42" level=WARN source=internal/middleware/auth.go:23 msg=未授权访问拦截 reason="请求缺少 nodectl_token Cookie" ip=[::1]:58475 path=/
+time="2026-02-17 08:30:44" level=INFO source=internal/server/handlers.go:93 msg=管理员登录成功 username=admin ip=[::1]:58475 path=/login
+time="2026-02-17 08:30:44" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/
+time="2026-02-17 08:30:44" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-nodes
+time="2026-02-17 08:31:01" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:31:07" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:31:07" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=302
+time="2026-02-17 08:31:07" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:31:07" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:31:33" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:31:33" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=302
+time="2026-02-17 08:31:33" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:31:33" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:31:41" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:31:41" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=334
+time="2026-02-17 08:31:41" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:31:41" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:19" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/
+time="2026-02-17 08:32:20" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-nodes
+time="2026-02-17 08:32:21" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:32:22" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-settings
+time="2026-02-17 08:32:24" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-settings
+time="2026-02-17 08:32:25" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:32:29" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:29" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=0
+time="2026-02-17 08:32:29" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:29" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:30" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/
+time="2026-02-17 08:32:30" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-nodes
+time="2026-02-17 08:32:30" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:32:34" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:34" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=300
+time="2026-02-17 08:32:34" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:34" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:36" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:36" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=266
+time="2026-02-17 08:32:36" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:36" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:38" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:38" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=232
+time="2026-02-17 08:32:38" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:38" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:39" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:39" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=198
+time="2026-02-17 08:32:39" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:39" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:40" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:40" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=164
+time="2026-02-17 08:32:40" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:40" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:41" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:41" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=130
+time="2026-02-17 08:32:41" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:41" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:42" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:42" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=96
+time="2026-02-17 08:32:42" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:42" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:44" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:32:45" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/
+time="2026-02-17 08:32:45" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-nodes
+time="2026-02-17 08:32:46" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:32:48" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:48" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=62
+time="2026-02-17 08:32:48" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:48" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:49" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:49" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=31
+time="2026-02-17 08:32:49" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:49" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:50" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:32:50" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=0
+time="2026-02-17 08:32:50" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=1
+time="2026-02-17 08:32:50" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:33:11" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:33:11" level=INFO source=internal/service/clash.go:276 msg=自定义直连规则库已保存 content_length=0
+time="2026-02-17 08:33:11" level=INFO source=internal/service/clash.go:251 msg=自定义分流策略组已保存 group_count=0
+time="2026-02-17 08:33:11" level=INFO source=internal/server/handlers.go:912 msg=自定义路由规则保存成功 ip=[::1]:58475 path=/api/custom-rules/save
+time="2026-02-17 08:33:23" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/
+time="2026-02-17 08:33:23" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-nodes
+time="2026-02-17 08:33:24" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/custom-rules/get
+time="2026-02-17 08:33:25" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/get-settings
+time="2026-02-17 08:33:29" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/update-settings
+time="2026-02-17 08:33:29" level=INFO source=internal/server/handlers.go:606 msg=系统全局配置已更新 ip=[::1]:58475 path=/api/update-settings
+time="2026-02-17 08:33:36" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58475 path=/api/update-settings
+time="2026-02-17 08:33:36" level=INFO source=internal/server/handlers.go:606 msg=系统全局配置已更新 ip=[::1]:58475 path=/api/update-settings
+time="2026-02-17 08:34:02" level=INFO source=internal/logger/logger.go:73 msg=日志组件初始化完成 模块=logger
+time="2026-02-17 08:34:02" level=INFO source=main.go:17 msg="Nodectl Core 正在启动" 版本号=dev
+time="2026-02-17 08:34:02" level=INFO source=internal/database/database.go:124 msg=数据库初始化成功，表结构已同步 path=data\nodectl.db
+time="2026-02-17 08:34:02" level=INFO source=internal/service/geo.go:78 msg="GeoIP 服务加载成功" path=data\geo\GeoLite2-Country.mmdb
+time="2026-02-17 08:34:02" level=INFO source=internal/server/server.go:61 msg="Web 服务已启动" 地址=http://localhost:8080
+time="2026-02-17 08:34:22" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58635 path=/api/clash/settings
+time="2026-02-17 08:34:23" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58635 path=/api/get-settings
+time="2026-02-17 08:34:28" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58635 path=/
+time="2026-02-17 08:34:28" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58635 path=/api/get-nodes
+time="2026-02-17 08:34:28" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58635 path=/
+time="2026-02-17 08:34:28" level=DEBUG source=internal/middleware/auth.go:83 msg=鉴权放行 user=admin ip=[::1]:58635 path=/api/get-nodes

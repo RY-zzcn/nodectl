@@ -33,6 +33,9 @@ func sendJSON(w http.ResponseWriter, status, message string) {
 
 // loginHandler 处理登录页面渲染和表单提交
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method == http.MethodGet {
 		tmpl.ExecuteTemplate(w, "login.html", nil)
 		return
@@ -48,6 +51,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 		err := database.DB.Where("key = ?", "admin_username").First(&userConfig).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) || userConfig.Value != username {
+			logger.Log.Warn("登录拦截: 用户名不存在", "username", username, "ip", clientIP, "path", reqPath)
 			tmpl.ExecuteTemplate(w, "login.html", map[string]string{"Error": "用户名或密码错误"})
 			return
 		}
@@ -55,7 +59,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		database.DB.Where("key = ?", "admin_password").First(&passConfig)
 		err = bcrypt.CompareHashAndPassword([]byte(passConfig.Value), []byte(password))
 		if err != nil {
-			logger.Log.Warn("登录失败: 密码错误", "尝试用户名", username, "IP", r.RemoteAddr)
+			logger.Log.Warn("登录拦截: 密码错误", "username", username, "ip", clientIP, "path", reqPath)
 			tmpl.ExecuteTemplate(w, "login.html", map[string]string{"Error": "用户名或密码错误"})
 			return
 		}
@@ -70,7 +74,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenString, err := token.SignedString([]byte(secretConfig.Value))
 		if err != nil {
-			logger.Log.Error("签发 Token 失败", "err", err.Error())
+			logger.Log.Error("签发 Token 失败", "error", err, "ip", clientIP, "path", reqPath)
 			tmpl.ExecuteTemplate(w, "login.html", map[string]string{"Error": "系统内部错误"})
 			return
 		}
@@ -86,25 +90,26 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			SameSite: http.SameSiteLaxMode,
 		})
 
-		logger.Log.Info("管理员登录成功", "用户名", username, "IP", r.RemoteAddr)
+		logger.Log.Info("管理员登录成功", "username", username, "ip", clientIP, "path", reqPath)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 
 // indexHandler 处理主控制台界面渲染
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
 
-	// 1. 获取所有节点数据
 	var nodes []database.NodePool
 	if err := database.DB.Find(&nodes).Error; err != nil {
-		logger.Log.Error("获取节点统计失败", "err", err.Error())
+		logger.Log.Error("获取节点统计失败", "error", err, "ip", clientIP, "path", reqPath)
 	}
 
-	// 2. 初始化基础统计
 	stats := map[string]int{
 		"Total":   0,
 		"Direct":  0,
@@ -113,12 +118,9 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	stats["Total"] = len(nodes)
 
-	// 3. [核心修改] 动态统计协议数量
-	// 定义一个临时 map 用于统计所有出现的协议次数
 	rawProtoCounts := make(map[string]int)
 
 	for _, node := range nodes {
-		// --- 基础分类统计 ---
 		if node.IsBlocked {
 			stats["Blocked"]++
 		} else {
@@ -129,11 +131,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// --- 协议统计 ---
-		// 遍历该节点包含的所有链接
 		for protoKey := range node.Links {
-			// 兼容处理: 数据库可能存的是 socks5，但定义列表里可能是 socks
-			// 简单统一化：如果是 socks5 视作 socks
 			if protoKey == "socks5" {
 				rawProtoCounts["socks"]++
 			} else {
@@ -142,21 +140,15 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. [核心修改] 根据 defaults.SupportedProtocols 生成有序的显示列表
 	type ProtoStatItem struct {
 		Name  string
 		Count int
 	}
 	var displayProtoStats []ProtoStatItem
 
-	// 按照 defaults.go 中定义的顺序遍历
 	for _, proto := range database.SupportedProtocols {
 		count := rawProtoCounts[proto]
-
-		// 只有数量 > 0 才显示
 		if count > 0 {
-			// 格式化显示名称 (例如: ss -> Shadowsocks, hy2 -> Hysteria2)
-			// 这里简单处理：转大写，特殊名称特殊处理
 			displayName := strings.ToUpper(proto)
 			switch proto {
 			case "ss":
@@ -164,9 +156,8 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 			case "hy2":
 				displayName = "Hysteria2"
 			case "socks":
-				displayName = "Socks5" // 显示更友好的名字
+				displayName = "Socks5"
 			}
-
 			displayProtoStats = append(displayProtoStats, ProtoStatItem{
 				Name:  displayName,
 				Count: count,
@@ -174,24 +165,46 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 5. 注入数据到模板
 	data := map[string]interface{}{
 		"Title":      "Nodectl 总览",
 		"Protocols":  database.SupportedProtocols,
 		"Version":    version.Version,
 		"Stats":      stats,
-		"ProtoStats": displayProtoStats, // 传递生成的切片
+		"ProtoStats": displayProtoStats,
 	}
 	tmpl.ExecuteTemplate(w, "index.html", data)
 }
 
+// logoutHandler 处理安全退出逻辑
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "nodectl_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Expires:  time.Now().Add(-1 * time.Hour),
+	})
+
+	logger.Log.Info("管理员已安全退出", "ip", clientIP, "path", reqPath)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// ------------------- [API 异步接口逻辑] -------------------
+
 func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 定义请求结构体
 	var req struct {
 		UUID          string            `json:"uuid"`
 		Name          string            `json:"name"`
@@ -203,48 +216,35 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 		IPV6          string            `json:"ipv6"`
 	}
 
-	// 解析 JSON
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求格式错误")
 		return
 	}
 
 	if req.UUID == "" {
+		logger.Log.Warn("请求缺少 UUID", "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "节点 UUID 不能为空")
 		return
 	}
 
-	// 调用 Service 更新
 	err := service.UpdateNode(req.UUID, req.Name, req.RoutingType, req.Links, req.IsBlocked, req.DisabledLinks, req.IPV4, req.IPV6)
 	if err != nil {
-		logger.Log.Error("更新节点失败", "err", err.Error())
+		logger.Log.Error("更新节点数据库失败", "error", err, "uuid", req.UUID, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据库更新失败")
 		return
 	}
 
-	logger.Log.Info("节点更新成功", "UUID", req.UUID)
+	logger.Log.Info("节点更新成功", "uuid", req.UUID, "name", req.Name, "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "节点更新成功")
 }
 
-// logoutHandler 处理安全退出逻辑
-func logoutHandler(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "nodectl_token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-		Expires:  time.Now().Add(-1 * time.Hour),
-	})
-	logger.Log.Info("管理员已安全退出", "IP", r.RemoteAddr)
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
-}
-
-// ------------------- [API 异步接口逻辑] -------------------
-
-// apiChangePassword 接收 JSON 请求，处理修改密码操作
 func apiChangePassword(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -255,34 +255,38 @@ func apiChangePassword(w http.ResponseWriter, r *http.Request) {
 		ConfirmPassword string `json:"confirm_password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求数据格式错误")
 		return
 	}
 
 	if req.NewPassword != req.ConfirmPassword {
+		logger.Log.Warn("修改密码失败: 两次密码不一致", "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "两次输入的新密码不一致")
 		return
 	}
 	if len(req.NewPassword) < 5 {
+		logger.Log.Warn("修改密码失败: 密码过短", "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "新密码长度不能小于 5 位")
 		return
 	}
 
 	var passConfig database.SysConfig
 	if err := database.DB.Where("key = ?", "admin_password").First(&passConfig).Error; err != nil {
+		logger.Log.Error("修改密码失败: 找不到密码配置", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "系统错误，找不到管理员账号")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(passConfig.Value), []byte(req.OldPassword)); err != nil {
-		logger.Log.Warn("修改密码失败: 旧密码错误", "IP", r.RemoteAddr)
+		logger.Log.Warn("修改密码拦截: 旧密码验证失败", "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "当前密码输入错误")
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		logger.Log.Error("新密码加密失败", "err", err.Error())
+		logger.Log.Error("新密码 Bcrypt 加密失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "密码加密失败，请稍后重试")
 		return
 	}
@@ -292,11 +296,11 @@ func apiChangePassword(w http.ResponseWriter, r *http.Request) {
 	if _, err := rand.Read(secureBytes); err == nil {
 		newSecret := hex.EncodeToString(secureBytes)
 		database.DB.Model(&database.SysConfig{}).Where("key = ?", "jwt_secret").Update("value", newSecret)
-		logger.Log.Warn("管理员密码已修改，系统加密密钥已重置，所有旧会话已注销")
+		logger.Log.Info("系统级密钥 (JWT Secret) 已重置", "ip", clientIP, "path", reqPath)
 	}
-	logger.Log.Info("管理员密码修改成功", "IP", r.RemoteAddr)
 
-	// 强制下线当前凭证
+	logger.Log.Info("管理员密码修改成功", "ip", clientIP, "path", reqPath)
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "nodectl_token",
 		Value:    "",
@@ -308,9 +312,12 @@ func apiChangePassword(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, "success", "密码修改成功！1.5秒后将重新跳转到登录页")
 }
 
-// apiAddNode 接收 JSON 请求，处理新增节点操作
 func apiAddNode(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -320,25 +327,28 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 		RoutingType int    `json:"routing_type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求格式错误")
 		return
 	}
 
-	// 调用 Service 层写入数据库
 	node, err := service.AddNode(req.Name, req.RoutingType)
 	if err != nil {
-		logger.Log.Error("添加节点失败", "err", err.Error())
+		logger.Log.Error("添加节点入库失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据库写入失败")
 		return
 	}
 
-	logger.Log.Info("节点添加成功", "Name", node.Name, "RoutingType", node.RoutingType)
+	logger.Log.Info("节点添加成功", "uuid", node.UUID, "name", node.Name, "routing_type", node.RoutingType, "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "节点添加成功")
 }
 
-// apiGetNodes 获取节点列表数据 (异步 API)
 func apiGetNodes(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodGet {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -349,7 +359,6 @@ func apiGetNodes(w http.ResponseWriter, r *http.Request) {
 	database.DB.Where("routing_type = ?", 1).Order("sort_index ASC, created_at DESC").Find(&directNodes)
 	database.DB.Where("routing_type = ?", 2).Order("sort_index ASC, created_at DESC").Find(&landNodes)
 
-	// [新增] 顺便获取面板 URL 传给前端，供安装脚本拼接使用
 	var panelURLConfig database.SysConfig
 	database.DB.Where("key = ?", "panel_url").First(&panelURLConfig)
 
@@ -358,7 +367,7 @@ func apiGetNodes(w http.ResponseWriter, r *http.Request) {
 		"data": map[string]interface{}{
 			"direct_nodes": directNodes,
 			"land_nodes":   landNodes,
-			"panel_url":    panelURLConfig.Value, // [新增字段]
+			"panel_url":    panelURLConfig.Value,
 		},
 	}
 
@@ -366,90 +375,99 @@ func apiGetNodes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// [新增] apiReorderNodes 处理拖拽排序和分组切换
 func apiReorderNodes(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 接收数据：目标分组 ID 和该分组内所有节点 UUID 的新顺序
 	var req struct {
 		TargetRoutingType int      `json:"target_routing_type"`
 		NodeUUIDs         []string `json:"node_uuids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求格式错误")
 		return
 	}
 
-	// 调用 Service 更新顺序
 	err := service.ReorderNodes(req.TargetRoutingType, req.NodeUUIDs)
 	if err != nil {
-		logger.Log.Error("更新排序失败", "err", err.Error())
+		logger.Log.Error("更新排序入库失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "保存排序失败")
 		return
 	}
 
+	logger.Log.Info("节点排序更新成功", "target_group", req.TargetRoutingType, "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "排序已更新")
 }
 
-// apiDeleteNode 接收 JSON 请求，处理删除节点操作
 func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 定义请求结构，只需要节点的 UUID
 	var req struct {
 		UUID string `json:"uuid"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求格式错误")
 		return
 	}
 
-	// 简单的校验
 	if req.UUID == "" {
+		logger.Log.Warn("请求缺少节点 UUID", "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "缺少节点 ID")
 		return
 	}
 
-	// 执行物理删除 (根据 UUID 删除 NodePool 表中的记录)
 	result := database.DB.Where("uuid = ?", req.UUID).Delete(&database.NodePool{})
 	if result.Error != nil {
-		logger.Log.Error("删除节点失败", "err", result.Error.Error())
+		logger.Log.Error("删除节点失败", "error", result.Error, "uuid", req.UUID, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据库删除失败")
 		return
 	}
 
-	logger.Log.Info("节点已删除", "UUID", req.UUID)
+	logger.Log.Info("节点已删除", "uuid", req.UUID, "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "节点已删除")
 }
 
-// [修改] apiPublicScript 返回渲染后的安装脚本
 func apiPublicScript(w http.ResponseWriter, r *http.Request) {
-	// 调用 Service 层进行模板渲染 (填充端口等信息)
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	scriptContent, err := service.RenderInstallScript()
 	if err != nil {
-		logger.Log.Error("脚本渲染失败", "err", err.Error())
+		logger.Log.Error("安装脚本模板渲染失败", "error", err, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Debug("成功分发安装脚本", "ip", clientIP, "path", reqPath)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write([]byte(scriptContent))
 }
 
-// [新增] apiCallbackReport 处理节点上报 (无需 Cookie，靠 install_id 鉴权)
 func apiCallbackReport(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 1. 完整定义接收前端脚本上报的数据结构
 	var report struct {
 		InstallID string `json:"install_id"`
 		Protocol  string `json:"protocol"`
@@ -459,37 +477,35 @@ func apiCallbackReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
+		logger.Log.Warn("解析回调 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "JSON 解析失败")
 		return
 	}
 
 	if report.InstallID == "" {
+		logger.Log.Warn("回调请求缺少 install_id", "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "缺少 install_id")
 		return
 	}
 
-	// 2. 校验并查找对应的节点
 	var node database.NodePool
 	if err := database.DB.Where("install_id = ?", report.InstallID).First(&node).Error; err != nil {
-		logger.Log.Warn("收到未知节点的上报", "install_id", report.InstallID)
+		logger.Log.Warn("收到未知节点的上报", "install_id", report.InstallID, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "节点不存在")
 		return
 	}
 
 	changed := false
 
-	// 3. 处理协议和链接的上报
 	if report.Protocol != "" && report.Link != "" {
 		if node.Links == nil {
 			node.Links = make(map[string]string)
 		}
-		// 将对应的协议链接存入 map 中
 		node.Links[report.Protocol] = report.Link
 		changed = true
-		logger.Log.Info("节点协议已上报", "节点", node.Name, "协议", report.Protocol)
+		logger.Log.Info("接收到节点协议上报", "name", node.Name, "protocol", report.Protocol, "ip", clientIP)
 	}
 
-	// 4. 处理双栈 IP 地址的上报
 	if report.IPv4 != "" || report.IPv6 != "" {
 		if report.IPv4 != "" {
 			node.IPV4 = report.IPv4
@@ -498,8 +514,6 @@ func apiCallbackReport(w http.ResponseWriter, r *http.Request) {
 			node.IPV6 = report.IPv6
 		}
 
-		// [新增] 自动解析 Region
-		// 优先使用 IPv4 解析，如果没有则尝试 IPv6
 		newRegion := ""
 		if node.IPV4 != "" {
 			newRegion = service.GlobalGeoIP.GetCountryIsoCode(node.IPV4)
@@ -511,18 +525,16 @@ func apiCallbackReport(w http.ResponseWriter, r *http.Request) {
 		if newRegion != "" && newRegion != node.Region {
 			node.Region = newRegion
 			changed = true
-			logger.Log.Info("节点地区已更新", "节点", node.Name, "地区", newRegion)
+			logger.Log.Info("节点地区解析更新", "name", node.Name, "region", newRegion, "ip", clientIP)
 		}
 
 		changed = true
-		logger.Log.Info("节点 IP 已更新", "节点", node.Name, "IPv4", report.IPv4, "IPv6", report.IPv6)
+		logger.Log.Info("接收到节点 IP 上报", "name", node.Name, "ipv4", report.IPv4, "ipv6", report.IPv6, "ip", clientIP)
 	}
 
-	// 5. 保存回数据库
 	if changed {
-		// 使用 Save 会全量更新，能确保 JSON(Links map) 字段正确被序列化保存
 		if err := database.DB.Save(&node).Error; err != nil {
-			logger.Log.Error("保存节点上报数据失败", "err", err.Error())
+			logger.Log.Error("保存节点上报数据失败", "error", err, "name", node.Name, "ip", clientIP, "path", reqPath)
 			sendJSON(w, "error", "数据库保存失败")
 			return
 		}
@@ -531,19 +543,23 @@ func apiCallbackReport(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, "success", "上报接收成功")
 }
 
-// [新增] apiGetSettings 获取全局节点代理设置
 func apiGetSettings(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodGet {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var configs []database.SysConfig
-	// [修改] 在 IN 查询列表中加入 "sub_token"
-	database.DB.Where("key IN ?", []string{
+	if err := database.DB.Where("key IN ?", []string{
 		"panel_url", "sub_token", "proxy_port_ss", "proxy_port_hy2", "proxy_port_tuic",
 		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
 		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "pref_use_emoji_flag", "sub_custom_name",
-	}).Find(&configs)
+	}).Find(&configs).Error; err != nil {
+		logger.Log.Error("读取系统配置失败", "error", err, "ip", clientIP, "path", reqPath)
+	}
 
 	data := make(map[string]string)
 	for _, c := range configs {
@@ -557,19 +573,22 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// [新增] apiUpdateSettings 保存全局节点代理设置
 func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var req map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求格式错误")
 		return
 	}
 
-	// [修改] 在白名单中加入 "sub_token"
 	validKeys := map[string]bool{
 		"panel_url": true, "sub_token": true, "proxy_port_ss": true, "proxy_port_hy2": true,
 		"proxy_port_tuic": true, "proxy_port_reality": true, "proxy_reality_sni": true,
@@ -579,36 +598,44 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	for k, v := range req {
 		if validKeys[k] {
-			database.DB.Model(&database.SysConfig{}).Where("key = ?", k).Update("value", v)
+			if err := database.DB.Model(&database.SysConfig{}).Where("key = ?", k).Update("value", v).Error; err != nil {
+				logger.Log.Error("更新系统配置异常", "key", k, "error", err, "ip", clientIP, "path", reqPath)
+			}
 		}
 	}
+	logger.Log.Info("系统全局配置已更新", "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "设置已保存")
 }
 
-// [新增] apiUpdateGeoIP 处理 GeoIP 数据库更新请求
 func apiUpdateGeoIP(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	logger.Log.Info("接收到触发更新 GeoIP 数据库的请求", "ip", clientIP, "path", reqPath)
 	go func() {
-		logger.Log.Info("后台开始更新 GeoIP 数据库...")
+		logger.Log.Info("后台线程开始更新 GeoIP 数据库...")
 		if err := service.GlobalGeoIP.ForceUpdate(); err != nil {
-			logger.Log.Error("GeoIP 数据库更新失败", "err", err.Error())
+			logger.Log.Error("GeoIP 数据库更新失败", "error", err)
 		} else {
-			logger.Log.Info("GeoIP 数据库更新成功")
+			logger.Log.Info("GeoIP 数据库更新流程圆满完成")
 		}
 	}()
 
 	sendJSON(w, "success", "更新任务已在后台启动，请留意日志或稍后刷新")
 }
 
-// 在 internal/server/handlers.go 中添加：
-
-// [新增] apiGetGeoStatus 获取 GeoIP 数据库状态
 func apiGetGeoStatus(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodGet {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -619,16 +646,15 @@ func apiGetGeoStatus(w http.ResponseWriter, r *http.Request) {
 	status := "unknown"
 	msg := ""
 
-	// 简单的状态判断逻辑
 	if errLocal != nil {
-		status = "not_found" // 本地无文件
+		status = "not_found"
 	} else if errRemote == nil && remoteTime.After(localTime.Add(24*time.Hour)) {
-		// 远程时间比本地时间晚 24 小时以上，认为有更新
 		status = "update_available"
 	} else if errRemote == nil {
 		status = "latest"
 	} else {
-		status = "check_failed" // 远程检查失败
+		status = "check_failed"
+		logger.Log.Warn("获取远程 GeoIP 版本信息失败", "error", errRemote, "ip", clientIP, "path", reqPath)
 	}
 
 	resp := map[string]interface{}{
@@ -636,12 +662,11 @@ func apiGetGeoStatus(w http.ResponseWriter, r *http.Request) {
 		"data": map[string]interface{}{
 			"local_time":  localTime.Format("2006-01-02"),
 			"remote_time": remoteTime.Format("2006-01-02"),
-			"state":       status, // latest, update_available, not_found, check_failed
+			"state":       status,
 			"error":       msg,
 		},
 	}
 
-	// 如果获取远程时间失败，把错误带上，但如果本地有文件，不影响使用
 	if errRemote != nil {
 		resp["data"].(map[string]interface{})["remote_error"] = errRemote.Error()
 	}
@@ -650,11 +675,12 @@ func apiGetGeoStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// handlers.go 末尾追加
-
-// apiGetClashSettings 获取前端弹窗所需的数据
 func apiGetClashSettings(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodGet {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -671,9 +697,12 @@ func apiGetClashSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// apiSaveClashSettings 保存前端提交的规则配置
 func apiSaveClashSettings(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -682,21 +711,21 @@ func apiSaveClashSettings(w http.ResponseWriter, r *http.Request) {
 		Modules []string `json:"modules"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据解析失败")
 		return
 	}
 
 	if err := service.SaveActiveClashModules(req.Modules); err != nil {
+		logger.Log.Error("保存 Clash 模块设置失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "保存失败")
 		return
 	}
 
+	logger.Log.Info("Clash 模板模块设置已更新", "modules", req.Modules, "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "Clash 规则组合保存成功")
 }
 
-// 在 handlers.go 中补充以下代码
-
-// verifySubToken 辅助函数：校验请求中的 Token
 func verifySubToken(r *http.Request) bool {
 	token := r.URL.Query().Get("token")
 	var config database.SysConfig
@@ -704,7 +733,6 @@ func verifySubToken(r *http.Request) bool {
 	return token != "" && token == config.Value
 }
 
-// getBaseURL 获取当前请求的基础 URL (用于拼接内部订阅地址)
 func getBaseURL(r *http.Request) string {
 	var config database.SysConfig
 	database.DB.Where("key = ?", "panel_url").First(&config)
@@ -720,10 +748,12 @@ func getBaseURL(r *http.Request) string {
 	return fmt.Sprintf("%s://%s", scheme, host)
 }
 
-// apiSubClash 输出最终的 Clash 订阅模板
-// [修改] apiSubClash 输出最终的 Clash 订阅模板
 func apiSubClash(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if !verifySubToken(r) {
+		logger.Log.Warn("Clash 订阅请求: Token 验证失败", "ip", clientIP, "path", reqPath)
 		http.Error(w, "Invalid Token", http.StatusForbidden)
 		return
 	}
@@ -731,17 +761,16 @@ func apiSubClash(w http.ResponseWriter, r *http.Request) {
 	baseURL := getBaseURL(r)
 	token := r.URL.Query().Get("token")
 
-	// 构造发给 Clash 模板的内部抓取地址
 	relayURL := fmt.Sprintf("%s/sub/raw/2?token=%s", baseURL, token)
 	exitURL := fmt.Sprintf("%s/sub/raw/1?token=%s", baseURL, token)
 
 	yamlContent, err := service.RenderClashConfig(relayURL, exitURL, baseURL, token)
 	if err != nil {
+		logger.Log.Error("生成 Clash 订阅模板失败", "error", err, "ip", clientIP, "path", reqPath)
 		http.Error(w, "模板生成失败", http.StatusInternalServerError)
 		return
 	}
 
-	// [新增] 从数据库获取自定义名称
 	var nameConfig database.SysConfig
 	database.DB.Where("key = ?", "sub_custom_name").First(&nameConfig)
 	subName := nameConfig.Value
@@ -749,8 +778,9 @@ func apiSubClash(w http.ResponseWriter, r *http.Request) {
 		subName = "NodeCTL"
 	}
 
+	logger.Log.Debug("成功下发 Clash 订阅模板", "ip", clientIP, "path", reqPath)
 	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
-	w.Header().Set("profile-title", subName) // 兼容客户端配置名称显示
+	w.Header().Set("profile-title", subName)
 
 	encodedName := url.QueryEscape(subName + ".yaml")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename*=utf-8''%s`, encodedName))
@@ -758,25 +788,27 @@ func apiSubClash(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(yamlContent))
 }
 
-// [新增] apiSubV2ray 输出通用 Base64 订阅
 func apiSubV2ray(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if !verifySubToken(r) {
+		logger.Log.Warn("V2Ray 订阅请求: Token 验证失败", "ip", clientIP, "path", reqPath)
 		http.Error(w, "Invalid Token", http.StatusForbidden)
 		return
 	}
 
-	// 获取国旗偏好设置
 	var flagConfig database.SysConfig
 	database.DB.Where("key = ?", "pref_use_emoji_flag").First(&flagConfig)
 	useFlag := flagConfig.Value != "false"
 
 	b64Content, err := service.GenerateV2RaySubBase64(useFlag)
 	if err != nil {
+		logger.Log.Error("生成 V2Ray Base64 订阅失败", "error", err, "ip", clientIP, "path", reqPath)
 		http.Error(w, "订阅生成失败", http.StatusInternalServerError)
 		return
 	}
 
-	// 获取自定义名称
 	var nameConfig database.SysConfig
 	database.DB.Where("key = ?", "sub_custom_name").First(&nameConfig)
 	subName := nameConfig.Value
@@ -784,6 +816,7 @@ func apiSubV2ray(w http.ResponseWriter, r *http.Request) {
 		subName = "NodeCTL"
 	}
 
+	logger.Log.Debug("成功下发 V2Ray Base64 订阅", "ip", clientIP, "path", reqPath)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("profile-title", subName)
 
@@ -793,14 +826,16 @@ func apiSubV2ray(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(b64Content))
 }
 
-// apiSubRaw 输出纯节点列表 (对应 Python 的 0.yaml 和 1.yaml)
 func apiSubRaw(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if !verifySubToken(r) {
+		logger.Log.Warn("Raw 节点列表请求: Token 验证失败", "ip", clientIP, "path", reqPath)
 		http.Error(w, "Invalid Token", http.StatusForbidden)
 		return
 	}
 
-	// 提取请求池类型 (1=直连, 2=落地)
 	pathParts := strings.Split(r.URL.Path, "/")
 	typeStr := pathParts[len(pathParts)-1]
 	routingType := 1
@@ -808,24 +843,32 @@ func apiSubRaw(w http.ResponseWriter, r *http.Request) {
 		routingType = 2
 	}
 
-	// [新增] 从数据库获取国旗偏好设置
 	var flagConfig database.SysConfig
 	database.DB.Where("key = ?", "pref_use_emoji_flag").First(&flagConfig)
-	useFlag := flagConfig.Value != "false" // 只要不是显式的 "false"，都默认为开启
+	useFlag := flagConfig.Value != "false"
 
-	// 传入 useFlag 参数进行渲染
 	yamlContent, err := service.GenerateRawNodesYAML(routingType, useFlag)
 	if err != nil {
+		logger.Log.Error("生成 Raw 节点列表失败", "error", err, "routing_type", routingType, "ip", clientIP, "path", reqPath)
 		http.Error(w, "节点生成失败", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Debug("成功下发 Raw 节点列表", "routing_type", routingType, "ip", clientIP, "path", reqPath)
 	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
 	w.Write([]byte(yamlContent))
 }
 
-// apiGetCustomRules 获取自定义规则原生文本 (供前端展示)
 func apiGetCustomRules(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
+	if r.Method != http.MethodGet {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	directRaw := service.GetCustomDirectRules()
 	proxyRules := service.GetCustomProxyRules()
 
@@ -834,43 +877,58 @@ func apiGetCustomRules(w http.ResponseWriter, r *http.Request) {
 		"status": "success",
 		"data": map[string]interface{}{
 			"direct": directRaw,
-			"proxy":  proxyRules, // 现在返回的是数组
+			"proxy":  proxyRules,
 		},
 	})
 }
 
-// apiSaveCustomRules 保存自定义规则原生文本
 func apiSaveCustomRules(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
+	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var req struct {
 		DirectRules string                    `json:"direct"`
-		ProxyRules  []service.CustomProxyRule `json:"proxy"` // 接收数组
+		ProxyRules  []service.CustomProxyRule `json:"proxy"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据解析失败")
 		return
 	}
 
-	service.SaveCustomDirectRules(req.DirectRules)
-	service.SaveCustomProxyRules(req.ProxyRules)
+	if err := service.SaveCustomDirectRules(req.DirectRules); err != nil {
+		logger.Log.Error("保存自定义直连规则失败", "error", err, "ip", clientIP, "path", reqPath)
+	}
+	if err := service.SaveCustomProxyRules(req.ProxyRules); err != nil {
+		logger.Log.Error("保存自定义分流规则失败", "error", err, "ip", clientIP, "path", reqPath)
+	}
 
+	logger.Log.Info("自定义路由规则保存成功", "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "自定义规则保存成功")
 }
 
-// [修改] apiSubRuleList 输出智能格式化后的规则列表
 func apiSubRuleList(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
 	if !verifySubToken(r) {
+		logger.Log.Warn("规则列表订阅请求: Token 验证失败", "ip", clientIP, "path", reqPath)
 		http.Error(w, "Invalid Token", http.StatusForbidden)
 		return
 	}
 
-	// 解析路径
 	path := strings.TrimPrefix(r.URL.Path, "/sub/rules/")
 	var rawContent string
 
 	if path == "direct" {
 		rawContent = service.GetCustomDirectRules()
 	} else if strings.HasPrefix(path, "proxy/") {
-		// 提取 proxy/{id} 中的 id
 		id := strings.TrimPrefix(path, "proxy/")
 		rules := service.GetCustomProxyRules()
 		for _, rule := range rules {
@@ -883,6 +941,7 @@ func apiSubRuleList(w http.ResponseWriter, r *http.Request) {
 
 	formattedContent := service.ParseCustomRules(rawContent)
 
+	logger.Log.Debug("成功下发智能格式化规则集", "rule_path", path, "ip", clientIP, "path", reqPath)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
 	w.Write([]byte(formattedContent))

@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"nodectl/internal/logger"
 )
 
 // ---------------------------------------------------------
@@ -77,6 +79,7 @@ func safeBase64Decode(s string) string {
 	}
 	decoded, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
+		logger.Log.Warn("Base64 节点解码失败", "error", err)
 		return ""
 	}
 	return string(decoded)
@@ -136,23 +139,36 @@ func ParseProxyLink(link, baseName, region string, useFlag bool) *ClashNode {
 	finalName = strings.TrimSpace(finalName)
 
 	lowerLink := strings.ToLower(link)
+	var node *ClashNode
 
 	if strings.HasPrefix(lowerLink, "vmess://") {
-		return parseVmess(link, finalName)
+		node = parseVmess(link, finalName)
 	} else if strings.HasPrefix(lowerLink, "vless://") {
-		return parseVless(link, finalName)
+		node = parseVless(link, finalName)
 	} else if strings.HasPrefix(lowerLink, "trojan://") {
-		return parseTrojan(link, finalName)
+		node = parseTrojan(link, finalName)
 	} else if strings.HasPrefix(lowerLink, "hy2://") || strings.HasPrefix(lowerLink, "hysteria2://") {
-		return parseHysteria2(link, finalName)
+		node = parseHysteria2(link, finalName)
 	} else if strings.HasPrefix(lowerLink, "tuic://") {
-		return parseTuic(link, finalName)
+		node = parseTuic(link, finalName)
 	} else if strings.HasPrefix(lowerLink, "ss://") {
-		return parseSS(link, finalName)
+		node = parseSS(link, finalName)
 	} else if strings.HasPrefix(lowerLink, "socks5://") {
-		return parseSocks5(link, finalName)
+		node = parseSocks5(link, finalName)
+	} else {
+		// 记录未知的协议头，截取前部分避免记录长文本
+		prefix := strings.Split(lowerLink, "://")[0]
+		logger.Log.Warn("不支持的代理协议", "name", finalName, "protocol", prefix)
+		return nil
 	}
-	return nil
+
+	if node != nil {
+		logger.Log.Debug("节点解析成功", "name", node.Name, "type", node.Type)
+	} else {
+		logger.Log.Warn("节点链接解析异常或格式损坏", "name", finalName)
+	}
+
+	return node
 }
 
 // ---------------------------------------------------------
@@ -162,6 +178,7 @@ func ParseProxyLink(link, baseName, region string, useFlag bool) *ClashNode {
 func parseVless(link, proxyName string) *ClashNode {
 	parsed, err := url.Parse(link)
 	if err != nil {
+		logger.Log.Warn("VLESS 链接 URL 解析失败", "error", err, "name", proxyName)
 		return nil
 	}
 
@@ -216,6 +233,7 @@ func parseVless(link, proxyName string) *ClashNode {
 func parseTrojan(link, proxyName string) *ClashNode {
 	parsed, err := url.Parse(link)
 	if err != nil {
+		logger.Log.Warn("Trojan 链接 URL 解析失败", "error", err, "name", proxyName)
 		return nil
 	}
 
@@ -260,6 +278,7 @@ func parseTrojan(link, proxyName string) *ClashNode {
 func parseHysteria2(link, proxyName string) *ClashNode {
 	parsed, err := url.Parse(link)
 	if err != nil {
+		logger.Log.Warn("Hysteria2 链接 URL 解析失败", "error", err, "name", proxyName)
 		return nil
 	}
 
@@ -319,6 +338,7 @@ func parseHysteria2(link, proxyName string) *ClashNode {
 func parseTuic(link, proxyName string) *ClashNode {
 	parsed, err := url.Parse(link)
 	if err != nil {
+		logger.Log.Warn("TUIC 链接 URL 解析失败", "error", err, "name", proxyName)
 		return nil
 	}
 
@@ -372,11 +392,13 @@ func parseVmess(link, proxyName string) *ClashNode {
 
 	decoded := safeBase64Decode(b64Part)
 	if decoded == "" {
+		logger.Log.Warn("VMess 链接 Base64 解码为空", "name", proxyName)
 		return nil
 	}
 
 	var v map[string]interface{}
 	if err := json.Unmarshal([]byte(decoded), &v); err != nil {
+		logger.Log.Warn("VMess 链接 JSON 反序列化失败", "error", err, "name", proxyName)
 		return nil
 	}
 
@@ -492,12 +514,15 @@ func parseSS(link, proxyName string) *ClashNode {
 			}
 		}
 	}
+
+	logger.Log.Warn("Shadowsocks 链接格式无法识别", "name", proxyName)
 	return nil
 }
 
 func parseSocks5(link, proxyName string) *ClashNode {
 	parsed, err := url.Parse(link)
 	if err != nil {
+		logger.Log.Warn("Socks5 链接 URL 解析失败", "error", err, "name", proxyName)
 		return nil
 	}
 

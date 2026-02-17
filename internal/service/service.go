@@ -15,13 +15,14 @@ import (
 )
 
 //go:embed singbox.tpl
-var SingboxScriptTpl string // [修改] 改为大写开头
+var SingboxScriptTpl string
 
 // GenerateRandomNodeName 生成随机节点名称 (node-4位字母数字)
 func GenerateRandomNodeName() string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
+		logger.Log.Warn("生成随机节点名称失败，启用回退名称", "error", err)
 		return "node-0000" // 容错备用
 	}
 	for i := range b {
@@ -45,9 +46,11 @@ func AddNode(name string, routingType int) (*database.NodePool, error) {
 
 	// 写入数据库
 	if err := database.DB.Create(node).Error; err != nil {
+		logger.Log.Error("服务层异常: 创建节点入库失败", "error", err, "node_name", name)
 		return nil, err
 	}
 
+	logger.Log.Debug("服务层: 节点记录创建成功", "uuid", node.UUID)
 	return node, nil
 }
 
@@ -56,6 +59,7 @@ func UpdateNode(uuid string, name string, routingType int, links map[string]stri
 	var node database.NodePool
 
 	if err := database.DB.Where("uuid = ?", uuid).First(&node).Error; err != nil {
+		logger.Log.Error("服务层异常: 更新时未找到目标节点", "error", err, "uuid", uuid)
 		return err
 	}
 
@@ -80,15 +84,22 @@ func UpdateNode(uuid string, name string, routingType int, links map[string]stri
 		// 这里策略是：只要解析出有效代码就覆盖，否则保留原样(或根据需求清空)
 		if region != "" {
 			node.Region = region
+			logger.Log.Debug("服务层: 节点 GeoIP 区域自动匹配成功", "uuid", uuid, "region", region)
 		}
 	}
 
-	return database.DB.Save(&node).Error
+	if err := database.DB.Save(&node).Error; err != nil {
+		logger.Log.Error("服务层异常: 保存节点更新失败", "error", err, "uuid", uuid)
+		return err
+	}
+
+	logger.Log.Debug("服务层: 节点数据更新成功", "uuid", uuid)
+	return nil
 }
 
-// [新增] ReorderNodes 批量更新节点的路由类型和排序索引
+// ReorderNodes 批量更新节点的路由类型和排序索引
 func ReorderNodes(routingType int, uuids []string) error {
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		for index, uuid := range uuids {
 			// 更新每个节点的 RoutingType (因为可能从直连拖到了落地)
 			// 并更新 SortIndex 为当前数组的下标
@@ -104,12 +115,21 @@ func ReorderNodes(routingType int, uuids []string) error {
 		}
 		return nil
 	})
+
+	if err != nil {
+		logger.Log.Error("服务层异常: 批量重排节点事务提交失败", "error", err, "routing_type", routingType)
+		return err
+	}
+
+	logger.Log.Debug("服务层: 节点批量重排完成", "routing_type", routingType, "affected_nodes", len(uuids))
+	return nil
 }
 
-// [修改] RenderInstallScript 渲染安装脚本 (只填充静态端口配置)
+// RenderInstallScript 渲染安装脚本 (只填充静态端口配置)
 func RenderInstallScript() (string, error) {
 	var configs []database.SysConfig
 	if err := database.DB.Find(&configs).Error; err != nil {
+		logger.Log.Error("服务层异常: 渲染脚本时读取配置失败", "error", err)
 		return "", fmt.Errorf("读取系统配置失败: %v", err)
 	}
 
@@ -154,13 +174,16 @@ func RenderInstallScript() (string, error) {
 	// 解析最终决定的模板内容
 	tmpl, err := template.New("install_script").Parse(tplContent)
 	if err != nil {
+		logger.Log.Error("服务层异常: 安装脚本模板语法解析失败", "error", err)
 		return "", fmt.Errorf("解析脚本模板失败: %v", err)
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
+		logger.Log.Error("服务层异常: 注入数据渲染脚本失败", "error", err)
 		return "", fmt.Errorf("渲染脚本失败: %v", err)
 	}
 
+	logger.Log.Debug("服务层: 成功渲染并装配部署脚本", "script_bytes", buf.Len())
 	return buf.String(), nil
 }
