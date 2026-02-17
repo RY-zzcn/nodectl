@@ -83,8 +83,14 @@ func (s *GeoService) Reload() error {
 	return nil
 }
 
-// GetLocalVersion 从数据库读取本地版本号
+// GetLocalVersion 读取本地版本号 (双重校验机制)
 func (s *GeoService) GetLocalVersion() string {
+	// 1. [核心修复] 必须先校验物理文件是否真实存在！
+	if _, err := os.Stat(s.path); os.IsNotExist(err) {
+		return "" // 如果物理文件丢失，无视数据库记录，直接视为“未下载”
+	}
+
+	// 2. 文件存在的情况下，再读取数据库里的版本号
 	var config database.SysConfig
 	if err := database.DB.Where("key = ?", GeoDBConfigKey).First(&config).Error; err != nil {
 		return ""
