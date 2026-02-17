@@ -1,6 +1,6 @@
 {{define "system_settings_modal.html"}}
 <style>
-    /* ================= 统一弹窗基础框架 ================= */
+    /* ================= 统一弹窗基础框架 (严格隔离前缀 sys-) ================= */
     .sys-modal-overlay {
         display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
@@ -9,56 +9,76 @@
     }
     .sys-modal-overlay.active { display: flex; opacity: 1; }
     
-    /* 统一尺寸与动画 */
+    /* 默认窄模式 320px，展开后 750px */
     .sys-modal-card {
-        background: #ffffff; width: 100%; max-width: 420px; height: 550px; border-radius: 12px; 
+        background: #ffffff; width: 100%; max-width: 320px; height: 550px; border-radius: 12px; 
         box-shadow: 0 20px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;
+        transition: max-width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
+    .sys-modal-card.has-content { max-width: 750px; }
 
+    /* 统一 Header 样式 */
     .sys-header { 
         background: #f5f5f7; border-bottom: 1px solid #e5e5ea; 
         padding: 15px 20px 15px 25px; display: flex; align-items: center; justify-content: space-between; 
     }
     .sys-title-area { display: flex; flex-direction: column; }
-    .sys-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-
+    .sys-title { font-size: 15px; font-weight: 600; color: #333; display: flex; align-items: center; gap: 8px; margin: 0; }
+    
     .sys-save-indicator {
         font-size: 12px; font-weight: 600; color: #34c759; opacity: 0; transition: opacity 0.3s;
         display: flex; align-items: center; gap: 4px;
     }
 
-    .sys-tab-menu { display: flex; gap: 24px; }
-    .sys-tab-btn {
-        background: transparent; border: none; font-size: 14px; font-weight: 600; color: #86868b;
-        padding: 10px 0; cursor: pointer; position: relative; transition: 0.2s;
-    }
-    .sys-tab-btn.active { color: #007aff; }
-    .sys-tab-btn.active::after {
-        content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #007aff; border-radius: 2px;
-    }
+    /* 主内容区 */
+    .sys-body { flex: 1; display: flex; flex-direction: row; background: #fff; overflow: hidden; }
+    .sys-no-scrollbar { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .sys-no-scrollbar::-webkit-scrollbar { display: none; }
 
-    .sys-body { flex: 1; position: relative; background: #fff; overflow: hidden; }
-    .no-scrollbar { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-
-    .sys-tab-content {
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        padding: 25px; display: none; flex-direction: column; background: #fff;
+    /* ================= 左侧分类导航面板 ================= */
+    .sys-left-col {
+        width: 320px; flex-shrink: 0; padding: 20px 25px;
+        border-right: 1px solid transparent; transition: border-color 0.3s;
     }
-    .sys-tab-content.active { display: flex; animation: fadeIn 0.2s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .sys-modal-card.has-content .sys-left-col { width: 260px; border-right-color: #f5f5f7; }
 
-    /* ================= 表单组件 ================= */
+    .sys-section-label { display: block; font-size: 13px; font-weight: 600; color: #888; margin-bottom: 12px; }
+
+    /* 导航卡片 */
+    .sys-nav-card {
+        border: 1px solid #e5e5ea; border-radius: 10px; background: #fff; margin-bottom: 10px;
+        padding: 12px 14px; user-select: none; cursor: pointer; transition: all 0.2s;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .sys-nav-card:hover { border-color: #d1d1d6; background: #fafafa; }
+    .sys-nav-card.active { border-color: #007aff; background: #f0f7ff; }
+    
+    .sys-nav-name { font-size: 14px; font-weight: 600; color: #1d1d1f; transition: color 0.2s; }
+    .sys-nav-card.active .sys-nav-name { color: #007aff; }
+
+    .sys-expand-indicator { color: #ccc; transition: all 0.2s; display: flex; align-items: center;}
+    .sys-nav-card:hover .sys-expand-indicator { color: #86868b; transform: translateX(2px); }
+    .sys-nav-card.active .sys-expand-indicator { color: #007aff; }
+
+    /* ================= 右侧/内联详情面板 ================= */
+    .sys-right-col {
+        flex: 1; padding: 20px 25px; display: none; background: #fff;
+    }
+    .sys-modal-card.has-content .sys-right-col { display: block; animation: sysFadeIn 0.3s ease; }
+    @keyframes sysFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* 表单组件 */
     .sys-field { margin-bottom: 24px; }
     .sys-label { display: block; font-size: 12px; font-weight: 600; color: #86868b; margin-bottom: 8px; text-transform: uppercase;}
     .sys-desc { font-size: 12px; color: #888; margin-top: 8px; line-height: 1.5; background: #f9f9fc; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
 
-    .sys-input {
+    .sys-input, .sys-select {
         width: 100%; padding: 10px 12px; border: 1px solid #d1d1d6; border-radius: 8px;
         font-size: 13px; color: #1d1d1f; outline: none; transition: 0.2s; background: #fafbfc;
-        font-family: Menlo, Monaco, "Courier New", monospace;
+        font-family: monospace;
     }
-    .sys-input:focus { border-color: #007aff; background: #fff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
+    .sys-input:focus, .sys-select:focus { border-color: #007aff; background: #fff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
+    select.sys-select { font-family: inherit; cursor: pointer; }
 
     .sys-input-group { display: flex; gap: 8px; }
     .sys-input-group .sys-input { flex: 1; }
@@ -70,80 +90,86 @@
     }
     .btn-sys-regen:hover { background: #e0efff; border-color: #b3d7ff; }
 
-    /* ================= iOS 风格偏好设置 ================= */
-    .pref-row {
+    /* 开关组件 */
+    .sys-pref-row {
         display: flex; justify-content: space-between; align-items: center;
         padding: 15px; background: #f9f9fc; border: 1px solid #eee; border-radius: 12px;
         margin-bottom: 15px; transition: 0.2s;
     }
-    .pref-row:hover { background: #f0f0f5; }
-    .pref-info { display: flex; flex-direction: column; gap: 4px; }
-    .pref-title { font-size: 14px; font-weight: 600; color: #333; }
-    .pref-desc { font-size: 12px; color: #888; line-height: 1.4; }
+    .sys-pref-row:hover { background: #f0f0f5; }
+    .sys-pref-info { display: flex; flex-direction: column; gap: 4px; }
+    .sys-pref-title { font-size: 14px; font-weight: 600; color: #333; }
+    .sys-pref-desc { font-size: 12px; color: #888; line-height: 1.4; }
 
-    .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-    .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
+    .sys-toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .sys-toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .sys-toggle-slider {
         position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
         background-color: #e5e5ea; transition: .3s; border-radius: 24px;
     }
-    .toggle-slider:before {
+    .sys-toggle-slider:before {
         position: absolute; content: ""; height: 20px; width: 20px;
         left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    .toggle-switch input:checked + .toggle-slider { background-color: #34c759; }
-    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+    .sys-toggle-switch input:checked + .sys-toggle-slider { background-color: #34c759; }
+    .sys-toggle-switch input:checked + .sys-toggle-slider:before { transform: translateX(20px); }
 
-    /* 针对选择框特别优化的样式 */
-    select.sys-input { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; cursor: pointer; }
-
-    /* ================= Geo 信息与按钮优化 ================= */
-    .geo-info-card {
+    /* Geo 信息卡片 */
+    .sys-geo-info-card {
         background: #fafbfc; border: 1px solid #e5e5ea; border-radius: 10px; padding: 15px;
         display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;
     }
-    .geo-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-    .geo-key { color: #666; font-weight: 500; }
-    .geo-value { color: #1d1d1f; font-weight: 600; font-family: monospace; }
+    .sys-geo-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .sys-geo-key { color: #666; font-weight: 500; }
+    .sys-geo-value { color: #1d1d1f; font-weight: 600; font-family: monospace; }
     
-    .btn-geo-action {
+    .btn-sys-geo-action {
         width: 100%; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
         display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; border: none; outline: none;
     }
-    .btn-geo-loading { background: #f5f5f7; color: #86868b; cursor: default; }
-    .btn-geo-update { background: #007aff; color: white; }
-    .btn-geo-update:hover { background: #0062cc; }
-    .btn-geo-latest { background: #eafff1; color: #34c759; border: 1px solid #bbf7d0; cursor: default; }
-    .btn-geo-error { background: #fff5f5; color: #d74242; border: 1px solid #fed7d7; }
-    .btn-geo-error:hover { background: #fee2e2; }
+    .btn-sys-geo-loading { background: #f5f5f7; color: #86868b; cursor: default; }
+    .btn-sys-geo-update { background: #007aff; color: white; }
+    .btn-sys-geo-update:hover { background: #0062cc; }
+    .btn-sys-geo-latest { background: #eafff1; color: #34c759; border: 1px solid #bbf7d0; cursor: default; }
+    .btn-sys-geo-error { background: #fff5f5; color: #d74242; border: 1px solid #fed7d7; }
+    .btn-sys-geo-error:hover { background: #fee2e2; }
 
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    .spin { animation: spin 1s linear infinite; }
+    @keyframes sysSpin { 100% { transform: rotate(360deg); } }
+    .sys-spin { animation: sysSpin 1s linear infinite; }
 
-    /* ================= 统一 Footer 样式 ================= */
+    /* Footer */
     .sys-footer { padding: 15px 25px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; background: #fff;}
     .btn-sys-cancel { background: #f5f5f7; border: none; color: #333; padding: 8px 25px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s;}
     .btn-sys-cancel:hover { background: #e5e5ea; }
 
+    /* ================= 移动端适配：内联抽屉展开模式 ================= */
+    .sys-mobile-inline-form {
+        padding: 15px; background: #fdfdfd; border: 1px solid #cce4ff; border-top: none;
+        border-radius: 0 0 10px 10px; margin-top: -10px; margin-bottom: 10px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); animation: sysSlideDown 0.2s ease-out; transform-origin: top center;
+    }
+    @keyframes sysSlideDown { from { opacity: 0; transform: scaleY(0.95); } to { opacity: 1; transform: scaleY(1); } }
+    
+    .sys-nav-card.mobile-expanded {
+        border-radius: 10px 10px 0 0; margin-bottom: 0; border-bottom-color: transparent;
+    }
+
     @media (max-width: 768px) {
         .sys-modal-card { max-width: 95%; height: 85vh; }
-        .sys-tab-menu { gap: 15px; }
-        .sys-tab-btn { font-size: 13px; }
+        .sys-modal-card.has-content { max-width: 95%; }
+        .sys-body { flex-direction: column; overflow-y: auto; display: block; }
+        .sys-left-col { width: 100%; height: auto; border-right: none; padding: 15px; overflow: visible; }
+        .sys-right-col { display: none !important; } /* 右侧面板彻底隐藏，表单移动到左侧内联显示 */
     }
 </style>
 
 <div class="sys-modal-overlay" id="systemSettingsModal">
-    <div class="sys-modal-card">
+    <div class="sys-modal-card" id="sysModalCard">
         
         <div class="sys-header">
             <div class="sys-title-area">
                 <div class="sys-title">⚙️ 系统核心设置</div>
-                <div class="sys-tab-menu">
-                    <button class="sys-tab-btn active" onclick="switchSysTab('basic')">基础配置</button>
-                    <button class="sys-tab-btn" onclick="switchSysTab('pref')">偏好设置</button>
-                    <button class="sys-tab-btn" onclick="switchSysTab('geo')">Geo 管理</button>
-                </div>
             </div>
             <div class="sys-save-indicator" id="sysSaveIndicator">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
@@ -151,74 +177,95 @@
             </div>
         </div>
         
-        <div class="sys-body no-scrollbar">
-            <div id="tab-basic" class="sys-tab-content no-scrollbar active">
-                <div class="sys-field">
-                    <label class="sys-label">面板外部访问地址 (Panel URL)</label>
-                    <input type="text" id="sys_panel_url" class="sys-input" placeholder="例如: https://www.yourdomain.com" oninput="triggerSysAutoSave()">
-                    <div class="sys-desc">用于脚本一键部署时的回调状态上报，以及订阅链接的生成基地址。</div>
+        <div class="sys-body sys-no-scrollbar">
+            <div class="sys-left-col sys-no-scrollbar">
+                <label class="sys-section-label">选择设置分类</label>
+                
+                <div class="sys-nav-card" data-sys-id="basic" onclick="selectSysCategory('basic', this)">
+                    <div class="sys-nav-name">⚙️ 基础配置</div>
+                    <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
                 </div>
 
-                <div class="sys-field">
-                    <label class="sys-label">订阅安全凭证 (Sub Token)</label>
-                    <div class="sys-input-group">
-                        <input type="text" id="sys_sub_token" class="sys-input" placeholder="用于拉取订阅的安全校验码" oninput="triggerSysAutoSave()">
-                        <button type="button" class="btn-sys-regen" onclick="generateNewSubToken()">重新生成</button>
-                    </div>
-                    <div class="sys-desc">这是您的核心订阅鉴权标识。如遭泄露，请点击重新生成，旧链接将立即失效。</div>
+                <div class="sys-nav-card" data-sys-id="pref" onclick="selectSysCategory('pref', this)">
+                    <div class="sys-nav-name">🎨 偏好设置</div>
+                    <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+                </div>
+
+                <div class="sys-nav-card" data-sys-id="geo" onclick="selectSysCategory('geo', this)">
+                    <div class="sys-nav-name">🌍 Geo 管理</div>
+                    <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
                 </div>
             </div>
 
-            <div id="tab-pref" class="sys-tab-content no-scrollbar">
-                <div class="pref-row">
-                    <div class="pref-info">
-                        <span class="pref-title">🌍 节点名称显示国旗</span>
-                        <span class="pref-desc">在生成的订阅文件中，自动为节点名称添加国家 Emoji 前缀 (如 🇺🇸、🇭🇰)</span>
+            <div class="sys-right-col sys-no-scrollbar" id="sysRightCol">
+                <label class="sys-section-label" id="sysRightTitle">设置详情</label>
+                
+                <div class="sys-form-section" id="sys-form-basic" style="display:none;">
+                    <div class="sys-field">
+                        <label class="sys-label">面板外部访问地址 (Panel URL)</label>
+                        <input type="text" id="sys_panel_url" class="sys-input" placeholder="例如: https://www.yourdomain.com" oninput="triggerSysAutoSave()">
+                        <div class="sys-desc">用于脚本一键部署时的回调状态上报，以及订阅链接的生成基地址。</div>
                     </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="sys_pref_flag" onchange="triggerSysAutoSave()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="pref-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
-                    <div class="pref-info" style="width: 100%;">
-                        <span class="pref-title">🌐 节点 IP 生成策略</span>
-                        <span class="pref-desc">控制订阅中下发的 IP (基于节点列表中记录的双栈IP，若均未记录则使用原链接IP)</span>
-                    </div>
-                    <select id="sys_pref_ip_strategy" class="sys-input" onchange="triggerSysAutoSave()">
-                        <option value="ipv4_prefer">IPv4 优先 (双栈时选用 v4，系统默认)</option>
-                        <option value="ipv6_prefer">IPv6 优先 (双栈时选用 v6)</option>
-                        <option value="dual_stack">双栈分离模式 (双栈时生成 v4 和 v6 两个独立节点)</option>
-                        <option value="ipv4_only">仅限 IPv4 (直接丢弃无 v4 的节点)</option>
-                        <option value="ipv6_only">仅限 IPv6 (直接丢弃无 v6 的节点)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div id="tab-geo" class="sys-tab-content no-scrollbar">
-                <div class="sys-field">
-                    <label class="sys-label">数据库版本信息</label>
-                    <div class="geo-info-card">
-                        <div class="geo-row">
-                            <span class="geo-key">本地记录版本</span>
-                            <span class="geo-value" id="geoLocalVersion">--</span>
+                    <div class="sys-field">
+                        <label class="sys-label">订阅安全凭证 (Sub Token)</label>
+                        <div class="sys-input-group">
+                            <input type="text" id="sys_sub_token" class="sys-input" placeholder="用于拉取订阅的安全校验码" oninput="triggerSysAutoSave()">
+                            <button type="button" class="btn-sys-regen" onclick="generateNewSubToken()">重新生成</button>
                         </div>
-                        <div class="geo-row">
-                            <span class="geo-key">GitHub 最新版</span>
-                            <span class="geo-value" id="geoRemoteVersion">--</span>
-                        </div>
+                        <div class="sys-desc">这是您的核心订阅鉴权标识。如遭泄露，请点击重新生成，旧链接将立即失效。</div>
                     </div>
                 </div>
 
-                <div class="sys-field">
-                    <label class="sys-label">状态与操作</label>
-                    <button type="button" id="btnGeoUpdate" class="btn-geo-action btn-geo-loading" onclick="handleGeoBtnClick()">
-                        <svg class="spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                        正在比对版本...
-                    </button>
-                    <div class="sys-desc" id="geoActionDesc" style="text-align: center; background: transparent; border: none; padding: 0;">连接 GitHub API 获取版本信息中...</div>
+                <div class="sys-form-section" id="sys-form-pref" style="display:none;">
+                    <div class="sys-pref-row">
+                        <div class="sys-pref-info">
+                            <span class="sys-pref-title">🌍 节点名称显示国旗</span>
+                            <span class="sys-pref-desc">自动为节点名称添加国家 Emoji 前缀 (如 🇺🇸、🇭🇰)</span>
+                        </div>
+                        <label class="sys-toggle-switch">
+                            <input type="checkbox" id="sys_pref_flag" onchange="triggerSysAutoSave()">
+                            <span class="sys-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="sys-pref-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+                        <div class="sys-pref-info" style="width: 100%;">
+                            <span class="sys-pref-title">🌐 节点 IP 生成策略</span>
+                            <span class="sys-pref-desc">控制订阅中下发的 IP (基于节点列表中记录的双栈IP)</span>
+                        </div>
+                        <select id="sys_pref_ip_strategy" class="sys-select" onchange="triggerSysAutoSave()">
+                            <option value="ipv4_prefer">IPv4 优先 (双栈时选用 v4，系统默认)</option>
+                            <option value="ipv6_prefer">IPv6 优先 (双栈时选用 v6)</option>
+                            <option value="dual_stack">双栈分离模式 (双栈时生成 v4 和 v6 两个独立节点)</option>
+                            <option value="ipv4_only">仅限 IPv4 (直接丢弃无 v4 的节点)</option>
+                            <option value="ipv6_only">仅限 IPv6 (直接丢弃无 v6 的节点)</option>
+                        </select>
+                    </div>
                 </div>
+
+                <div class="sys-form-section" id="sys-form-geo" style="display:none;">
+                    <div class="sys-field">
+                        <label class="sys-label">数据库版本信息</label>
+                        <div class="sys-geo-info-card">
+                            <div class="sys-geo-row">
+                                <span class="sys-geo-key">本地记录版本</span>
+                                <span class="sys-geo-value" id="sysGeoLocalVersion">--</span>
+                            </div>
+                            <div class="sys-geo-row">
+                                <span class="sys-geo-key">GitHub 最新版</span>
+                                <span class="sys-geo-value" id="sysGeoRemoteVersion">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sys-field">
+                        <label class="sys-label">状态与操作</label>
+                        <button type="button" id="btnSysGeoUpdate" class="btn-sys-geo-action btn-sys-geo-loading" onclick="handleGeoBtnClick()">
+                            <svg class="sys-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                            正在比对版本...
+                        </button>
+                        <div class="sys-desc" id="sysGeoActionDesc" style="text-align: center; background: transparent; border: none; padding: 0;">连接 API 获取版本信息中...</div>
+                    </div>
+                </div>
+                
             </div>
         </div>
 
@@ -230,24 +277,90 @@
 
 <script>
     const sysModal = document.getElementById('systemSettingsModal');
+    const sysModalCard = document.getElementById('sysModalCard');
     let hasCheckedGeo = false; 
     let geoState = 'checking'; 
 
-    function switchSysTab(tabName) {
-        const btns = document.querySelectorAll('.sys-tab-btn');
-        btns.forEach(btn => btn.classList.remove('active'));
+    // 手风琴/分栏切换核心逻辑
+    function selectSysCategory(catId, cardElement) {
+        const isAlreadyActive = cardElement.classList.contains('active');
+        const isMobile = window.innerWidth <= 768;
         
-        if(tabName === 'basic') btns[0].classList.add('active');
-        if(tabName === 'pref') btns[1].classList.add('active');
-        if(tabName === 'geo') {
-            btns[2].classList.add('active');
-            if(!hasCheckedGeo) checkGeoStatus();
+        // 重置所有卡片和表单位置
+        document.querySelectorAll('.sys-nav-card').forEach(c => c.classList.remove('active', 'mobile-expanded'));
+        document.querySelectorAll('.sys-form-section').forEach(f => {
+            f.style.display = 'none';
+            f.classList.remove('sys-mobile-inline-form');
+            document.getElementById('sysRightCol').appendChild(f);
+        });
+
+        // 手机端：点击已展开项则折叠
+        if (isAlreadyActive && isMobile) {
+            sysModalCard.classList.remove('has-content');
+            return;
         }
 
-        const contents = document.querySelectorAll('.sys-tab-content');
-        contents.forEach(c => c.classList.remove('active'));
-        document.getElementById('tab-' + tabName).classList.add('active');
+        // 激活当前项
+        cardElement.classList.add('active');
+        const catName = cardElement.querySelector('.sys-nav-name').innerText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+        document.getElementById('sysRightTitle').innerText = catName;
+        
+        const formEl = document.getElementById('sys-form-' + catId);
+
+        // 如果是选中 Geo 管理，且还没检查过版本，触发检查
+        if (catId === 'geo' && !hasCheckedGeo) {
+            checkGeoStatus();
+        }
+
+        if (isMobile) {
+            cardElement.classList.add('mobile-expanded');
+            formEl.classList.add('sys-mobile-inline-form');
+            cardElement.parentNode.insertBefore(formEl, cardElement.nextSibling);
+            sysModalCard.classList.remove('has-content');
+        } else {
+            document.getElementById('sysRightCol').appendChild(formEl);
+            sysModalCard.classList.add('has-content');
+        }
+
+        formEl.style.display = 'block';
+
+        if (isMobile) {
+            setTimeout(() => cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        }
     }
+
+    // 响应式布局自适应修正 (防窗口拉伸)
+    function adjustSysLayout() {
+        const isMobile = window.innerWidth <= 768;
+        const activeCard = document.querySelector('.sys-nav-card.active');
+        
+        if (!activeCard) {
+            if (!isMobile) {
+                const firstCard = document.querySelector('.sys-nav-card');
+                if (firstCard) selectSysCategory(firstCard.getAttribute('data-sys-id'), firstCard);
+            }
+            return;
+        }
+
+        const catId = activeCard.getAttribute('data-sys-id');
+        const formEl = document.getElementById('sys-form-' + catId);
+
+        if (isMobile) {
+            activeCard.classList.add('mobile-expanded');
+            formEl.classList.add('sys-mobile-inline-form');
+            activeCard.parentNode.insertBefore(formEl, activeCard.nextSibling);
+            sysModalCard.classList.remove('has-content');
+        } else {
+            activeCard.classList.remove('mobile-expanded');
+            formEl.classList.remove('sys-mobile-inline-form');
+            document.getElementById('sysRightCol').appendChild(formEl);
+            sysModalCard.classList.add('has-content');
+        }
+    }
+
+    window.addEventListener('resize', () => {
+        if (sysModal.classList.contains('active')) adjustSysLayout();
+    });
 
     function generateNewSubToken() {
         const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -260,8 +373,25 @@
     }
 
     async function openSystemSettingsModal() {
+        // 重置状态
+        document.querySelectorAll('.sys-nav-card').forEach(c => c.classList.remove('active', 'mobile-expanded'));
+        document.querySelectorAll('.sys-form-section').forEach(f => {
+            f.style.display = 'none';
+            f.classList.remove('sys-mobile-inline-form');
+            document.getElementById('sysRightCol').appendChild(f);
+        });
+
+        if (window.innerWidth > 768) {
+            sysModalCard.classList.add('has-content');
+            const firstCard = document.querySelector('.sys-nav-card');
+            firstCard.classList.add('active');
+            document.getElementById('sysRightTitle').innerText = '基础配置';
+            document.getElementById('sys-form-basic').style.display = 'block';
+        } else {
+            sysModalCard.classList.remove('has-content');
+        }
+
         sysModal.classList.add('active');
-        switchSysTab('basic'); 
         hasCheckedGeo = false; 
         renderGeoBtn('checking'); 
         document.getElementById('sysSaveIndicator').style.opacity = '0';
@@ -273,11 +403,7 @@
                 const data = result.data;
                 document.getElementById('sys_panel_url').value = data.panel_url || '';
                 document.getElementById('sys_sub_token').value = data.sub_token || '';
-                
-                const useFlag = data.pref_use_emoji_flag !== 'false';
-                document.getElementById('sys_pref_flag').checked = useFlag;
-
-                // 绑定新增加的策略参数
+                document.getElementById('sys_pref_flag').checked = data.pref_use_emoji_flag !== 'false';
                 document.getElementById('sys_pref_ip_strategy').value = data.pref_ip_strategy || 'ipv4_prefer';
             }
         } catch(e) { console.error("加载配置失败", e); }
@@ -285,6 +411,7 @@
 
     function closeSystemSettingsModal() {
         sysModal.classList.remove('active');
+        setTimeout(() => sysModalCard.classList.remove('has-content'), 300);
     }
 
     let sysAutoSaveTimer = null;
@@ -299,7 +426,7 @@
                 "panel_url": document.getElementById('sys_panel_url').value.trim(),
                 "sub_token": document.getElementById('sys_sub_token').value.trim(),
                 "pref_use_emoji_flag": document.getElementById('sys_pref_flag').checked ? "true" : "false",
-                "pref_ip_strategy": document.getElementById('sys_pref_ip_strategy').value // 追加新参数
+                "pref_ip_strategy": document.getElementById('sys_pref_ip_strategy').value
             };
 
             if(!payload.sub_token) {
@@ -326,6 +453,7 @@
         }, 600);
     }
 
+    // ================= Geo API 相关逻辑 =================
     async function checkGeoStatus() {
         hasCheckedGeo = true;
         renderGeoBtn('checking');
@@ -336,11 +464,8 @@
             
             if(result.status === 'success') {
                 const data = result.data;
-                const local = data.local_version || '未下载';
-                const remote = data.remote_version || '未知';
-                
-                document.getElementById('geoLocalVersion').innerText = local;
-                document.getElementById('geoRemoteVersion').innerText = remote;
+                document.getElementById('sysGeoLocalVersion').innerText = data.local_version || '未下载';
+                document.getElementById('sysGeoRemoteVersion').innerText = data.remote_version || '未知';
                 
                 let uiState = 'error';
                 if (data.state === 'latest') uiState = 'latest';
@@ -352,7 +477,7 @@
                 throw new Error(result.message);
             }
         } catch(e) {
-            document.getElementById('geoRemoteVersion').innerText = "网络错误";
+            document.getElementById('sysGeoRemoteVersion').innerText = "网络错误";
             renderGeoBtn('error');
         }
     }
@@ -363,18 +488,13 @@
     }
 
     async function updateGeoDatabase() {
-        const btn = document.getElementById('btnGeoUpdate');
-        btn.className = 'btn-geo-action btn-geo-loading';
-        btn.innerHTML = '<svg class="spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在后台下载更新...';
-        btn.style.cursor = 'default';
+        renderGeoBtn('updating');
 
         try {
             const response = await fetch('/api/update-geoip', { method: 'POST' });
             const result = await response.json();
             if(result.status === 'success') {
-                setTimeout(() => {
-                    checkGeoStatus(); 
-                }, 3000);
+                setTimeout(() => { checkGeoStatus(); }, 3000);
             } else {
                 alert("指令发送失败: " + result.message);
                 renderGeoBtn('update');
@@ -387,29 +507,35 @@
 
     function renderGeoBtn(state, isNotFound = false) {
         geoState = state;
-        const btn = document.getElementById('btnGeoUpdate');
-        const desc = document.getElementById('geoActionDesc');
-        const rVer = document.getElementById('geoRemoteVersion');
+        const btn = document.getElementById('btnSysGeoUpdate');
+        const desc = document.getElementById('sysGeoActionDesc');
+        const rVer = document.getElementById('sysGeoRemoteVersion');
 
         if (state === 'checking') {
-            btn.className = 'btn-geo-action btn-geo-loading';
-            btn.innerHTML = '<svg class="spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在比对版本...';
+            btn.className = 'btn-sys-geo-action btn-sys-geo-loading';
+            btn.innerHTML = '<svg class="sys-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在比对版本...';
             desc.innerText = '正在连接 GitHub API 获取版本信息...';
             if(rVer.innerText === '--') rVer.innerText = '检查中...';
         
+        } else if (state === 'updating') {
+            btn.className = 'btn-sys-geo-action btn-sys-geo-loading';
+            btn.innerHTML = '<svg class="sys-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在后台下载更新...';
+            btn.style.cursor = 'default';
+            desc.innerText = '后端正在执行下载和解压任务，请稍候...';
+
         } else if (state === 'latest') {
-            btn.className = 'btn-geo-action btn-geo-latest';
+            btn.className = 'btn-sys-geo-action btn-sys-geo-latest';
             btn.innerHTML = '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 已是最新版本';
             desc.innerText = '当前数据库已是最新版本，无需执行任何操作。';
         
         } else if (state === 'update') {
-            btn.className = 'btn-geo-action btn-geo-update';
+            btn.className = 'btn-sys-geo-action btn-sys-geo-update';
             const actionText = isNotFound ? '立即下载数据库' : '立即更新数据库';
             btn.innerHTML = `<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${actionText}`;
             desc.innerText = isNotFound ? '本地未找到数据库文件，请下载以启用 IP 归属地解析。' : '检测到新版本，建议更新以获得更准确的解析。';
         
         } else if (state === 'error') {
-            btn.className = 'btn-geo-action btn-geo-error';
+            btn.className = 'btn-sys-geo-action btn-sys-geo-error';
             btn.innerHTML = '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg> 检查失败，点击重试';
             desc.innerText = '无法获取版本信息，请检查网络连接或稍后重试。';
         }

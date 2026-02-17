@@ -42,6 +42,8 @@ func initBasicSettings() {
 		{Key: "geo_db_version", Value: "", Description: "GeoIP 数据库版本号"},
 		{Key: "pref_ip_strategy", Value: "ipv4_prefer", Description: "节点IP生成策略"},
 		{Key: "clash_custom_modules", Value: "[]", Description: "用户自定义的 Clash 分流模块"},
+		{Key: "clash_custom_proxy_rules", Value: "[]", Description: "自定义分流策略组配置"},
+		{Key: "clash_custom_direct_raw", Value: "", Description: "自定义直连规则原始文本"},
 	}
 
 	for _, config := range defaultConfigs {

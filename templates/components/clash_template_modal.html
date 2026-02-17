@@ -1,5 +1,15 @@
 {{define "clash_template_modal.html"}}
 <style>
+    /* =======================================================
+       ✨ 布局调整参数区 (方便你手动调节窗口大小)
+       ======================================================= */
+    :root {
+        --clash-modal-max-width: 900px;   /* 弹窗最大宽度 */
+        --clash-modal-max-height: 85vh;   /* 弹窗最大高度 (vh为屏幕高度的百分比) */
+        --clash-left-col-width: 320px;    /* 左侧自定义添加区的固定宽度 */
+    }
+
+    /* ================= 统一弹窗基础框架 ================= */
     .clash-modal-overlay {
         display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
@@ -9,9 +19,12 @@
     .clash-modal-overlay.active { display: flex; opacity: 1; }
     
     .clash-modal-card {
-        background: #ffffff; width: 100%; max-width: 600px; border-radius: 12px; 
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;
-        max-height: 90vh;
+        background: #ffffff; width: 100%; 
+        max-width: var(--clash-modal-max-width); 
+        max-height: var(--clash-modal-max-height); 
+        border-radius: 12px; 
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15); 
+        display: flex; flex-direction: column; overflow: hidden;
     }
 
     .clash-header { 
@@ -20,78 +33,153 @@
     }
     .clash-title { font-size: 15px; font-weight: 600; color: #333; margin: 0; }
 
-    .clash-body { 
-        padding: 20px 25px; background: #fff; overflow-y: auto;
+    /* 左右分栏容器 */
+    .clash-body-wrapper {
+        display: flex; flex-direction: row; overflow: hidden; flex: 1; min-height: 0;
+    }
+
+    /* 左侧：添加自定义规则栏 */
+    .clash-left-col {
+        width: var(--clash-left-col-width); flex-shrink: 0; padding: 25px; border-right: 1px solid #e5e5ea;
+        background: #fafbfc; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .clash-left-col::-webkit-scrollbar { display: none; }
+
+    .left-section-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
+
+    .custom-input-group { margin-bottom: 15px; }
+    .custom-input-group label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
+    .custom-input {
+        width: 100%; padding: 10px 12px; border: 1px solid #d1d1d6; border-radius: 8px;
+        font-size: 13px; outline: none; transition: 0.2s; background: #fff; box-sizing: border-box;
+    }
+    .custom-input:focus { border-color: #007aff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
+
+    .btn-add-custom {
+        width: 100%; background: #007aff; border: none; color: white; font-weight: 600;
+        padding: 12px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.2s; margin-top: 5px;
+    }
+    .btn-add-custom:hover { background: #0062cc; }
+
+    /* 右侧：规则展示区 */
+    .clash-right-col {
+        flex: 1; padding: 25px; background: #fff; overflow-y: auto;
         scrollbar-width: none; -ms-overflow-style: none;
     }
-    .clash-body::-webkit-scrollbar { display: none; }
+    .clash-right-col::-webkit-scrollbar { display: none; }
 
-    /* 预设区域 */
-    .preset-section {
-        background: #f9f9fc; border: 1px solid #e1e1e8; border-radius: 10px;
+    /* 虚线分组容器与标题行 */
+    .module-group-box {
+        border: 1px dashed #c5c5d2; background: #fafbfc; border-radius: 10px;
         padding: 15px; margin-bottom: 20px;
     }
-    .preset-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;}
-    .preset-btns-row { display: flex; gap: 10px; flex-wrap: wrap; }
     
-    .btn-preset {
-        padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d1d6; 
-        background: #fff; font-size: 12px; font-weight: 600; color: #555;
-        cursor: pointer; transition: all 0.2s;
+    .module-group-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
     }
-    .btn-preset:hover { border-color: #007aff; color: #007aff; }
-    .btn-preset.active { background: #007aff; color: #fff; border-color: #007aff; }
-    .preset-desc-box { font-size: 12px; color: #888; margin-top: 10px; min-height: 18px; line-height: 1.5; }
+    
+    .module-group-title {
+        font-size: 13px; font-weight: 600; color: #666; display: flex; align-items: center; gap: 6px;
+    }
 
-    /* 模块多选区域 */
-    .clash-section-label { font-size: 13px; font-weight: 600; color: #888; margin-bottom: 12px; display: block; }
-    .clash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 25px;}
+    /* ✨ 新增：极其优雅的悬浮提示框 (Tooltip) */
+    .info-tooltip-wrap {
+        position: relative; display: inline-flex; align-items: center; cursor: pointer; margin-left: 2px;
+        outline: none; /* 去除手机端点击发光 */
+    }
+    .info-tooltip-wrap svg { color: #a1a1aa; transition: color 0.2s; }
+    .info-tooltip-wrap:hover svg, .info-tooltip-wrap:focus svg { color: #007aff; }
+    
+    .tooltip-content {
+        position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%) translateY(5px);
+        background: rgba(29, 29, 31, 0.9); color: #fff; padding: 6px 10px; border-radius: 6px;
+        font-size: 11px; white-space: nowrap; font-weight: 500; letter-spacing: 0.5px;
+        opacity: 0; visibility: hidden; transition: all 0.2s; pointer-events: none; z-index: 100;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    /* 小箭头 */
+    .tooltip-content::after {
+        content: ''; position: absolute; top: 100%; left: 50%; margin-left: -4px;
+        border-width: 4px; border-style: solid; border-color: rgba(29, 29, 31, 0.9) transparent transparent transparent;
+    }
+    /* 悬浮或手机端点击获取焦点时显示 */
+    .info-tooltip-wrap:hover .tooltip-content, .info-tooltip-wrap:focus .tooltip-content {
+        opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
+    }
 
+    /* 精致的灰白色预设下拉菜单 */
+    .preset-select {
+        padding: 6px 14px; font-size: 12px; font-weight: 600; color: #333;
+        background-color: #f5f5f7; border: 1px solid #d1d1d6; border-radius: 6px;
+        outline: none; cursor: pointer; transition: all 0.2s;
+        font-family: inherit; 
+        appearance: none; -webkit-appearance: none; 
+        text-align: center; text-align-last: center; 
+    }
+    .preset-select:hover { background-color: #e5e5ea; border-color: #c5c5d2; }
+    .preset-select option { text-align: center; }
+
+    /* 网格布局 */
+    .clash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .clash-custom-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    /* 模块复选框 */
     .clash-module-label {
-        display: flex; align-items: center; gap: 10px; cursor: pointer; 
-        font-size: 13px; font-weight: 500; color: #333; padding: 10px 12px; 
-        background: #fafbfc; border-radius: 8px; border: 1px solid #e1e1e8;
+        display: flex; align-items: center; gap: 8px; cursor: pointer; 
+        font-size: 13px; font-weight: 500; color: #333; padding: 10px; 
+        background: #fff; border-radius: 8px; border: 1px solid #e1e1e8;
         transition: all 0.2s; user-select: none; position: relative;
     }
-    .clash-module-label:hover { border-color: #cce4ff; background: #f0f7ff; }
+    .clash-module-label:hover { border-color: #cce4ff; }
     .clash-module-label.is-checked { border-color: #007aff; background: #f0f7ff; box-shadow: 0 2px 6px rgba(0,122,255,0.1);}
 
     .mod-icon-box { width: 20px; height: 20px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; font-size: 16px; }
     .mod-icon-box img { width: 100%; height: 100%; object-fit: contain; }
 
-    .btn-delete-custom {
+    /* 悬浮操作按钮组容器 */
+    .custom-actions {
         position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-        background: transparent; border: none; color: #d74242; cursor: pointer;
-        padding: 4px; display: none;
+        display: none; align-items: center; gap: 4px;
     }
-    .clash-module-label:hover .btn-delete-custom { display: block; }
+    .clash-module-label:hover .custom-actions { display: flex; }
 
-    /* 自定义添加区域 */
-    .custom-add-box {
-        background: #fff; border: 1px dashed #d1d1d6; border-radius: 10px; padding: 15px;
+    /* 编辑按钮 (蓝灰色) */
+    .btn-edit-custom {
+        background: #f0f7ff; border: 1px solid #cce4ff; color: #007aff; border-radius: 6px;
+        cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
     }
-    .custom-input-row { display: flex; gap: 10px; margin-bottom: 10px; }
-    .custom-input {
-        flex: 1; padding: 8px 12px; border: 1px solid #d1d1d6; border-radius: 6px;
-        font-size: 12px; outline: none; transition: 0.2s; background: #fafbfc;
-    }
-    .custom-input:focus { border-color: #007aff; background: #fff; }
-    .btn-add-custom {
-        background: #f0f7ff; border: 1px solid #cce4ff; color: #007aff; font-weight: 600;
-        padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: 0.2s;
-    }
-    .btn-add-custom:hover { background: #e0efff; }
+    .btn-edit-custom:hover { background: #e0efff; }
 
+    /* 删除按钮 (红粉色) - ✨ 支持二次确认状态的样式切换 */
+    .btn-delete-custom {
+        background: #fff5f5; border: 1px solid #fed7d7; color: #d74242; border-radius: 6px;
+        cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .btn-delete-custom:hover { background: #fee2e2; }
+    
+    /* 二次确认高亮状态 */
+    .btn-delete-custom.confirm-state {
+        background: #d74242; color: #ffffff; border-color: #d74242;
+        padding: 4px 10px; font-size: 11px; font-weight: bold; white-space: nowrap;
+    }
+    .btn-delete-custom.confirm-state:hover { background: #c53030; }
+
+    /* 底部操作区 */
     .clash-footer { 
         padding: 15px 25px; border-top: 1px solid #eee; background: #fff;
-        display: flex; justify-content: flex-end; gap: 12px;
+        display: flex; justify-content: flex-end; gap: 12px; z-index: 10;
     }
     .btn-clash-cancel { background: #f5f5f7; border: none; color: #333; padding: 8px 22px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s;}
     .btn-clash-save { background: #007aff; border: none; color: white; padding: 8px 22px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s;}
 
+    /* 移动端自适应 */
     @media (max-width: 768px) {
-        .clash-grid { grid-template-columns: 1fr 1fr; }
-        .custom-input-row { flex-direction: column; }
+        .clash-modal-card { max-width: 95%; }
+        .clash-body-wrapper { flex-direction: column; overflow-y: auto;}
+        .clash-left-col { width: 100%; border-right: none; border-bottom: 1px solid #e5e5ea; padding: 20px; overflow: visible;}
+        .clash-right-col { width: 100%; padding: 20px; overflow: visible;}
+        .clash-grid { grid-template-columns: repeat(2, 1fr); }
+        .clash-custom-grid { grid-template-columns: 1fr; } 
     }
 </style>
 
@@ -101,25 +189,71 @@
             <div class="clash-title">⚙️ Clash 路由分流引擎</div>
         </div>
         
-        <div class="clash-body">
-            <div class="preset-section">
-                <div class="preset-title">一键模板预设</div>
-                <div class="preset-btns-row" id="presetBtnsContainer"></div>
-                <div class="preset-desc-box" id="presetDescBox">选择上方预设，快速应用分流组合</div>
+        <div class="clash-body-wrapper">
+            <div class="clash-left-col">
+                <div class="left-section-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                    添加自定义规则集
+                </div>
+                
+                <div class="custom-input-group">
+                    <label>标识名 (必填)</label>
+                    <input type="text" id="customModName" class="custom-input" placeholder="如: 私人网盘">
+                </div>
+                
+                <div class="custom-input-group">
+                    <label>图标 (可选)</label>
+                    <input type="text" id="customModIcon" class="custom-input" placeholder="支持 Emoji 或 ico URL">
+                </div>
+                
+                <div class="custom-input-group">
+                    <label>Domain 规则集 (.mrs)</label>
+                    <input type="text" id="customModDomain" class="custom-input" placeholder="Domain MRS 链接地址">
+                </div>
+
+                <div class="custom-input-group">
+                    <label>IP 规则集 (.mrs)</label>
+                    <input type="text" id="customModIP" class="custom-input" placeholder="IP MRS 链接地址">
+                </div>
+
+                <div class="custom-input-group">
+                    <label>Classical 规则集 (.yaml)</label>
+                    <input type="text" id="customModUrl" class="custom-input" placeholder="Classical YAML 链接地址">
+                </div>
+
+                <p style="font-size: 11px; color: #888; margin-bottom: 15px; line-height: 1.4;">提示：三种规则集地址至少需填写一项。推荐填写 Domain + IP 组合，或填写单条 Classical 链接。</p>
+
+                <button id="btnAddCustom" class="btn-add-custom" onclick="addCustomModule()">添加并应用配置</button>
             </div>
 
-            <label class="clash-section-label">启用的分流规则集 (支持多选)</label>
-            <div id="clashModulesContainer" class="clash-grid"></div>
+            <div class="clash-right-col">
 
-            <label class="clash-section-label">➕ 添加自定义规则集</label>
-            <div class="custom-add-box">
-                <div class="custom-input-row">
-                    <input type="text" id="customModName" class="custom-input" placeholder="标识名 (如: Spotify)">
-                    <input type="text" id="customModIcon" class="custom-input" placeholder="图标 Emoji 或图片 URL">
+                <div class="module-group-box">
+                    <div class="module-group-header">
+                        <div class="module-group-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            官方内置分流规则
+                            <div class="info-tooltip-wrap" tabindex="0">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                <div class="tooltip-content">mihomo核心官方内置分流规则</div>
+                            </div>
+                        </div>
+                        <select id="presetSelect" class="preset-select" onchange="applyPresetFromDropdown(this)" title="选择预设快速应用">
+                            <option value="-1">自定义配置</option>
+                            </select>
+                    </div>
+                    <div id="builtinModulesContainer" class="clash-grid"></div>
                 </div>
-                <div class="custom-input-row">
-                    <input type="text" id="customModUrl" class="custom-input" placeholder="规则集下载地址 (YAML 格式 URL)">
-                    <button class="btn-add-custom" onclick="addCustomModule()">添加并应用</button>
+
+                <div class="module-group-box">
+                    <div class="module-group-title" style="color: #007aff;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        我的自定义规则
+                    </div>
+                    <div id="customModulesContainer" class="clash-custom-grid"></div>
+                    <div id="customEmptyTip" style="font-size:12px; color:#999; text-align:center; padding: 10px 0; display:none;">
+                        暂无自定义规则集，请在左侧添加
+                    </div>
                 </div>
             </div>
         </div>
@@ -136,12 +270,17 @@
     let cacheBuiltin = [];
     let cacheCustom = [];
     let cachePresets = [];
-    let activeSet = new Set(); // 追踪当前选中的 name
+    let activeSet = new Set(); 
+    let editingCustomName = null; 
+    let deleteTimeoutMap = {}; // 记录各个删除按钮的计时器
 
     async function openClashModal() {
         clashModal.classList.add('active');
-        document.getElementById('clashModulesContainer').innerHTML = '<div style="font-size:13px; color:#999; padding: 10px;">加载中...</div>';
+        document.getElementById('builtinModulesContainer').innerHTML = '<div style="font-size:13px; color:#999;">加载中...</div>';
         
+        resetEditState();
+        deleteTimeoutMap = {}; // 清理所有计时器
+
         try {
             const res = await fetch('/api/clash/settings');
             const result = await res.json();
@@ -151,29 +290,63 @@
                 cachePresets = result.data.presets || [];
                 activeSet = new Set(result.data.active_modules || []);
                 
-                renderPresets();
+                renderPresetsDropdown();
                 renderModules();
+                matchCurrentStateToPreset();
             }
         } catch (error) { alert('加载配置失败'); }
     }
 
-    function closeClashModal() { clashModal.classList.remove('active'); }
-
-    function renderPresets() {
-        const container = document.getElementById('presetBtnsContainer');
-        let html = '';
-        cachePresets.forEach((p, idx) => {
-            html += `<button class="btn-preset" onclick="applyPreset(${idx}, this)">${p.name}</button>`;
-        });
-        container.innerHTML = html;
+    function closeClashModal() { 
+        clashModal.classList.remove('active'); 
+        resetEditState(); 
+        // 彻底清空存在的倒计时
+        Object.values(deleteTimeoutMap).forEach(clearTimeout);
+        deleteTimeoutMap = {};
     }
 
-    function applyPreset(index, btnElement) {
-        const preset = cachePresets[index];
-        document.getElementById('presetDescBox').innerText = preset.desc;
-        document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-        btnElement.classList.add('active');
+    function renderPresetsDropdown() {
+        const select = document.getElementById('presetSelect');
+        let html = '<option value="-1">自定义配置</option>';
+        cachePresets.forEach((p, idx) => {
+            html += `<option value="${idx}">${p.name}</option>`;
+        });
+        select.innerHTML = html;
+        select.value = "-1"; 
+    }
 
+    function matchCurrentStateToPreset() {
+        const select = document.getElementById('presetSelect');
+        const allAvailableModules = [...cacheBuiltin, ...cacheCustom].map(m => m.name);
+        
+        for (let i = 0; i < cachePresets.length; i++) {
+            const preset = cachePresets[i];
+            const isAll = preset.modules.includes('ALL');
+            let isMatch = false;
+
+            if (isAll) {
+                isMatch = (activeSet.size === allAvailableModules.length && allAvailableModules.length > 0);
+            } else {
+                const validPresetModules = preset.modules.filter(m => allAvailableModules.includes(m));
+                if (validPresetModules.length === activeSet.size && activeSet.size > 0) {
+                    isMatch = validPresetModules.every(m => activeSet.has(m));
+                }
+            }
+
+            if (isMatch) {
+                select.value = i.toString();
+                return;
+            }
+        }
+        
+        select.value = "-1"; 
+    }
+
+    function applyPresetFromDropdown(selectEl) {
+        const index = selectEl.value;
+        if (index === "-1") return; 
+
+        const preset = cachePresets[index];
         const isAll = preset.modules.includes('ALL');
         const targetSet = new Set(preset.modules);
         
@@ -187,18 +360,28 @@
             }
             syncLabelStyle(cb);
         });
+        
+        matchCurrentStateToPreset();
     }
 
     function renderModules() {
-        const container = document.getElementById('clashModulesContainer');
-        let html = '';
+        const builtinContainer = document.getElementById('builtinModulesContainer');
+        const customContainer = document.getElementById('customModulesContainer');
+        const customEmptyTip = document.getElementById('customEmptyTip');
         
-        // 渲染内置
-        cacheBuiltin.forEach(mod => { html += buildModuleHTML(mod, false); });
-        // 渲染自定义
-        cacheCustom.forEach(mod => { html += buildModuleHTML(mod, true); });
-        
-        container.innerHTML = html;
+        let builtinHtml = '';
+        cacheBuiltin.forEach(mod => { builtinHtml += buildModuleHTML(mod, false); });
+        builtinContainer.innerHTML = builtinHtml;
+
+        let customHtml = '';
+        cacheCustom.forEach(mod => { customHtml += buildModuleHTML(mod, true); });
+        customContainer.innerHTML = customHtml;
+
+        if (cacheCustom.length === 0) {
+            customEmptyTip.style.display = 'block';
+        } else {
+            customEmptyTip.style.display = 'none';
+        }
     }
 
     function buildModuleHTML(mod, isCustom) {
@@ -206,14 +389,24 @@
         const activeClass = isChecked ? 'is-checked' : '';
         let iconHtml = (mod.icon && mod.icon.startsWith('http')) ? `<img src="${mod.icon}">` : (mod.icon || '📦');
         
-        let deleteBtn = isCustom ? `<button class="btn-delete-custom" onclick="deleteCustomModule('${mod.name}', event)" title="删除">✖</button>` : '';
+        // ✨ 将删除按钮改为传入 this 对象
+        let actionsHtml = isCustom ? `
+            <div class="custom-actions">
+                <button class="btn-edit-custom" onclick="editCustomModule('${mod.name}', event)" title="编辑此自定义规则">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button class="btn-delete-custom" onclick="deleteCustomModule('${mod.name}', this, event)" title="删除此自定义规则">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </div>
+        ` : '';
 
         return `
             <label class="clash-module-label ${activeClass}">
                 <input type="checkbox" class="clash-module-cb" value="${mod.name}" ${isChecked} style="display:none;" onchange="handleModuleToggle(this)">
                 <div class="mod-icon-box">${iconHtml}</div>
                 <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${mod.name}</span>
-                ${deleteBtn}
+                ${actionsHtml}
             </label>
         `;
     }
@@ -223,8 +416,7 @@
         else activeSet.delete(cb.value);
         
         syncLabelStyle(cb);
-        document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-        document.getElementById('presetDescBox').innerText = '自定义修改中...';
+        matchCurrentStateToPreset();
     }
 
     function syncLabelStyle(cb) {
@@ -233,37 +425,113 @@
         else label.classList.remove('is-checked');
     }
 
-    // 添加自定义模块并保存
+    function resetEditState() {
+        editingCustomName = null;
+        document.getElementById('customModName').value = '';
+        document.getElementById('customModIcon').value = '';
+        document.getElementById('customModDomain').value = '';
+        document.getElementById('customModIP').value = '';
+        document.getElementById('customModUrl').value = '';
+        
+        const btn = document.getElementById('btnAddCustom');
+        btn.innerText = '添加并应用配置';
+        btn.style.backgroundColor = '#007aff';
+    }
+
+    function editCustomModule(name, event) {
+        event.preventDefault(); 
+        event.stopPropagation(); 
+        
+        const mod = cacheCustom.find(m => m.name === name);
+        if (!mod) return;
+
+        document.getElementById('customModName').value = mod.name || '';
+        document.getElementById('customModIcon').value = mod.icon || '';
+        document.getElementById('customModDomain').value = mod.domain_url || '';
+        document.getElementById('customModIP').value = mod.ip_url || '';
+        document.getElementById('customModUrl').value = mod.url || '';
+
+        editingCustomName = name;
+        const btn = document.getElementById('btnAddCustom');
+        btn.innerText = '保存修改并应用';
+        btn.style.backgroundColor = '#f5a623'; 
+    }
+
     async function addCustomModule() {
         const name = document.getElementById('customModName').value.trim();
         const icon = document.getElementById('customModIcon').value.trim();
+        const domain_url = document.getElementById('customModDomain').value.trim();
+        const ip_url = document.getElementById('customModIP').value.trim();
         const url = document.getElementById('customModUrl').value.trim();
 
-        if(!name || !url) return alert('标识名和规则下载地址为必填项！');
-        if(cacheBuiltin.find(m => m.name === name) || cacheCustom.find(m => m.name === name)) return alert('该名称已存在！');
+        if(!name) return alert('标识名为必填项！');
+        if(!domain_url && !ip_url && !url) return alert('请至少填写一种规则集的下载地址！');
 
-        cacheCustom.push({ name, icon, url });
-        activeSet.add(name); // 自动勾选新加的
+        if (editingCustomName) {
+            if (name !== editingCustomName && (cacheBuiltin.find(m => m.name === name) || cacheCustom.find(m => m.name === name))) {
+                return alert('该名称已存在，请更换！');
+            }
+
+            const idx = cacheCustom.findIndex(m => m.name === editingCustomName);
+            if (idx !== -1) {
+                cacheCustom[idx] = { name, icon, domain_url, ip_url, url };
+            }
+
+            if (name !== editingCustomName && activeSet.has(editingCustomName)) {
+                activeSet.delete(editingCustomName);
+                activeSet.add(name);
+            } else if (!activeSet.has(name)) {
+                activeSet.add(name); 
+            }
+
+        } else {
+            if(cacheBuiltin.find(m => m.name === name) || cacheCustom.find(m => m.name === name)) return alert('该名称已存在，请更换！');
+            cacheCustom.push({ name, icon, domain_url, ip_url, url });
+            activeSet.add(name); 
+        }
         
         await syncCustomModulesToBackend();
-        
-        document.getElementById('customModName').value = '';
-        document.getElementById('customModIcon').value = '';
-        document.getElementById('customModUrl').value = '';
+        resetEditState(); 
         renderModules();
+        matchCurrentStateToPreset();
     }
 
-    // 删除自定义模块
-    async function deleteCustomModule(name, event) {
-        // [修复关键点]：彻底阻断点击事件冒泡，防止触发 label 的底层 checkbox
+    // ✨ 核心机制：二次点击确认的优雅删除逻辑
+    async function deleteCustomModule(name, btnElement, event) {
         event.preventDefault(); 
         event.stopPropagation(); 
-        if(!confirm(`确定要删除自定义模块 [${name}] 吗？`)) return;
         
-        cacheCustom = cacheCustom.filter(m => m.name !== name);
-        activeSet.delete(name);
-        await syncCustomModulesToBackend();
-        renderModules();
+        // 判断当前按钮是否已经处于“待确认”状态
+        if (btnElement.classList.contains('confirm-state')) {
+            // 是：执行真正的删除逻辑
+            clearTimeout(deleteTimeoutMap[name]); // 拦截并取消计时器
+            delete deleteTimeoutMap[name];
+
+            cacheCustom = cacheCustom.filter(m => m.name !== name);
+            activeSet.delete(name);
+
+            if (editingCustomName === name) resetEditState();
+
+            await syncCustomModulesToBackend();
+            renderModules();
+            matchCurrentStateToPreset();
+        } else {
+            // 否：第一次点击，进入“待确认”状态
+            btnElement.classList.add('confirm-state');
+            
+            // 备份原来的 SVG 图标
+            const originalSvg = btnElement.innerHTML;
+            btnElement.innerHTML = '确定删除?';
+            
+            // 设定 3 秒后自动恢复为普通的垃圾桶图标
+            deleteTimeoutMap[name] = setTimeout(() => {
+                // 判断该 DOM 节点是否还存在于页面中 (防止在此期间被 renderModules() 重绘冲掉报错)
+                if (btnElement && btnElement.parentNode) {
+                    btnElement.classList.remove('confirm-state');
+                    btnElement.innerHTML = originalSvg;
+                }
+            }, 3000);
+        }
     }
 
     async function syncCustomModulesToBackend() {
@@ -274,7 +542,6 @@
         });
     }
 
-    // 最终保存
     async function saveClashSettings() {
         const btn = document.getElementById('clashSaveBtn');
         const selectedModules = Array.from(activeSet);

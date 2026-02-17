@@ -3,12 +3,12 @@
     {
       "name": "极简基础",
       "desc": "仅包含最核心的搜索引擎、通讯软件及 AI 工具分流。",
-      "modules": ["Telegram", "Google", "OpenAI", "GitHub", "Apple", "Microsoft"]
+      "modules": ["Telegram", "Google", "GoogleFCM", "OpenAI", "GitHub", "Microsoft"]
     },
     {
       "name": "常用推荐 (默认)",
       "desc": "覆盖 90% 日常需求，包含主流流媒体、社媒与常用软件。",
-      "modules": ["Telegram", "Google", "YouTube", "Netflix", "Twitter(X)", "GitHub", "OpenAI", "Spotify", "Discord", "Apple", "Microsoft", "BiliBili", "TikTok"]
+      "modules": ["Telegram", "Google", "GoogleFCM", "YouTube", "Netflix", "Twitter(X)", "GitHub", "OpenAI", "Spotify", "Discord", "Microsoft", "TikTok"]
     },
     {
       "name": "高大全",
