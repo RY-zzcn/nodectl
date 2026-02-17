@@ -662,7 +662,10 @@
     <main class="main-content">
         <div class="top-section-grid">
             <div class="sub-card">
-                <div class="card-header"><span class="card-title">📊 节点总览</span></div>
+                <div class="card-header">
+                    <span class="card-title">📊 节点总览</span>
+                    <button class="btn-custom-common btn-color-blue" onclick="openAddNodeModal()">+ 添加节点</button>
+                </div>
                 
                 <div class="stats-grid">
                     <div class="stat-item">
@@ -713,11 +716,6 @@
         </div>
 
         <div class="sub-card" id="node-manager-card">
-            <div class="card-header">
-                <span class="card-title">🌐 节点列表管理</span>
-                <button class="btn-custom-common btn-color-blue" onclick="openAddNodeModal()">+ 添加节点</button>
-            </div>
-
             <div class="node-columns-grid">
                 <div class="node-column-panel theme-green">
                     <div class="column-header">
