@@ -192,11 +192,11 @@
                     <label class="sys-label">数据库版本信息</label>
                     <div class="geo-info-card">
                         <div class="geo-row">
-                            <span class="geo-key">本地版本</span>
+                            <span class="geo-key">本地记录版本</span>
                             <span class="geo-value" id="geoLocalVersion">--</span>
                         </div>
                         <div class="geo-row">
-                            <span class="geo-key">最新版本</span>
+                            <span class="geo-key">GitHub 最新版</span>
                             <span class="geo-value" id="geoRemoteVersion">--</span>
                         </div>
                     </div>
@@ -349,8 +349,7 @@
     }
 
     async function updateGeoDatabase() {
-        if(!confirm("确定要下载并更新 GeoIP 数据库吗？\n这可能需要几十秒的时间。")) return;
-
+        // [修改] 已经移除原生 confirm 拦截逻辑，直接执行下载
         const btn = document.getElementById('btnGeoUpdate');
         btn.className = 'btn-geo-action btn-geo-loading';
         btn.innerHTML = '<svg class="spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在后台下载更新...';

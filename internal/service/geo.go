@@ -44,14 +44,20 @@ func InitGeoIP() {
 		return
 	}
 
-	// 初始加载文件到内存
+	GlobalGeoIP = svc
+
+	// 初始尝试加载文件到内存
 	if err := svc.Reload(); err != nil {
-		slog.Warn("GeoIP 暂无本地数据库，如果需要启用请在设置中手动下载")
+		slog.Warn("GeoIP 暂无本地数据库，正在后台自动执行首次下载...")
+		// 开启后台协程静默下载，不阻塞主程序启动
+		go func() {
+			if err := svc.ForceUpdate(); err != nil {
+				slog.Error("GeoIP 自动下载失败，请稍后在面板手动更新", "err", err)
+			}
+		}()
 	} else {
 		slog.Info("GeoIP 服务加载成功")
 	}
-
-	GlobalGeoIP = svc
 }
 
 // Reload 加载/重载数据库文件到内存
