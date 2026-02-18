@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -240,8 +242,17 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func apiChangePassword(w http.ResponseWriter, r *http.Request) {
+
 	clientIP := r.RemoteAddr
 	reqPath := r.URL.Path
+
+	demoPath := filepath.Join("data", "debug", "demo")
+	if _, err := os.Stat(demoPath); err == nil {
+		// 如果 demo 文件存在 (不报 err)，说明开启了演示模式
+		logger.Log.Warn("尝试在演示模式下修改密码，已被拦截", "ip", r.RemoteAddr)
+		sendJSON(w, "error", "演示模式已开启，禁止修改密码")
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
