@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,10 +30,32 @@ var AppStartTime = time.Now()
 
 // ------------------- [通用辅助函数] -------------------
 
-// sendJSON 辅助函数：快速返回 JSON 格式的响应
-func sendJSON(w http.ResponseWriter, status, message string) {
+// sendJSON 辅助函数：智能返回 JSON 响应
+// payload 可以是 string (作为 message) 或 map (作为数据合并)
+func sendJSON(w http.ResponseWriter, status string, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": status, "message": message})
+
+	// 1. 初始化基础响应结构
+	response := map[string]interface{}{
+		"status": status,
+	}
+
+	// 2. 根据 payload 的类型智能处理
+	switch v := payload.(type) {
+	case string:
+		// 如果传入的是字符串，自动放入 "message" 字段 (兼容旧代码)
+		response["message"] = v
+	case map[string]interface{}:
+		// 如果传入的是 Map，将其字段合并到顶层 JSON 中
+		for k, val := range v {
+			response[k] = val
+		}
+	default:
+		// 其他情况作为 data 字段返回
+		response["data"] = v
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 // ------------------- [页面渲染逻辑] -------------------
@@ -197,48 +220,82 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // ------------------- [API 异步接口逻辑] -------------------
 
+// apiUpdateNode 更新节点信息
 func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	clientIP := r.RemoteAddr
 	reqPath := r.URL.Path
 
-	if r.Method != http.MethodPost {
-		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		UUID          string            `json:"uuid"`
-		Name          string            `json:"name"`
-		RoutingType   int               `json:"routing_type"`
-		IsBlocked     bool              `json:"is_blocked"`
-		Links         map[string]string `json:"links"`
-		DisabledLinks []string          `json:"disabled_links"`
-		IPV4          string            `json:"ipv4"`
-		IPV6          string            `json:"ipv6"`
-	}
-
+	// 1. 解析前端发来的 JSON 数据
+	var req database.NodePool
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
-		sendJSON(w, "error", "请求格式错误")
+		sendJSON(w, "error", "无效的数据格式")
 		return
 	}
 
-	if req.UUID == "" {
-		logger.Log.Warn("请求缺少 UUID", "ip", clientIP, "path", reqPath)
-		sendJSON(w, "error", "节点 UUID 不能为空")
+	// 2. 先从数据库查出真实存在的节点 (确保拿到主键 ID)
+	var targetNode database.NodePool
+	if err := database.DB.First(&targetNode, "uuid = ?", req.UUID).Error; err != nil {
+		logger.Log.Warn("更新失败: 节点不存在", "uuid", req.UUID, "ip", clientIP)
+		sendJSON(w, "error", "节点不存在")
 		return
 	}
 
-	err := service.UpdateNode(req.UUID, req.Name, req.RoutingType, req.Links, req.IsBlocked, req.DisabledLinks, req.IPV4, req.IPV6)
-	if err != nil {
-		logger.Log.Error("更新节点数据库失败", "error", err, "uuid", req.UUID, "ip", clientIP, "path", reqPath)
+	// 3. 将前端请求的基础字段更新到数据库对象上
+	// 注意：不要直接覆盖 targetNode = req，因为那样会丢失 ID
+	targetNode.Name = req.Name
+	targetNode.RoutingType = req.RoutingType
+	targetNode.IsBlocked = req.IsBlocked
+	targetNode.DisabledLinks = req.DisabledLinks
+	targetNode.IPV4 = req.IPV4
+	targetNode.IPV6 = req.IPV6
+	// 如果你的结构体有 Region 字段且前端不传，这里保持原样即可，或者根据 IP 重新解析
+
+	// 4. 安全检查：判断是否处于安全环境
+	isSecure := service.CheckRequestSecure(r)
+	if !isSecure {
+		var config database.SysConfig
+		database.DB.Where("key = ?", "sys_force_http").First(&config)
+		if config.Value == "true" {
+			isSecure = true // 用户选择忽略风险，允许在 HTTP 下编辑
+		}
+	}
+
+	// 5. 根据安全状态执行智能合并或全量覆盖
+	if !isSecure {
+		// [受限的 HTTP 模式] 执行智能合并策略 (禁止编辑链接)
+		safeLinks := make(map[string]string)
+
+		for k, v := range req.Links {
+			if v == "__KEEP_EXISTING__" {
+				if oldVal, ok := targetNode.Links[k]; ok {
+					safeLinks[k] = oldVal
+				}
+			} else {
+				if _, exists := targetNode.Links[k]; exists {
+					// 数据库已有 -> 试图修改 -> 驳回，强制使用旧值
+					safeLinks[k] = targetNode.Links[k]
+				} else {
+					// 数据库没有 -> 新增 -> 允许写入
+					safeLinks[k] = v
+				}
+			}
+		}
+		targetNode.Links = safeLinks
+
+	} else {
+		// [HTTPS 模式 或 强制 HTTP 模式] 直接全量覆盖，允许自由编辑
+		targetNode.Links = req.Links
+	}
+
+	// 6. 保存更新 (因为 targetNode 包含 ID，GORM 会正确执行 UPDATE)
+	if err := database.DB.Save(&targetNode).Error; err != nil {
+		logger.Log.Error("更新节点数据库失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据库更新失败")
 		return
 	}
 
-	logger.Log.Info("节点更新成功", "uuid", req.UUID, "name", req.Name, "ip", clientIP, "path", reqPath)
-	sendJSON(w, "success", "节点更新成功")
+	logger.Log.Info("节点更新成功", "name", targetNode.Name, "uuid", targetNode.UUID)
+	sendJSON(w, "success", "更新成功")
 }
 
 func apiChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -354,36 +411,69 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, "success", "节点添加成功")
 }
 
+// apiGetNodes 获取所有节点列表 (已修复：增加分类逻辑适配前端)
 func apiGetNodes(w http.ResponseWriter, r *http.Request) {
-	clientIP := r.RemoteAddr
-	reqPath := r.URL.Path
-
-	if r.Method != http.MethodGet {
-		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	// 1. 从数据库查询所有节点，按 SortIndex 排序
+	var nodes []database.NodePool
+	if err := database.DB.Order("sort_index ASC").Find(&nodes).Error; err != nil {
+		logger.Log.Error("获取节点列表失败", "error", err)
+		sendJSON(w, "error", "获取节点数据失败")
 		return
 	}
 
+	// 2. 安全检查：判断是否处于安全环境 (HTTPS 协议 或 用户开启了强制 HTTP)
+	isSecure := service.CheckRequestSecure(r)
+	if !isSecure {
+		var config database.SysConfig
+		database.DB.Where("key = ?", "sys_force_http").First(&config)
+		if config.Value == "true" {
+			isSecure = true // 用户选择忽略风险，视为安全
+		}
+	}
+
+	// 如果依然不安全，则脱敏(隐藏)真实链接
+	if !isSecure {
+		for i := range nodes {
+			maskedLinks := make(map[string]string)
+			for k := range nodes[i].Links {
+				maskedLinks[k] = "🔒 安全保护: 仅 HTTPS 可见"
+			}
+			nodes[i].Links = maskedLinks
+		}
+	}
+
+	// 3. [核心修复] 将节点分类为直连和落地，适配前端展示需求
 	var directNodes []database.NodePool
 	var landNodes []database.NodePool
 
-	database.DB.Where("routing_type = ?", 1).Order("sort_index ASC, created_at DESC").Find(&directNodes)
-	database.DB.Where("routing_type = ?", 2).Order("sort_index ASC, created_at DESC").Find(&landNodes)
+	for _, node := range nodes {
+		if node.RoutingType == 1 {
+			directNodes = append(directNodes, node)
+		} else if node.RoutingType == 2 {
+			landNodes = append(landNodes, node)
+		}
+	}
 
-	var panelURLConfig database.SysConfig
-	database.DB.Where("key = ?", "panel_url").First(&panelURLConfig)
+	// 确保空切片序列化为 [] 而不是 null
+	if directNodes == nil {
+		directNodes = []database.NodePool{}
+	}
+	if landNodes == nil {
+		landNodes = []database.NodePool{}
+	}
 
-	response := map[string]interface{}{
-		"status": "success",
+	// 获取面板地址 (前端复制链接时需要)
+	var config database.SysConfig
+	database.DB.Where("key = ?", "panel_url").First(&config)
+
+	// 4. 返回结构化数据
+	sendJSON(w, "success", map[string]interface{}{
 		"data": map[string]interface{}{
 			"direct_nodes": directNodes,
 			"land_nodes":   landNodes,
-			"panel_url":    panelURLConfig.Value,
+			"panel_url":    config.Value,
 		},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 func apiReorderNodes(w http.ResponseWriter, r *http.Request) {
@@ -456,6 +546,23 @@ func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
 func apiPublicScript(w http.ResponseWriter, r *http.Request) {
 	clientIP := r.RemoteAddr
 	reqPath := r.URL.Path
+
+	// ---------------- [新增验证逻辑 开始] ----------------
+	// 1. 获取 URL 中的 id 参数
+	installID := r.URL.Query().Get("id")
+	if installID == "" {
+		logger.Log.Warn("安装脚本请求被拦截", "reason", "缺少安装ID", "ip", clientIP)
+		http.Error(w, "Missing InstallID", http.StatusBadRequest)
+		return
+	}
+
+	// 2. 验证 ID 是否有效节点
+	var node database.NodePool
+	if err := database.DB.Where("install_id = ?", installID).First(&node).Error; err != nil {
+		logger.Log.Warn("安装脚本请求被拦截", "reason", "无效的安装ID", "id", installID, "ip", clientIP)
+		http.Error(w, "Invalid InstallID", http.StatusForbidden)
+		return
+	}
 
 	scriptContent, err := service.RenderInstallScript()
 	if err != nil {
@@ -568,6 +675,7 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		"panel_url", "sub_token", "proxy_port_ss", "proxy_port_hy2", "proxy_port_tuic",
 		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
 		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "pref_use_emoji_flag", "sub_custom_name", "pref_ip_strategy",
+		"sys_force_http", "cf_email", "cf_api_key", "cf_domain",
 	}).Find(&configs).Error; err != nil {
 		logger.Log.Error("读取系统配置失败", "error", err, "ip", clientIP, "path", reqPath)
 	}
@@ -577,10 +685,14 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		data[c.Key] = c.Value
 	}
 
+	// 获取当前证书的解析信息
+	certInfo := service.GetCurrentCertInfo()
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "success",
-		"data":   data,
+		"status":    "success",
+		"data":      data,
+		"cert_info": certInfo,
 	})
 }
 
@@ -605,6 +717,7 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"proxy_port_tuic": true, "proxy_port_reality": true, "proxy_reality_sni": true,
 		"proxy_ss_method": true, "proxy_port_socks5": true, "proxy_socks5_user": true, "proxy_socks5_pass": true, "pref_use_emoji_flag": true,
 		"sub_custom_name": true, "pref_ip_strategy": true,
+		"sys_force_http": true, "cf_email": true, "cf_api_key": true, "cf_domain": true,
 	}
 
 	for k, v := range req {
@@ -1033,4 +1146,89 @@ func apiGetSystemMonitor(w http.ResponseWriter, r *http.Request) {
 		"status": "success",
 		"data":   data,
 	})
+}
+
+// apiSaveCert 处理用户手动上传证书
+func apiSaveCert(w http.ResponseWriter, r *http.Request) {
+	// 限制上传大小为 10MB
+	r.ParseMultipartForm(10 << 20)
+
+	// 读取 .crt / .pem 文件
+	fileCrt, _, err := r.FormFile("cert_file")
+	if err != nil {
+		sendJSON(w, "error", "缺少证书文件 (.crt/.pem)")
+		return
+	}
+	defer fileCrt.Close()
+	crtBytes, _ := io.ReadAll(fileCrt)
+
+	// 读取 .key 文件
+	fileKey, _, err := r.FormFile("key_file")
+	if err != nil {
+		sendJSON(w, "error", "缺少私钥文件 (.key)")
+		return
+	}
+	defer fileKey.Close()
+	keyBytes, _ := io.ReadAll(fileKey)
+
+	// 调用 service 层的保存逻辑
+	if err := service.SaveUploadedCert(crtBytes, keyBytes); err != nil {
+		logger.Log.Error("保存证书失败", "error", err)
+		sendJSON(w, "error", "证书保存失败: "+err.Error())
+		return
+	}
+
+	sendJSON(w, "success", "证书已更新，请重启程序以生效")
+}
+
+// apiApplyCert 处理 Cloudflare 自动申请证书请求
+func apiApplyCert(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email  string `json:"email"`
+		ApiKey string `json:"api_key"`
+		Domain string `json:"domain"`
+	}
+	// 解析 JSON body
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "参数解析失败")
+		return
+	}
+
+	if req.Email == "" || req.ApiKey == "" || req.Domain == "" {
+		sendJSON(w, "error", "请填写完整的 Cloudflare 信息")
+		return
+	}
+
+	// 调用 service 层的申请逻辑
+	if err := service.ApplyCloudflareCert(req.Email, req.ApiKey, req.Domain); err != nil {
+		logger.Log.Error("证书申请失败", "error", err)
+		sendJSON(w, "error", "申请失败: "+err.Error())
+		return
+	}
+
+	sendJSON(w, "success", "证书申请任务已提交")
+}
+
+// apiRestartCore 处理前端下发的重启核心请求
+// 功能：返回成功响应后，异步触发系统的热重启逻辑
+func apiRestartCore(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
+	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	logger.Log.Info("接收到面板核心重启请求", "ip", clientIP)
+
+	// 必须先给前端返回成功的 JSON，否则直接重启会导致前端请求 Pending 并报错
+	sendJSON(w, "success", "系统核心即将重启，面板可能会短暂断开连接...")
+
+	// 延迟 1 秒后触发重启，确保 HTTP 响应已经发送给前端
+	go func() {
+		time.Sleep(1 * time.Second)
+		TriggerRestart() // 调用 server.go 中的重启触发器
+	}()
 }

@@ -627,6 +627,13 @@
     </style>
 </head>
 <body>
+    <div id="security-banner" style="display:none; background: #fff3cd; color: #856404; padding: 12px 20px; border-bottom: 1px solid #ffeeba; align-items: center; justify-content: space-between; font-size: 14px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span><b>安全警告：</b> 检测到您正在使用非加密 HTTP 连接。为保护数据安全，协议管理功能已受限。请尽快配置 HTTPS 证书。</span>
+        </div>
+        <button onclick="dismissSecurityBanner()" style="background:transparent; border:none; color:#856404; cursor:pointer; font-size:20px; line-height: 1;">&times;</button>
+    </div>
     <nav class="top-navbar">
         <div style="display: flex; align-items: center;">
             <a href="/" class="nav-brand">
@@ -1010,6 +1017,24 @@
             } catch (error) { alert('网络错误，请稍后重试'); }
         }
 
+
+
+        // 页面加载时检查
+        document.addEventListener('DOMContentLoaded', function() {
+            // 只有在非 HTTPS 且 用户未点击过关闭 时才显示
+            const isSecure = window.location.protocol === 'https:';
+            const isDismissed = localStorage.getItem('hide_security_warn');
+
+            if (!isSecure && !isDismissed) {
+                document.getElementById('security-banner').style.display = 'flex';
+            }
+        });
+
+        function dismissSecurityBanner() {
+            document.getElementById('security-banner').style.display = 'none';
+            // 写入本地存储，永久关闭 (除非清除缓存)
+            localStorage.setItem('hide_security_warn', 'true');
+        }
     </script>
     
     {{template "pwd_modal.html" .}}

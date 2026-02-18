@@ -192,8 +192,9 @@
 
         const protocolsArgHtml = selectedArgs.map(p => `<span class="hl-proto">${p}</span>`).join(" ");
         const protocolsArgRaw = selectedArgs.join(" ");
-
-        const scriptUrl = `${host}/api/public/install-script`;
+        
+        // [修改后] 将 install_id 拼接到 URL 参数中
+        const scriptUrl = `${host}/api/public/install-script?id=${currentScriptNode.install_id}`;
 
         // 构建带有高亮的 HTML 命令展示 (浅色主题)
         const cmdHtml = 

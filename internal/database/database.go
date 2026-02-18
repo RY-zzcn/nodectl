@@ -22,7 +22,7 @@ var DB *gorm.DB
 // NodePool 节点池表
 type NodePool struct {
 	UUID          string            `gorm:"primaryKey;column:uuid;type:varchar(36)" json:"uuid"`
-	InstallID     string            `gorm:"column:install_id;type:varchar(16);uniqueIndex" json:"install_id"`
+	InstallID     string            `gorm:"column:install_id;type:varchar(8);uniqueIndex" json:"install_id"`
 	Name          string            `gorm:"column:name" json:"name"`
 	RoutingType   int               `gorm:"column:routing_type;default:1" json:"routing_type"` //路由类型
 	IsBlocked     bool              `gorm:"column:is_blocked;default:false" json:"is_blocked"` // 是否屏蔽
@@ -46,7 +46,7 @@ func (n *NodePool) BeforeCreate(tx *gorm.DB) (err error) {
 		n.UUID = uuid.New().String()
 	}
 	if n.InstallID == "" {
-		n.InstallID = generateSecureRandomID(16)
+		n.InstallID = generateSecureRandomID(8)
 	}
 	return
 }

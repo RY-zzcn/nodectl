@@ -84,3 +84,13 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r)
 	}
 }
+
+// ForceHTTPS 强制 HTTPS 重定向中间件 (已废弃网络层重定向)
+// 功能：在单端口热切换架构下，不再执行 HTTP 到 HTTPS 的强制跳转。
+// 真正的安全保护由 handlers.go 内部根据 sys_force_http 动态脱敏敏感数据来实现。
+func ForceHTTPS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// 直接放行，保证用户在 HTTP 模式下也能打开后台面板上传证书
+		next.ServeHTTP(w, r)
+	}
+}

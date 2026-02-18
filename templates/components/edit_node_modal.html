@@ -21,7 +21,7 @@
     }
     .edit-modal-card.has-content { max-width: 800px; }
 
-    /* 统一 Header 样式 (加入静默保存指示器) */
+    /* Header */
     .edit-header { 
         background: #f5f5f7; border-bottom: 1px solid #e5e5ea; 
         padding: 15px 20px 15px 25px; display: flex; align-items: center; justify-content: space-between; 
@@ -34,15 +34,15 @@
         display: flex; align-items: center; gap: 4px;
     }
 
-    /* 隐藏滚动条全局类 */
+    /* 滚动条 */
     .no-scrollbar { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
 
-    /* 主内容区 */
+    /* 主布局 */
     .edit-form-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     .edit-body { flex: 1; display: flex; flex-direction: row; background: #fff; overflow: hidden; }
 
-    /* ================= 左侧面板 ================= */
+    /* 左侧面板 */
     .edit-left-col {
         width: 380px; flex-shrink: 0; padding: 25px;
         border-right: 1px solid transparent; transition: border-color 0.3s;
@@ -52,7 +52,7 @@
     .edit-section { margin-bottom: 24px; }
     .section-label { display: block; font-size: 13px; font-weight: 600; color: #888; margin-bottom: 10px; }
 
-    /* 输入组件 */
+    /* 基础输入组件 */
     .title-input {
         width: 100%; box-sizing: border-box; 
         padding: 8px 12px; font-size: 15px; font-weight: 600;
@@ -60,9 +60,8 @@
         outline: none; transition: border 0.2s; color: #1d1d1f; background: #fafbfc;
     }
     .title-input:focus { border-color: #007aff; background: #fff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
-    .title-input::placeholder { color: #ccc; font-weight: 400; }
 
-    /* 路由类型分段控制器 */
+    /* 分段控制器 */
     .segmented-control {
         width: 100%; box-sizing: border-box;
         background: #f5f5f7; padding: 4px; border-radius: 8px; display: flex; gap: 4px; border: 1px solid #e5e5ea;
@@ -73,14 +72,12 @@
         border-radius: 6px; transition: all 0.2s; font-weight: 600;
     }
     .segment-option:hover { color: #333; }
-    
     .segment-option.active { box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #fff; }
     .segment-option.active[data-type="1"] { background: #34c759; } 
     .segment-option.active[data-type="2"] { background: #f5a623; } 
     .segment-option.active[data-type="3"] { background: #d74242; } 
-    .segment-option.active:hover { color: #fff; } 
 
-    /* IP 输入框 */
+    /* IP 输入 */
     .ip-input {
         width: 100%; box-sizing: border-box;
         padding: 10px 12px; font-size: 13px; font-weight: 500; font-family: monospace;
@@ -88,7 +85,6 @@
         outline: none; transition: border 0.2s; color: #333; background: #fafbfc;
     }
     .ip-input:focus { border-color: #007aff; background: #fff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1); }
-    
     .add-ip-link { font-size: 12px; color: #007aff; cursor: pointer; display: inline-block; margin-top: 6px; font-weight: 500;}
     .add-ip-link:hover { text-decoration: underline; }
 
@@ -108,76 +104,77 @@
     .edit-modal-card.has-content .edit-right-col { display: flex; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* 协议卡片 */
+    /* 协议卡片容器 */
     .protocol-card {
         border: 1px solid #e5e5ea; border-radius: 10px; 
         background: #fff; margin-bottom: 12px;
         overflow: hidden; transition: all 0.2s;
     }
     .protocol-card:hover { border-color: #d1d1d6; }
-    .protocol-card.disabled { opacity: 0.6; background: #f9f9fc; }
+    /* 禁用状态 */
+    .protocol-card.disabled { opacity: 0.7; background: #fdfdfd; }
+    .protocol-card.disabled .proto-header { background: #fcfcfc; }
 
-    /* 折叠交互样式 */
-    .card-header-row {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 12px 15px; background: #fafbfc; 
-        cursor: pointer; user-select: none; transition: background 0.2s;
+    /* 协议头部行 */
+    .proto-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 12px; background: #fafbfc; border-bottom: 1px solid #f0f0f5;
+        transition: background 0.2s;
     }
-    .card-header-row:hover { background: #f0f0f5; }
+    /* HTTP 安全模式下，只有一行，去掉底部边框 */
+    .protocol-card.locked-mode .proto-header { border-bottom: none; background: #fff; }
     
-    .protocol-card.expanded .card-header-row { border-bottom: 1px solid #f0f0f5; }
-    .protocol-card.disabled:not(.expanded) .card-header-row { border-bottom: none; }
-
-    .expand-chevron {
-        transition: transform 0.3s; color: #888; margin-right: 6px; 
-        display: flex; align-items: center; justify-content: center;
+    .proto-title { display: flex; align-items: center; }
+    .proto-badge {
+        font-size: 12px; font-weight: 700; padding: 2px 6px; 
+        border-radius: 4px; border: 1px solid transparent;
     }
-    .protocol-card.expanded .expand-chevron { transform: rotate(180deg); color: #007aff; }
+    .proto-actions { display: flex; align-items: center; gap: 10px; }
 
-    .protocol-tag { font-size: 14px; font-weight: 700; color: #1d1d1f; text-transform: uppercase; }
-    .card-actions { display: flex; align-items: center; gap: 12px; }
-
-    /* 开关组件 */
-    .toggle-switch { position: relative; width: 34px; height: 18px; }
-    .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
+    /* 小号开关 */
+    .switch-sm { position: relative; width: 30px; height: 16px; }
+    .switch-sm input { opacity: 0; width: 0; height: 0; }
+    .slider-sm {
         position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-        background-color: #e5e5ea; transition: .3s; border-radius: 18px;
+        background-color: #e5e5ea; transition: .3s; border-radius: 16px;
     }
-    .toggle-slider:before {
-        position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px;
-        background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    .slider-sm:before {
+        position: absolute; content: ""; height: 12px; width: 12px; left: 2px; bottom: 2px;
+        background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
     }
-    input:checked + .toggle-slider { background-color: #34c759; } 
-    input:checked + .toggle-slider:before { transform: translateX(16px); }
+    input:checked + .slider-sm { background-color: #34c759; }
+    input:checked + .slider-sm:before { transform: translateX(14px); }
 
-    /* ✨ 全新红色垃圾桶按钮 */
-    .btn-delete-icon {
-        background: #fff5f5; border: 1px solid #fed7d7; color: #d74242; border-radius: 6px;
-        cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
-        outline: none;
+    /* 删除按钮 (支持二次确认状态) */
+    .btn-icon.delete {
+        background: transparent; border: none; color: #999; 
+        cursor: pointer; padding: 4px; display: flex; border-radius: 4px; transition: all 0.2s;
     }
-    .btn-delete-icon:hover { background: #fee2e2; }
-    .btn-delete-icon.confirm-state {
-        background: #d74242; color: #ffffff; border-color: #d74242;
-        padding: 4px 10px; font-size: 11px; font-weight: bold; white-space: nowrap;
+    .btn-icon.delete:hover { background: #fee2e2; color: #d74242; }
+    
+    /* 二次确认时的样式 */
+    .btn-icon.delete.confirm {
+        background: #d74242; color: white; width: auto; padding: 4px 8px; font-size: 11px;
     }
+    .btn-icon.delete.confirm:hover { background: #b91c1c; }
+    .btn-icon.delete.confirm svg { display: none; } /* 隐藏图标 */
+    .btn-icon.delete.confirm::after { content: "确认删除?"; font-weight: 600; } /* 显示文字 */
 
     /* 链接输入框 */
-    .card-body-row { padding: 0; display: none; } 
-    .protocol-card.expanded .card-body-row { display: block; } 
-    
-    .protocol-textarea {
-        width: 100%; border: none; padding: 12px 15px; box-sizing: border-box;
-        font-size: 12px; line-height: 1.5; color: #333;
-        font-family: Menlo, Monaco, "Courier New", monospace; 
-        background: transparent; outline: none;
-        resize: none; overflow: hidden; min-height: 60px;
-        white-space: pre-wrap; word-break: break-all; overflow-wrap: break-word;
+    .link-input {
+        width: 100%; border: none; padding: 12px; box-sizing: border-box;
+        font-family: monospace; font-size: 12px; outline: none; background: #fff; display: block;
     }
-    .protocol-textarea:focus { background: #fff; }
+    .link-input:focus { background: #fff; }
 
-    /* ================= 底部操作栏 ================= */
+    /* 顶部警告条 */
+    .security-warning-bar {
+        background: #fff8dc; border: 1px solid #f5c6cb; color: #856404;
+        padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px;
+        display: flex; align-items: center; gap: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+
     .edit-footer { 
         padding: 15px 25px; border-top: 1px solid #eee; background: #fff;
         display: flex; justify-content: flex-end; gap: 12px; z-index: 5;
@@ -188,7 +185,7 @@
     }
     .btn-footer-close:hover { background: #e5e5ea; }
 
-    /* 移动端响应式 */
+    /* 移动端 */
     @media (max-width: 768px) {
         .edit-modal-card { max-width: 95%; height: 85vh; }
         .edit-modal-card.has-content { max-width: 95%; }
@@ -242,7 +239,7 @@
                 </div>
 
                 <div class="edit-right-col no-scrollbar">
-                    <div id="protocolRowsContainer"></div>
+                    <div id="protocolListContainer"></div>
                 </div>
             </div>
 
@@ -261,20 +258,21 @@
 <script>
     const editModalEl = document.getElementById('editNodeModal');
     const editModalCard = document.getElementById('editModalCard');
-    const container = document.getElementById('protocolRowsContainer');
     
     let originalRoutingType = 1; 
-    let isInitializingEdit = false; // 拦截初始化时触发保存
+    let isInitializingEdit = false; 
 
     function openEditModal(uuid) {
         isInitializingEdit = true;
         const node = window.allNodesData[uuid];
         if (!node) { alert('数据加载异常，请刷新'); return; }
 
+        // 1. 基础信息填充
         document.getElementById('editSaveIndicator').style.opacity = '0';
         document.getElementById('editNodeUUID').value = node.uuid;
         document.getElementById('editNodeName').value = node.name;
         
+        // 2. 路由类型状态
         if (!node.is_blocked) {
             originalRoutingType = node.routing_type;
         } else {
@@ -283,26 +281,257 @@
         let uiState = node.is_blocked ? 3 : node.routing_type;
         selectEditGroup(uiState, true);
 
+        // 3. IP 信息渲染
         renderIPInputs(node.ipv4, node.ipv6);
 
+        // 4. 协议列表渲染初始化
+        const container = document.getElementById('protocolListContainer');
         container.innerHTML = ''; 
         const disabledSet = new Set(node.disabled_links || []);
 
+        // ================= 安全模式检测 =================
+        let isLinksLocked = false;
+        if (node.links) {
+            // 后端返回的脱敏数据包含 "🔒"
+            isLinksLocked = Object.values(node.links).some(v => v && v.includes('🔒'));
+        }
+
+        const addSection = document.getElementById('addProtocolSection');
+
+        if (isLinksLocked) {
+            // HTTP 模式：显示顶部大警告
+            container.innerHTML = `
+                <div class="security-warning-bar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <span><b>HTTP 安全模式：</b>仅允许写入、管理启停和删除协议。允许在安全证书界面强制开启忽略安全保护。</span>
+                </div>
+            `;
+            // [修改点] 这里不再隐藏 addSection，允许用户添加新协议
+            if(addSection) addSection.style.display = 'flex'; 
+        } else {
+            // HTTPS 模式
+            if(addSection) addSection.style.display = 'flex';
+        } 
+        // 👆👆👆 你之前就是少了这个大括号！
+
+        // 5. 循环渲染协议卡片
         if (node.links && Object.keys(node.links).length > 0) {
-            for (const [proto, link] of Object.entries(node.links)) {
+            // 排序：已启用的在前
+            const sortedProtos = Object.keys(node.links).sort((a, b) => {
+                const aDis = disabledSet.has(a);
+                const bDis = disabledSet.has(b);
+                if (aDis === bDis) return 0;
+                return aDis ? 1 : -1;
+            });
+
+            for (const proto of sortedProtos) {
+                const link = node.links[proto];
                 const isEnabled = !disabledSet.has(proto);
-                renderProtocolCard(proto, link, isEnabled, false);
+                // 核心：传入 isLinksLocked 状态
+                renderProtocolCard(proto, link, isEnabled, false, isLinksLocked);
             }
+        } else if (!isLinksLocked) {
+            // 如果不是锁定模式且无数据，显示提示
+            // (锁定模式下已经有警告条了，不需要这个提示)
+            container.innerHTML += `<div style="text-align:center; color:#999; padding:20px; font-size:12px;">暂无协议节点</div>`;
         }
         
         updateLayoutState();
         editModalEl.classList.add('active');
         
-        // 初始化完毕，放开保存拦截
+        // 强制展开右侧 (HTTP 模式下也要展开，因为有警告条和可能的列表)
+        if(isLinksLocked || (node.links && Object.keys(node.links).length > 0)) {
+            editModalCard.classList.add('has-content');
+        }
+
         setTimeout(() => { isInitializingEdit = false; }, 100);
     }
 
-    // 渲染 IP 输入时，绑定自动保存事件
+    // 渲染单行协议卡片
+    function renderProtocolCard(proto, link, isEnabled, isNew, isLocked = false) {
+        const div = document.createElement('div');
+        div.className = 'protocol-card';
+        div.setAttribute('data-proto', proto);
+        if (!isEnabled) div.classList.add('disabled');
+        if (isLocked) div.classList.add('locked-mode'); // HTTP 模式专用样式类
+
+        // 开关状态
+        const checkedState = isEnabled ? 'checked' : '';
+        
+        // 协议徽章颜色
+        let badgeColor = '#666'; 
+        if (window.getProtoColor) {
+            const c = window.getProtoColor(proto);
+            badgeColor = c.text;
+        }
+
+        // 构建 HTML
+        let html = `
+            <div class="proto-header">
+                <div class="proto-title">
+                    <span class="proto-badge" style="color:${badgeColor}; border-color:${badgeColor}20; background:${badgeColor}10;">
+                        ${proto.toUpperCase()}
+                    </span>
+                </div>
+                <div class="proto-actions">
+                    <label class="switch-sm">
+                        <input type="checkbox" class="proto-switch" ${checkedState} onchange="toggleProtocol(this)">
+                        <span class="slider-sm"></span>
+                    </label>
+                    <button type="button" class="btn-icon delete" onclick="removeProtocolCard(this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            </div>`;
+
+        // 仅在非锁定(HTTPS)模式下才渲染 Input
+        if (!isLocked) {
+            html += `
+            <input type="text" class="link-input" 
+                value="${link}" 
+                placeholder="${proto}://..." 
+                onchange="markAsModified()"
+            >`;
+        }
+
+        div.innerHTML = html;
+        
+        const container = document.getElementById('protocolListContainer');
+        if (isNew) {
+            container.appendChild(div);
+        } else {
+            container.appendChild(div);
+        }
+    }
+
+    // 标记修改
+    function markAsModified() {
+        triggerNodeAutoSave(false);
+    }
+
+    // 切换协议开关
+    function toggleProtocol(checkbox) {
+        const card = checkbox.closest('.protocol-card');
+        if (checkbox.checked) {
+            card.classList.remove('disabled');
+        } else {
+            card.classList.add('disabled');
+        }
+        triggerNodeAutoSave(true);
+    }
+
+    // 删除协议卡片 (双击确认逻辑)
+    function removeProtocolCard(btn) {
+        if (btn.classList.contains('confirm')) {
+            // 第二次点击：执行删除
+            const card = btn.closest('.protocol-card');
+            card.remove();
+            updateLayoutState();
+            triggerNodeAutoSave(true);
+        } else {
+            // 第一次点击：进入确认状态
+            btn.classList.add('confirm');
+            // 2秒后自动恢复
+            setTimeout(() => {
+                if (btn) btn.classList.remove('confirm');
+            }, 2000);
+        }
+    }
+
+    // 自动保存函数 (适配 HTTPS 和 HTTP 模式)
+    let editNodeAutoSaveTimer = null;
+    function triggerNodeAutoSave(immediate = false) {
+        if (isInitializingEdit) return; 
+        
+        const uuid = document.getElementById('editNodeUUID').value;
+        if (!uuid) return;
+
+        clearTimeout(editNodeAutoSaveTimer);
+        const indicator = document.getElementById('editSaveIndicator');
+        indicator.innerHTML = '<span style="color:#888;">保存中...</span>';
+        indicator.style.opacity = '1';
+
+        const delayMs = immediate ? 0 : 700;
+
+        editNodeAutoSaveTimer = setTimeout(async () => {
+            const name = document.getElementById('editNodeName').value;
+            const uiState = parseInt(document.getElementById('editNodeUIState').value);
+            
+            const v4El = document.getElementById('editNodeIPV4');
+            const v6El = document.getElementById('editNodeIPV6');
+            const ipv4 = v4El ? v4El.value.trim() : "";
+            const ipv6 = v6El ? v6El.value.trim() : "";
+
+            let finalRoutingType = 1;
+            let finalIsBlocked = false;
+            if (uiState === 3) {
+                finalIsBlocked = true;
+                finalRoutingType = originalRoutingType; 
+            } else {
+                finalIsBlocked = false;
+                finalRoutingType = uiState;
+            }
+            
+            const links = {};
+            const disabledLinks = []; 
+
+            const listContainer = document.getElementById('protocolListContainer');
+            const cards = listContainer.querySelectorAll('.protocol-card');
+            
+            cards.forEach(card => {
+                const proto = card.getAttribute('data-proto');
+                // HTTP 模式下 input 可能不存在
+                const input = card.querySelector('.link-input');
+                const toggle = card.querySelector('.proto-switch');
+                
+                // 只要开关存在，就说明协议卡片存在
+                if (toggle) { // 只要开关存在，说明卡片未被删除
+                    if (input) {
+                        // 1. 如果有输入框 (HTTPS模式 或 新添加的协议)，正常取值
+                        const linkVal = input.value.trim();
+                        if (linkVal && !linkVal.includes('🔒')) {
+                            links[proto] = linkVal; 
+                        }
+                    } else {
+                        // 2. [关键修改] HTTP模式下的旧协议没有输入框
+                        // 我们传入一个特殊标记，告诉后端保留数据库里的原值
+                        links[proto] = "__KEEP_EXISTING__"; 
+                    }
+                    
+                    if (!toggle.checked) disabledLinks.push(proto);
+                }
+            });
+
+            try {
+                const response = await fetch('/api/update-node', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        uuid, name, 
+                        routing_type: finalRoutingType, 
+                        links, 
+                        is_blocked: finalIsBlocked,
+                        disabled_links: disabledLinks,
+                        ipv4, ipv6 
+                    })
+                });
+                const res = await response.json();
+                
+                if (res.status === 'success') {
+                    indicator.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg> 已保存`;
+                    setTimeout(() => indicator.style.opacity = '0', 2000);
+                    
+                    if (typeof loadNodesList === 'function') loadNodesList();
+                } else {
+                    indicator.innerHTML = '<span style="color:#ff3b30;">保存失败</span>';
+                }
+            } catch (err) {
+                indicator.innerHTML = '<span style="color:#ff3b30;">网络错误</span>';
+            }
+        }, delayMs);
+    }
+
+    // IP 渲染相关辅助函数
     function renderIPInputs(ipv4, ipv6) {
         const ipContainer = document.getElementById('ipEditContainer');
         const v4 = ipv4 || '';
@@ -359,6 +588,7 @@
     }
 
     function updateLayoutState() {
+        const container = document.getElementById('protocolListContainer');
         if (container.children.length > 0) {
             editModalCard.classList.add('has-content');
         } else {
@@ -372,10 +602,9 @@
         const availableProtos = GLOBAL_SUPPORTED_PROTOCOLS.filter(p => !existingProtos.has(p));
         
         const addSection = document.getElementById('addProtocolSection');
-        if (availableProtos.length === 0) {
-            addSection.style.display = 'none'; 
-        } else {
-            addSection.style.display = 'block';
+        if (addSection) {
+            if (availableProtos.length === 0) addSection.style.display = 'none'; 
+            else addSection.style.display = 'block';
         }
     }
 
@@ -386,16 +615,11 @@
             if (parseInt(el.getAttribute('data-type')) === val) el.classList.add('active');
         });
         if (val === 1 || val === 2) originalRoutingType = val;
-        
         if (!skipSave) triggerNodeAutoSave(true);
     }
 
-    function autoResizeTextarea(el) {
-        el.style.height = 'auto'; 
-        el.style.height = (el.scrollHeight) + 'px';
-    }
-
     function showAddProtocolMenu() {
+        const container = document.getElementById('protocolListContainer');
         const listEl = document.getElementById('protoSelectList');
         listEl.innerHTML = '<div style="font-size:11px; color:#999; margin-bottom:6px; padding-left:6px; font-weight: 600;">选择协议类型</div>';
         
@@ -435,184 +659,7 @@
     function insertProtocolCard(proto) {
         renderProtocolCard(proto, '', true, true);
         updateLayoutState();
-        triggerNodeAutoSave(); // 添加协议也会保存
-    }
-
-    function renderProtocolCard(proto, linkValue, isEnabled, isNew = false) {
-        if (isNew) {
-            document.querySelectorAll('#protocolRowsContainer .protocol-card').forEach(c => {
-                c.classList.remove('expanded');
-            });
-        }
-
-        const div = document.createElement('div');
-        div.className = `protocol-card ${isEnabled ? '' : 'disabled'} ${isNew ? 'expanded' : ''}`;
-        div.setAttribute('data-proto', proto);
-
-        const checkedAttr = isEnabled ? 'checked' : '';
-        const safeValue = linkValue ? linkValue.trim() : '';
-
-        // ✨ 替换为红色垃圾桶图标
-        div.innerHTML = `
-            <div class="card-header-row" onclick="toggleCardExpand(this)">
-                <div style="display: flex; align-items: center;">
-                    <div class="expand-chevron">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
-                    <span class="protocol-tag">${proto}</span>
-                </div>
-                <div class="card-actions" onclick="event.stopPropagation()">
-                    <label class="toggle-switch">
-                        <input type="checkbox" class="proto-enable-check" ${checkedAttr} onchange="toggleCardState(this)">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <button type="button" class="btn-delete-icon" onclick="handleDeleteClick(this)" title="删除此协议">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
-                </div>
-            </div>
-            <div class="card-body-row">
-                <textarea class="protocol-textarea" 
-                          oninput="autoResizeTextarea(this); triggerNodeAutoSave();"
-                          placeholder="请粘贴 ${proto}:// 节点链接..." spellcheck="false">${safeValue}</textarea>
-            </div>
-        `;
-        container.appendChild(div);
-        
-        if (isNew) {
-             setTimeout(() => {
-                const textarea = div.querySelector('textarea');
-                autoResizeTextarea(textarea);
-             }, 10);
-        }
-    }
-
-    window.toggleCardExpand = function(headerEl) {
-        const card = headerEl.closest('.protocol-card');
-        const wasExpanded = card.classList.contains('expanded');
-        
-        document.querySelectorAll('#protocolRowsContainer .protocol-card').forEach(c => {
-            c.classList.remove('expanded');
-        });
-
-        if (!wasExpanded) {
-            card.classList.add('expanded');
-            const textarea = card.querySelector('textarea');
-            autoResizeTextarea(textarea);
-        }
-    }
-
-    window.toggleCardState = function(checkbox) {
-        const card = checkbox.closest('.protocol-card');
-        if (checkbox.checked) {
-            card.classList.remove('disabled');
-        } else {
-            card.classList.add('disabled');
-        }
-        triggerNodeAutoSave(true);
-    }
-
-    // 二次确认删除机制
-    window.handleDeleteClick = function(btn) {
-        if (btn.dataset.confirmState === 'true') {
-            btn.closest('.protocol-card').remove();
-            updateLayoutState();
-            triggerNodeAutoSave(true); // 删除后触发保存
-        } else {
-            btn.dataset.confirmState = 'true';
-            const origHtml = btn.innerHTML; // 保存 SVG 图标
-            btn.innerHTML = '确定?';
-            btn.classList.add('confirm-state');
-            
-            btn.resetTimer = setTimeout(() => {
-                btn.dataset.confirmState = 'false';
-                btn.innerHTML = origHtml;
-                btn.classList.remove('confirm-state');
-            }, 2500);
-        }
-    }
-
-    // ================= ✨ 核心机制：静默自动保存 =================
-    let editNodeAutoSaveTimer = null;
-    function triggerNodeAutoSave(immediate = false) {
-        if (isInitializingEdit) return; 
-        
-        const uuid = document.getElementById('editNodeUUID').value;
-        if (!uuid) return;
-
-        clearTimeout(editNodeAutoSaveTimer);
-        const indicator = document.getElementById('editSaveIndicator');
-        indicator.innerHTML = '<span style="color:#888;">保存中...</span>';
-        indicator.style.opacity = '1';
-
-        // ✨ 核心判断：如果是立即保存则等待 0 毫秒，如果是输入框则等待 700 毫秒
-        const delayMs = immediate ? 0 : 700;
-
-        editNodeAutoSaveTimer = setTimeout(async () => {
-            // 组装数据
-            const name = document.getElementById('editNodeName').value;
-            const uiState = parseInt(document.getElementById('editNodeUIState').value);
-            
-            const v4El = document.getElementById('editNodeIPV4');
-            const v6El = document.getElementById('editNodeIPV6');
-            const ipv4 = v4El ? v4El.value.trim() : "";
-            const ipv6 = v6El ? v6El.value.trim() : "";
-
-            let finalRoutingType = 1;
-            let finalIsBlocked = false;
-            if (uiState === 3) {
-                finalIsBlocked = true;
-                finalRoutingType = originalRoutingType; 
-            } else {
-                finalIsBlocked = false;
-                finalRoutingType = uiState;
-            }
-            
-            const links = {};
-            const disabledLinks = []; 
-
-            const cards = container.querySelectorAll('.protocol-card');
-            cards.forEach(card => {
-                const proto = card.getAttribute('data-proto');
-                const input = card.querySelector('.protocol-textarea');
-                const toggle = card.querySelector('.proto-enable-check');
-                
-                const linkVal = input.value.trim();
-                if (linkVal) {
-                    links[proto] = linkVal; 
-                    if (!toggle.checked) disabledLinks.push(proto);
-                }
-            });
-
-            // 发起请求
-            try {
-                const response = await fetch('/api/update-node', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        uuid, name, 
-                        routing_type: finalRoutingType, 
-                        links, 
-                        is_blocked: finalIsBlocked,
-                        disabled_links: disabledLinks,
-                        ipv4, ipv6 
-                    })
-                });
-                const res = await response.json();
-                
-                if (res.status === 'success') {
-                    indicator.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg> 已保存`;
-                    setTimeout(() => indicator.style.opacity = '0', 2000);
-                    
-                    // 静默刷新底层列表，不影响当前弹窗的操作体验
-                    if (typeof loadNodesList === 'function') loadNodesList();
-                } else {
-                    indicator.innerHTML = '<span style="color:#ff3b30;">保存失败</span>';
-                }
-            } catch (err) {
-                indicator.innerHTML = '<span style="color:#ff3b30;">网络错误</span>';
-            }
-        }, delayMs); // 使用上面动态计算的 delayMs 变量
+        triggerNodeAutoSave(); 
     }
 </script>
 {{end}}

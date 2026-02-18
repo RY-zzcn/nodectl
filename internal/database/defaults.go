@@ -44,6 +44,12 @@ func initBasicSettings() {
 		{Key: "clash_custom_modules", Value: "[]", Description: "用户自定义的 Clash 分流模块"},
 		{Key: "clash_custom_proxy_rules", Value: "[]", Description: "自定义分流策略组配置"},
 		{Key: "clash_custom_direct_raw", Value: "", Description: "自定义直连规则原始文本"},
+		// [修正] 将 sys_force_https 改为 sys_force_http
+		{Key: "sys_force_http", Value: "false", Description: "是否强制允许 HTTP (忽略安全)"},
+		// [新增] Cloudflare API 配置预留
+		{Key: "cf_email", Value: "", Description: "Cloudflare 账号邮箱"},
+		{Key: "cf_api_key", Value: "", Description: "Cloudflare Global API Key"},
+		{Key: "cf_domain", Value: "", Description: "证书绑定的主域名"},
 	}
 
 	for _, config := range defaultConfigs {

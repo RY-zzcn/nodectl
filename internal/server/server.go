@@ -1,67 +1,159 @@
+// 路径: internal/server/server.go
 package server
 
 import (
+	"crypto/tls"
 	"embed"
 	"html/template"
 	"net/http"
+	"time"
 
 	"nodectl/internal/logger"
 	"nodectl/internal/middleware"
 	"nodectl/internal/service"
 )
 
-// tmpl 设为包级全局变量，供同包下的 handlers.go 使用
+// tmpl 设为包级全局变量，供同包下的 handlers.go 使用渲染页面
 var tmpl *template.Template
 
-// Start 启动 HTTP 服务器
+// restartChan 用于接收重启信号的通道
+var restartChan = make(chan bool)
+
+// TriggerRestart 触发服务器重启逻辑 (供 handlers.go 调用)
+// 功能：向 restartChan 发送信号，通知主循环关闭当前 Server 实例
+func TriggerRestart() {
+	restartChan <- true
+}
+
+// ------------------- [中间件包装函数] -------------------
+
+// withSecure 仅强制 HTTPS (用于登录页、订阅链接、公开接口)
+// 功能：如果开启了强制 HTTPS，将 HTTP 请求重定向到 HTTPS
+func withSecure(h http.HandlerFunc) http.HandlerFunc {
+	return middleware.ForceHTTPS(h)
+}
+
+// withAuthAndSecure 强制 HTTPS + 登录鉴权 (用于后台管理接口)
+// 功能：保护核心 API，必须登录且在安全协议下才能访问
+func withAuthAndSecure(h http.HandlerFunc) http.HandlerFunc {
+	return middleware.ForceHTTPS(middleware.Auth(h))
+}
+
+// ------------------- [服务器启动逻辑] -------------------
+
+// Start 启动核心网络服务器，支持自动检测证书并在 8080 端口热切换 HTTP/HTTPS
+// 功能：初始化依赖组件，注册所有路由，并通过死循环守护 HTTP 服务的生命周期
 func Start(tmplFS embed.FS) {
-	service.InitGeoIP()
-	// 1. 预编译解析模板
+	// 1. 初始化各类服务组件
+	service.InitGeoIP()       // 初始化 GeoIP 数据库
+	service.InitCertManager() // 初始化证书目录
+
+	// 2. 预编译解析模板
 	tmpl = template.Must(template.ParseFS(tmplFS, "templates/*.html", "templates/components/*.html"))
 
-	// 2. 创建独立的路游分发器
+	// 3. 创建路由器并注册所有路由 (只需执行一次，避免重复注册引发 panic)
 	mux := http.NewServeMux()
 
-	// ========== 页面路由 (Page Routes) ==========
-	mux.HandleFunc("/login", loginHandler)
-	mux.HandleFunc("/", middleware.Auth(indexHandler))
-	mux.HandleFunc("/logout", logoutHandler)
+	// ========== A. 页面路由 (Page Routes) ==========
+	mux.HandleFunc("/login", withSecure(loginHandler))   // 登录页
+	mux.HandleFunc("/", withAuthAndSecure(indexHandler)) // 首页
+	mux.HandleFunc("/logout", withSecure(logoutHandler)) // 退出
 
-	// ========== API 路由 (API Routes) ==========
-	mux.HandleFunc("/api/change-password", middleware.Auth(apiChangePassword))
-	mux.HandleFunc("/api/update-node", middleware.Auth(apiUpdateNode))
-	mux.HandleFunc("/api/add-node", middleware.Auth(apiAddNode))
-	mux.HandleFunc("/api/get-nodes", middleware.Auth(apiGetNodes))
-	mux.HandleFunc("/api/delete-node", middleware.Auth(apiDeleteNode))
-	mux.HandleFunc("/api/reorder-nodes", middleware.Auth(apiReorderNodes))
-	mux.HandleFunc("/api/get-settings", middleware.Auth(apiGetSettings))
-	mux.HandleFunc("/api/update-settings", middleware.Auth(apiUpdateSettings))
-	mux.HandleFunc("/api/clash/settings", middleware.Auth(apiGetClashSettings))
-	mux.HandleFunc("/api/clash/save", middleware.Auth(apiSaveClashSettings))
-	mux.HandleFunc("/api/custom-rules/get", middleware.Auth(apiGetCustomRules))
-	mux.HandleFunc("/api/custom-rules/save", middleware.Auth(apiSaveCustomRules))
-	mux.HandleFunc("/api/clash/custom-modules/save", middleware.Auth(apiSaveCustomClashModules))
-	mux.HandleFunc("/api/system-monitor", middleware.Auth(apiGetSystemMonitor))
+	// ========== B. 管理员 API (需登录 + 保护) ==========
+	// 基础与设置
+	mux.HandleFunc("/api/change-password", withAuthAndSecure(apiChangePassword))
+	mux.HandleFunc("/api/get-settings", withAuthAndSecure(apiGetSettings))
+	mux.HandleFunc("/api/update-settings", withAuthAndSecure(apiUpdateSettings))
 
-	// [新增] 公开路由 (不需要 middleware.Auth)
-	mux.HandleFunc("/api/public/install-script", apiPublicScript) // 获取脚本
-	mux.HandleFunc("/api/callback/report", apiCallbackReport)     // 脚本上报
-	// [新增] 客户端订阅接口 (公开，依靠 URL Token 鉴权)
-	mux.HandleFunc("/sub/clash", apiSubClash)
-	mux.HandleFunc("/sub/v2ray", apiSubV2ray)
-	mux.HandleFunc("/sub/raw/1", apiSubRaw)             // 1=直连池
-	mux.HandleFunc("/sub/raw/2", apiSubRaw)             // 2=落地池
-	mux.HandleFunc("/sub/rules/direct", apiSubRuleList) // 自定义直连规则
-	mux.HandleFunc("/sub/rules/proxy/", apiSubRuleList) // 自定义分流规则
+	// 节点管理
+	mux.HandleFunc("/api/get-nodes", withAuthAndSecure(apiGetNodes))
+	mux.HandleFunc("/api/add-node", withAuthAndSecure(apiAddNode))
+	mux.HandleFunc("/api/update-node", withAuthAndSecure(apiUpdateNode))
+	mux.HandleFunc("/api/delete-node", withAuthAndSecure(apiDeleteNode))
+	mux.HandleFunc("/api/reorder-nodes", withAuthAndSecure(apiReorderNodes))
 
-	// [新增] GeoIP 更新接口
-	mux.HandleFunc("/api/update-geoip", middleware.Auth(apiUpdateGeoIP))
-	mux.HandleFunc("/api/get-geo-status", middleware.Auth(apiGetGeoStatus))
+	// 证书与重启 (关键接口)
+	mux.HandleFunc("/api/save-cert", withAuthAndSecure(apiSaveCert))   // 手动上传证书
+	mux.HandleFunc("/api/apply-cert", withAuthAndSecure(apiApplyCert)) // 申请证书
+	mux.HandleFunc("/api/restart", withAuthAndSecure(apiRestartCore))  // 热重启核心
 
-	// 3. 启动服务
-	port := "8080"
-	logger.Log.Info("Web 服务已启动", "地址", "http://localhost:"+port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		logger.Log.Error("Web 服务异常退出", "err", err.Error())
+	// Clash 与规则管理
+	mux.HandleFunc("/api/clash/settings", withAuthAndSecure(apiGetClashSettings))
+	mux.HandleFunc("/api/clash/save", withAuthAndSecure(apiSaveClashSettings))
+	mux.HandleFunc("/api/clash/custom-modules/save", withAuthAndSecure(apiSaveCustomClashModules))
+	mux.HandleFunc("/api/custom-rules/get", withAuthAndSecure(apiGetCustomRules))
+	mux.HandleFunc("/api/custom-rules/save", withAuthAndSecure(apiSaveCustomRules))
+
+	// 监控与 GeoIP
+	mux.HandleFunc("/api/system-monitor", withAuthAndSecure(apiGetSystemMonitor))
+	mux.HandleFunc("/api/update-geoip", withAuthAndSecure(apiUpdateGeoIP))
+	mux.HandleFunc("/api/get-geo-status", withAuthAndSecure(apiGetGeoStatus))
+
+	// ========== C. 公开/工具 路由 ==========
+	mux.HandleFunc("/api/public/install-script", withSecure(apiPublicScript)) // 安装脚本
+	mux.HandleFunc("/api/callback/report", withSecure(apiCallbackReport))     // 节点上报
+
+	// 订阅接口
+	mux.HandleFunc("/sub/clash", withSecure(apiSubClash))
+	mux.HandleFunc("/sub/v2ray", withSecure(apiSubV2ray))
+	mux.HandleFunc("/sub/raw/1", withSecure(apiSubRaw))
+	mux.HandleFunc("/sub/raw/2", withSecure(apiSubRaw))
+	mux.HandleFunc("/sub/rules/direct", withSecure(apiSubRuleList))
+	mux.HandleFunc("/sub/rules/proxy/", withSecure(apiSubRuleList))
+
+	// 4. 进入服务守护主循环 (实现热重启的核心逻辑)
+	for {
+		// 每次进入循环前，尝试加载证书
+		err := service.LoadCertificate()
+		certLoaded := (err == nil)
+
+		if certLoaded {
+			logger.Log.Info("SSL 证书加载成功，准备进入 HTTPS 模式", "domain", service.GetCurrentCertInfo().Domain)
+		} else {
+			logger.Log.Info("未检测到有效证书，准备进入 HTTP 模式", "msg", "如需使用 HTTPS，请在面板上传证书")
+		}
+
+		// 实例化当前 Server，统一监听 8080 端口
+		activeServer := &http.Server{
+			Addr:    ":8080",
+			Handler: mux,
+		}
+
+		// 若证书就绪，则挂载 TLS 动态获取配置
+		if certLoaded {
+			activeServer.TLSConfig = &tls.Config{
+				GetCertificate: service.GetCertificate,
+			}
+		}
+
+		// [后台协程] 监听重启信号
+		// 功能：一旦接收到 TriggerRestart 发送的信号，就强制关闭当前的 Server 实例
+		go func(srv *http.Server) {
+			<-restartChan // 阻塞等待通道信号
+			logger.Log.Info("收到重启信号，正在卸载当前网络服务...")
+			if srv != nil {
+				srv.Close() // 强制关闭服务，释放 8080 端口
+			}
+		}(activeServer)
+
+		// [主线程] 启动服务并阻塞
+		var serveErr error
+		if certLoaded {
+			logger.Log.Info("HTTPS 服务已启动", "地址", "https://localhost:8080")
+			serveErr = activeServer.ListenAndServeTLS("", "")
+		} else {
+			logger.Log.Info("HTTP 服务已启动", "地址", "http://localhost:8080")
+			serveErr = activeServer.ListenAndServe()
+		}
+
+		// 拦截异常崩溃 (主动调用的 srv.Close 会返回 http.ErrServerClosed，属于正常行为)
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			logger.Log.Error("服务异常崩溃退出", "error", serveErr)
+			break // 严重错误(如端口占用被强杀)，跳出循环结束程序
+		}
+
+		// 走到这里说明 Server 被成功关闭了，休眠 1 秒后进入下一次 for 循环重新拉起服务
+		logger.Log.Info("旧网络服务已彻底关闭，准备拉起新实例...")
+		time.Sleep(1 * time.Second)
 	}
 }
