@@ -291,6 +291,7 @@
     }
 
     // 核心渲染逻辑：生成一键导入按钮和二维码
+    // 核心渲染逻辑：生成一键导入按钮和二维码
     function renderRightPanel(formatKey) {
         const data = subFormatData[formatKey];
         const link = data.getLink();
@@ -298,9 +299,12 @@
         const subName = document.getElementById('inputSubName').value.trim() || 'NodeCTL';
         
         let importBtnHtml = '';
-        let gridClass = 'sub-actions-grid has-import';
+        // 默认不加 has-import 类，这样只有复制按钮时会独占一行撑满
+        let gridClass = 'sub-actions-grid'; 
         
         if (formatKey === 'clash') {
+            // 只有 Clash 模式下，加上 has-import 变成左右两列，并生成导入按钮
+            gridClass = 'sub-actions-grid has-import'; 
             const clashUrl = `clash://install-config?url=${encodeURIComponent(link)}&name=${encodeURIComponent(subName)}`;
             importBtnHtml = `
                 <a href="${clashUrl}" class="btn-sub-action btn-import">
@@ -309,14 +313,7 @@
                 </a>
             `;
         } else if (formatKey === 'v2ray') {
-            const b64Link = btoa(link);
-            const subUrl = `sub://${b64Link}`;
-            importBtnHtml = `
-                <a href="${subUrl}" class="btn-sub-action btn-import" title="支持 Shadowrocket 等主流手机客户端">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    导入 App
-                </a>
-            `;
+            // V2Ray 下什么都不做，importBtnHtml 保持为空，界面上只会显示一个宽的复制按钮
         }
 
         contentDiv.innerHTML = `
@@ -450,7 +447,7 @@
 
     function showCopySuccess(btn) {
         const originalHtml = btn.innerHTML;
-        btn.innerHTML = '✅ 复制成功!';
+        btn.innerHTML = '复制成功!';
         btn.classList.add('copied');
         
         setTimeout(() => {

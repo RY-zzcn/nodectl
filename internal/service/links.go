@@ -651,12 +651,30 @@ func ReplaceLinkIP(link, newIP string) string {
 		}
 		if lastColon := strings.LastIndex(body, ":"); lastColon != -1 {
 			if atIndex := strings.LastIndex(body[:lastColon], "@"); atIndex != -1 {
-				port := body[lastColon+1:]
-				userPass := body[:atIndex]
-				return "ss://" + base64.StdEncoding.EncodeToString([]byte(userPass)) + "@" + ipForURL + ":" + port
+				userInfo := body[:atIndex]
+				portInfo := body[lastColon+1:]
+
+				port := portInfo
+				nameSuffix := ""
+				if hashIdx := strings.Index(portInfo, "#"); hashIdx != -1 {
+					port = portInfo[:hashIdx]
+					nameSuffix = portInfo[hashIdx:]
+				}
+
+				// 还原出原始的 method:password
+				if unescaped, err := url.QueryUnescape(userInfo); err == nil && strings.Contains(unescaped, ":") {
+					userInfo = unescaped
+				}
+				if !strings.Contains(userInfo, ":") {
+					if decoded := safeBase64Decode(userInfo); decoded != "" {
+						userInfo = decoded
+					}
+				}
+
+				b64UserInfo := base64.StdEncoding.EncodeToString([]byte(userInfo))
+				return "ss://" + b64UserInfo + "@" + ipForURL + ":" + port + nameSuffix
 			}
 		}
-		return link
 	}
 
 	// 3. 处理标准 URL (Vless, Trojan, Hy2, Tuic, Socks5 等)
