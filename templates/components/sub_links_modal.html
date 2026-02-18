@@ -391,6 +391,10 @@
     // 自动静默保存订阅名称 (防抖)，并自动刷新右侧的参数
     let subNameSaveTimer = null;
     function saveCustomSubNameDebounced() {
+        if (!document.getElementById('subLinksModal').classList.contains('active')) {
+            return; 
+        }
+
         clearTimeout(subNameSaveTimer);
         const indicator = document.getElementById('subSaveIndicator');
         indicator.innerHTML = '<span style="color:#888;">保存中...</span>';

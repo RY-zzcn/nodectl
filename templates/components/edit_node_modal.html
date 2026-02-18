@@ -474,6 +474,10 @@
     // 自动保存函数 (适配 HTTPS 和 HTTP 模式)
     let editNodeAutoSaveTimer = null;
     function triggerNodeAutoSave(immediate = false) {
+        if (!document.getElementById('editNodeModal').classList.contains('active')) {
+            return; 
+        }
+
         if (isInitializingEdit) return; 
         
         const uuid = document.getElementById('editNodeUUID').value;

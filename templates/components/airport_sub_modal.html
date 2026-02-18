@@ -1,0 +1,84 @@
+{{define "airport_sub_modal.html"}}
+<style>
+    /* ================= 机场订阅弹窗隔离样式 ================= */
+    .airport-modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        z-index: 3000; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.3s ease;
+    }
+    .airport-modal-overlay.active { display: flex; opacity: 1; }
+    
+    /* 参考系统设置的宽屏设计，预留足够空间 */
+    .airport-modal-card {
+        background: #ffffff; width: 100%; max-width: 800px; height: 80vh; border-radius: 12px; 
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;
+        transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .airport-modal-overlay.active .airport-modal-card { transform: translateY(0); }
+
+    .airport-modal-header {
+        padding: 16px 20px; border-bottom: 1px solid #f0f0f5; 
+        display: flex; justify-content: space-between; align-items: center; background: #fafbfc;
+    }
+    .airport-modal-title { font-size: 16px; font-weight: 700; color: #1d1d1f; display: flex; align-items: center; gap: 8px;}
+    .airport-close-btn {
+        background: transparent; border: none; font-size: 20px; color: #86868b; cursor: pointer;
+        transition: color 0.2s; display: flex; align-items: center; justify-content: center;
+    }
+    .airport-close-btn:hover { color: #1d1d1f; }
+
+    .airport-modal-body {
+        flex: 1; overflow-y: auto; padding: 20px; background: #ffffff;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    
+    /* 临时占位提示样式 */
+    .airport-placeholder {
+        text-align: center; color: #86868b;
+    }
+    .airport-placeholder svg {
+        width: 64px; height: 64px; margin-bottom: 15px; color: #007aff; opacity: 0.8;
+    }
+</style>
+
+<div class="airport-modal-overlay" id="airportSubModalOverlay" onclick="if(event.target===this) closeAirportSubModal()">
+    <div class="airport-modal-card">
+        <div class="airport-modal-header">
+            <div class="airport-modal-title">
+                <span>☁️ 机场订阅接入 (开发中)</span>
+            </div>
+            <button class="airport-close-btn" onclick="closeAirportSubModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        
+        <div class="airport-modal-body">
+            <div class="airport-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                <h3 style="color: #333; margin-bottom: 8px;">模块预留位置</h3>
+                <p style="font-size: 14px; max-width: 300px; margin: 0 auto; line-height: 1.5;">
+                    此界面未来将用于配置外部机场订阅链接，提供定时同步、协议清洗以及快速导入等进阶功能。
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 弹窗控制逻辑
+    function openAirportSubModal() {
+        const overlay = document.getElementById('airportSubModalOverlay');
+        overlay.style.display = 'flex';
+        // 稍微延迟添加 active 以触发 CSS 动画
+        setTimeout(() => overlay.classList.add('active'), 10);
+    }
+
+    function closeAirportSubModal() {
+        const overlay = document.getElementById('airportSubModalOverlay');
+        overlay.classList.remove('active');
+        // 等待动画结束再隐藏 DOM
+        setTimeout(() => overlay.style.display = 'none', 300);
+    }
+</script>
+{{end}}

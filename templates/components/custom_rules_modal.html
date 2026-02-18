@@ -379,6 +379,10 @@
     // --- 自动保存防抖引擎 ---
     let autoSaveTimer = null;
     function triggerAutoSave() {
+        if (!document.getElementById('customRulesModal').classList.contains('active')) {
+            return; 
+        }
+
         if (currentProxyId) {
             const ruleObj = proxyRules.find(r => r.id === currentProxyId);
             if (ruleObj) ruleObj.content = serializeItemsToContent(currentProxyItems);
