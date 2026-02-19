@@ -46,7 +46,8 @@ func Start(tmplFS embed.FS) {
 	// 1. 初始化各类服务组件
 	service.InitGeoIP()       // 初始化 GeoIP 数据库
 	service.InitCertManager() // 初始化证书目录
-
+	//避免空指针报错
+	service.InitMihomo()
 	// 2. 预编译解析模板
 	tmpl = template.Must(template.ParseFS(tmplFS, "templates/*.html", "templates/components/*.html"))
 
@@ -88,6 +89,9 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/system-monitor", withAuthAndSecure(apiGetSystemMonitor))
 	mux.HandleFunc("/api/update-geoip", withAuthAndSecure(apiUpdateGeoIP))
 	mux.HandleFunc("/api/get-geo-status", withAuthAndSecure(apiGetGeoStatus))
+	// Mihomo 核心管理
+	mux.HandleFunc("/api/update-mihomo", withAuthAndSecure(apiUpdateMihomo)) // 新增
+	mux.HandleFunc("/api/get-mihomo-status", withAuthAndSecure(apiGetMihomoStatus))
 
 	// ========== C. 公开/工具 路由 ==========
 	mux.HandleFunc("/api/public/install-script", withSecure(apiPublicScript)) // 安装脚本
@@ -109,6 +113,7 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/airport/delete", withAuthAndSecure(apiAirportDelete))            // 删除订阅
 	mux.HandleFunc("/api/airport/nodes", withAuthAndSecure(apiAirportNodes))              // 获取订阅下节点
 	mux.HandleFunc("/api/airport/node/routing", withAuthAndSecure(apiAirportNodeRouting)) // 修改节点状态
+	mux.HandleFunc("/api/airport/test-nodes", withAuthAndSecure(apiTestAirportNodes))     // 新增测速接口
 
 	// 4. 进入服务守护主循环 (实现热重启的核心逻辑)
 	for {

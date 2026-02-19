@@ -141,6 +141,11 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 			ClientFingerprint: vj.Fp,
 			UDP:               true,
 		}
+
+		if node.Cipher == "" {
+			node.Cipher = "auto"
+		}
+
 		if vj.Tls == "tls" {
 			node.TLS = true
 		}

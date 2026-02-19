@@ -40,6 +40,7 @@ func initBasicSettings() {
 		{Key: "pref_use_emoji_flag", Value: "true", Description: "订阅节点是否添加国旗前缀"},
 		{Key: "sub_custom_name", Value: "NodeCTL", Description: "自定义订阅名称"},
 		{Key: "geo_db_version", Value: "", Description: "GeoIP 数据库版本号"},
+		{Key: "mihomo_core_version", Value: "", Description: "Mihomo 核心版本号"},
 		{Key: "pref_ip_strategy", Value: "ipv4_prefer", Description: "节点IP生成策略"},
 		{Key: "clash_custom_modules", Value: "[]", Description: "用户自定义的 Clash 分流模块"},
 		{Key: "clash_custom_proxy_rules", Value: "[]", Description: "自定义分流策略组配置"},
@@ -52,6 +53,7 @@ func initBasicSettings() {
 		{Key: "cf_domain", Value: "", Description: "证书绑定的主域名"},
 		{Key: "cf_auto_renew", Value: "true", Description: "是否开启证书自动续期"},
 		{Key: "airport_filter_invalid", Value: "false", Description: "是否剔除机场订阅中的无效节点"},
+		{Key: "pref_speed_test_mode", Value: "ping_speed", Description: "节点测速模式"},
 	}
 
 	for _, config := range defaultConfigs {

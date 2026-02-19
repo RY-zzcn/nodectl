@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -732,7 +733,7 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		"panel_url", "sub_token", "proxy_port_ss", "proxy_port_hy2", "proxy_port_tuic",
 		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
 		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "pref_use_emoji_flag", "sub_custom_name", "pref_ip_strategy",
-		"sys_force_http", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid",
+		"sys_force_http", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid", "pref_speed_test_mode",
 	}).Find(&configs).Error; err != nil {
 		logger.Log.Error("读取系统配置失败", "error", err, "ip", clientIP, "path", reqPath)
 	}
@@ -779,7 +780,7 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"proxy_ss_method": true, "proxy_port_socks5": true, "proxy_socks5_user": true, "proxy_socks5_pass": true, "pref_use_emoji_flag": true,
 		"sub_custom_name": true, "pref_ip_strategy": true,
 		"sys_force_http": true, "cf_email": true, "cf_api_key": true, "cf_domain": true, "cf_auto_renew": true,
-		"airport_filter_invalid": true,
+		"airport_filter_invalid": true, "pref_speed_test_mode": true,
 	}
 
 	for k, v := range req {
@@ -1529,4 +1530,111 @@ func apiAirportEdit(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("订阅信息已修改", "id", req.ID, "updates", updates)
 	sendJSON(w, "success", "修改成功")
+}
+
+// apiUpdateMihomo 触发 Mihomo 核心更新/下载
+func apiUpdateMihomo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	logger.Log.Info("后台线程开始更新 Mihomo 核心...")
+	go func() {
+		if err := service.GlobalMihomo.ForceUpdate(); err != nil {
+			logger.Log.Error("Mihomo 核心更新失败", "error", err)
+		}
+	}()
+
+	sendJSON(w, "success", "更新任务已在后台启动，请稍后刷新查看状态")
+}
+
+// apiGetMihomoStatus 获取 Mihomo 核心状态
+func apiGetMihomoStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	localVersion := service.GlobalMihomo.GetLocalVersion()
+	remoteVersion, _, _, errRemote := service.GlobalMihomo.GetRemoteVersion()
+
+	status := "unknown"
+	if localVersion == "" {
+		status = "not_found"
+	} else if errRemote == nil && remoteVersion != "" && remoteVersion != localVersion {
+		status = "update_available"
+	} else if errRemote == nil && remoteVersion == localVersion {
+		status = "latest"
+	} else {
+		status = "check_failed"
+	}
+
+	resp := map[string]interface{}{
+		"status": "success",
+		"data": map[string]interface{}{
+			"local_version":  localVersion,
+			"remote_version": remoteVersion,
+			"state":          status,
+		},
+	}
+
+	if errRemote != nil {
+		resp["data"].(map[string]interface{})["remote_error"] = errRemote.Error()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// apiTestAirportNodes 流式处理节点测速请求 (Server-Sent Events)
+func apiTestAirportNodes(w http.ResponseWriter, r *http.Request) {
+	// 1. 设置 SSE 必需的响应头
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	subID := r.URL.Query().Get("sub_id")
+	nodeID := r.URL.Query().Get("node_id")
+
+	var nodes []database.AirportNode
+	if subID != "" {
+		database.DB.Where("sub_id = ?", subID).Find(&nodes)
+	} else if nodeID != "" {
+		database.DB.Where("id = ?", nodeID).Find(&nodes)
+	}
+
+	if len(nodes) == 0 {
+		fmt.Fprintf(w, "data: %s\n\n", `{"node_id": "all", "type": "error", "text": "未找到需要测试的节点"}`)
+		flusher.Flush()
+		return
+	}
+
+	if !service.GlobalMihomo.IsCoreReady() {
+		fmt.Fprintf(w, "data: %s\n\n", `{"node_id": "all", "type": "error", "text": "请先在设置中下载 Mihomo 核心"}`)
+		flusher.Flush()
+		return
+	}
+
+	// 2. 利用 r.Context() 感知客户端断开连接
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	resultChan := make(chan service.SpeedTestResult)
+
+	// 3. 异步启动测速任务
+	go service.GlobalMihomo.RunBatchTest(ctx, nodes, resultChan)
+
+	// 4. 死循环监听管道，来一个结果发一个给前端 (流式推送)
+	for res := range resultChan {
+		data, _ := json.Marshal(res)
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush() // 立即把缓冲区数据推给前端
+	}
 }

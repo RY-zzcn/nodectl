@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,13 +25,61 @@ func SyncAirportSubscription(subID string) error {
 		return err
 	}
 
-	// 1. 下载订阅内容
-	resp, err := http.Get(sub.URL)
+	// 定义一个闭包函数，用于复用流量解析逻辑
+	parseTraffic := func(userInfo string) {
+		if userInfo == "" {
+			return
+		}
+		parts := strings.Split(userInfo, ";")
+		for _, part := range parts {
+			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+			if len(kv) == 2 {
+				val, _ := strconv.ParseInt(kv[1], 10, 64)
+				switch strings.ToLower(kv[0]) {
+				case "upload":
+					sub.Upload = val
+				case "download":
+					sub.Download = val
+				case "total":
+					sub.Total = val
+				case "expire":
+					sub.Expire = val
+				}
+			}
+		}
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// 1. 第一次请求：伪装成 Clash，专门骗取流量信息 Header
+	reqClash, err := http.NewRequest("GET", sub.URL, nil)
+	if err == nil {
+		reqClash.Header.Set("User-Agent", "Clash/1.18.0")
+		if respClash, err := client.Do(reqClash); err == nil {
+			parseTraffic(respClash.Header.Get("Subscription-Userinfo"))
+			respClash.Body.Close() // 只要 Header，直接丢弃容易解析失败的 YAML Body
+		}
+	}
+
+	// 2. 第二次请求：伪装成 v2rayN，强制获取最稳定的 Base64 节点数据
+	reqV2ray, err := http.NewRequest("GET", sub.URL, nil)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	reqV2ray.Header.Set("User-Agent", "v2rayN/6.31")
+
+	respV2ray, err := client.Do(reqV2ray)
+	if err != nil {
+		return err
+	}
+	defer respV2ray.Body.Close()
+
+	// 兜底机制：如果第一步 Clash 意外没拿到流量，尝试用本次 v2rayN 请求的 Header 补救
+	if sub.Total == 0 {
+		parseTraffic(respV2ray.Header.Get("Subscription-Userinfo"))
+	}
+
+	bodyBytes, _ := io.ReadAll(respV2ray.Body)
 	content := string(bodyBytes)
 
 	// 2. 解析节点链接 (自动识别 Base64 或 Clash)
@@ -73,9 +122,11 @@ func SyncAirportSubscription(subID string) error {
 
 	var nodesToInsert []database.AirportNode
 	for i, item := range newLinks {
-		// 传入完整的特征 (Name, Server, Port) 进行立体鉴定
+		// 【核心修复】：严格遵循用户偏好！
+		// 只要用户开启了过滤开关，且节点被鉴定为无效（包含结构错误或广告），
+		// 直接 continue 丢弃，绝对不加入 nodesToInsert，从而彻底不写入数据库！
 		if filterInvalid && isInvalidNode(item.Name, item.Server, item.Port) {
-			logger.Log.Debug("剔除无效机场节点", "name", item.Name, "server", item.Server, "port", item.Port)
+			logger.Log.Debug("根据用户偏好拦截无效节点，不写入数据库", "name", item.Name)
 			continue
 		}
 
@@ -94,12 +145,28 @@ func SyncAirportSubscription(subID string) error {
 		})
 	}
 
-	if err := tx.Create(&nodesToInsert).Error; err != nil {
+	// 4. 批量只插入有效的节点
+	if len(nodesToInsert) > 0 {
+		if err := tx.Create(&nodesToInsert).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// 5. 将更新后的流量信息和时间保存到数据库
+	// 显式指定模型和 ID，确保流量数据绝对能被精确更新
+	if err := tx.Model(&database.AirportSub{}).Where("id = ?", subID).Updates(map[string]interface{}{
+		"upload":     sub.Upload,
+		"download":   sub.Download,
+		"total":      sub.Total,
+		"expire":     sub.Expire,
+		"updated_at": time.Now(),
+	}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	tx.Model(&sub).Update("updated_at", time.Now())
+	// 6. 提交事务 (这一步非常重要，不提交则上面的节点和流量都不会保存)
 	tx.Commit()
 	return nil
 }
@@ -116,12 +183,12 @@ type NodeItem struct {
 // ------------------- [无效节点过滤引擎] -------------------
 // isInvalidNode 判断节点是否为虚假广告/无效信息节点 (名称+结构多维鉴定)
 func isInvalidNode(name string, server string, port int) bool {
-	// 1. [绝对精准] 结构级防伪：端口非法
+	// 1. [结构级防伪] 端口非法
 	if port <= 0 || port > 65535 {
 		return true
 	}
 
-	// 2. [绝对精准] 结构级防伪：拦截常见的虚假占位 IP
+	// 2. [结构级防伪] 拦截常见的虚假占位 IP
 	dummyServers := map[string]bool{
 		"127.0.0.1": true, "0.0.0.0": true, "localhost": true,
 		"1.1.1.1": true, "8.8.8.8": true, "1.0.0.1": true,
@@ -137,7 +204,7 @@ func isInvalidNode(name string, server string, port int) bool {
 		return true
 	}
 
-	// 4. [正则防伪] 拦截名称中包含域名或 IP 地址的节点
+	// 4. [正则防伪] 拦截名称中包含域名或 IP 地址的占位节点
 	ipPattern := regexp.MustCompile(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`)
 	if ipPattern.MatchString(name) {
 		return true
@@ -148,7 +215,7 @@ func isInvalidNode(name string, server string, port int) bool {
 		return true
 	}
 
-	// 5. [常规防伪]
+	// 5. [常规防伪] 广告及到期提示关键字
 	keywords := []string{
 		"到期", "剩余", "流量", "过期", "官网", "套餐", "重置",
 		"更新", "群", "广告", "折", "优惠", "福利", "公告",

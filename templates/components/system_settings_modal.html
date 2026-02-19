@@ -362,6 +362,11 @@
                     <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
                 </div>
 
+                <div class="sys-nav-card" data-sys-id="mihomo" onclick="selectSysCategory('mihomo', this)">
+                    <div class="sys-nav-name">🐱 Mihomo 核心</div>
+                    <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+                </div>
+
                 <div class="sys-nav-card" data-sys-id="monitor" onclick="selectSysCategory('monitor', this)">
                     <div class="sys-nav-name">💻 系统监控</div>
                     <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
@@ -551,6 +556,26 @@
                             <span class="sys-toggle-slider"></span>
                         </label>
                     </div>
+
+                    <div class="sys-pref-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+                        <div class="sys-pref-info" style="width: 100%; flex-direction: row; align-items: center; gap: 6px;">
+                            <span class="sys-pref-title">⚡ 节点测速模式</span>
+                            <div class="sys-info-tooltip-wrap" tabindex="0">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                <div class="sys-tooltip-content">
+                                    <div style="margin-bottom:6px; color:#cce4ff;">决定点击测速闪电图标时的执行内容：</div>
+                                    <div><b>仅 Ping:</b> 发送 HTTP 请求测试延迟，耗时极短</div>
+                                    <div><b>Ping + 带宽:</b> 先测延迟，延迟通了再测实际下载速度</div>
+                                    <div><b>全面测试:</b> 完整测试 Ping、TCP 延迟以及真实带宽</div>
+                                </div>
+                            </div>
+                        </div>
+                        <select id="sys_pref_speed_test_mode" class="sys-select" onchange="triggerSysAutoSave()">
+                            <option value="ping_only">仅 Ping 延迟</option>
+                            <option value="ping_speed">Ping + 真实带宽 (推荐)</option>
+                            <option value="all">全面测试 (Ping + TCP + 带宽)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="sys-form-section" id="sys-form-geo" style="display:none;">
@@ -576,6 +601,31 @@
                         <div class="sys-desc" id="sysGeoActionDesc" style="text-align: center; background: transparent; border: none; padding: 0;">连接 API 获取版本信息中...</div>
                     </div>
                 </div>
+
+                <div class="sys-form-section" id="sys-form-mihomo" style="display:none;">
+                    <div class="sys-field">
+                        <label class="sys-label">核心版本信息</label>
+                        <div class="sys-geo-info-card">
+                            <div class="sys-geo-row">
+                                <span class="sys-geo-key">本地记录版本</span>
+                                <span class="sys-geo-value" id="sysMihomoLocalVersion">--</span>
+                            </div>
+                            <div class="sys-geo-row">
+                                <span class="sys-geo-key">GitHub 最新版</span>
+                                <span class="sys-geo-value" id="sysMihomoRemoteVersion">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sys-field">
+                        <label class="sys-label">状态与操作</label>
+                        <button type="button" id="btnSysMihomoUpdate" class="btn-sys-geo-action btn-sys-geo-loading" onclick="handleMihomoBtnClick()">
+                            <svg class="sys-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                            正在比对版本...
+                        </button>
+                        <div class="sys-desc" id="sysMihomoActionDesc" style="text-align: center; background: transparent; border: none; padding: 0;">连接 API 获取版本信息中...</div>
+                    </div>
+                </div>
+
 
                 <div class="sys-form-section" id="sys-form-monitor" style="display:none;">
                     
@@ -672,6 +722,8 @@
     const sysModalCard = document.getElementById('sysModalCard');
     let hasCheckedGeo = false; 
     let geoState = 'checking'; 
+    let hasCheckedMihomo = false; 
+    let mihomoState = 'checking'; 
     let sysMonitorTimer = null; // 监控定时器
 
     // 手风琴/分栏切换核心逻辑
@@ -702,6 +754,8 @@
 
         if (catId === 'geo' && !hasCheckedGeo) {
             checkGeoStatus();
+        } else if (catId === 'mihomo' && !hasCheckedMihomo) {
+            checkMihomoStatus();
         } else if (catId === 'monitor') {
             startSysMonitor(); // ✨ 开启系统实时监控
         }
@@ -785,6 +839,7 @@
                 document.getElementById('sys_pref_flag').checked = data.pref_use_emoji_flag !== 'false';
                 document.getElementById('sys_pref_ip_strategy').value = data.pref_ip_strategy || 'ipv4_prefer';
                 document.getElementById('sys_airport_filter_invalid').checked = (data.airport_filter_invalid === 'true');
+                document.getElementById('sys_pref_speed_test_mode').value = data.pref_speed_test_mode || 'ping_speed';
 
                 // 2. 证书与高级配置
                 document.getElementById('sys_force_http').checked = (data.sys_force_http === 'true');
@@ -880,6 +935,8 @@
         sysModal.classList.add('active');
         hasCheckedGeo = false; 
         renderGeoBtn('checking'); 
+        hasCheckedMihomo = false; 
+        renderMihomoBtn('checking'); 
         document.getElementById('sysSaveIndicator').style.opacity = '0';
 
         // 弹窗打开时，调用重构后的方法加载所有配置项
@@ -910,6 +967,7 @@
                 "pref_use_emoji_flag": document.getElementById('sys_pref_flag').checked ? "true" : "false",
                 "pref_ip_strategy": document.getElementById('sys_pref_ip_strategy').value,
                 "airport_filter_invalid": document.getElementById('sys_airport_filter_invalid').checked ? "true" : "false", // ✨ 新增：提交剔除无效节点开关
+                "pref_speed_test_mode": document.getElementById('sys_pref_speed_test_mode').value,
                 "sys_force_http": document.getElementById('sys_force_http').checked ? 'true' : 'false',
                 "cf_email": document.getElementById('sys_cf_email').value,
                 "cf_api_key": document.getElementById('sys_cf_api_key').value,
@@ -971,15 +1029,38 @@
         }
     }
     function handleGeoBtnClick() { if (geoState === 'update') updateGeoDatabase(); else if (geoState === 'error') checkGeoStatus(); }
+
     async function updateGeoDatabase() {
         renderGeoBtn('updating');
         try {
             const response = await fetch('/api/update-geoip', { method: 'POST' });
             const result = await response.json();
-            if(result.status === 'success') { setTimeout(() => { checkGeoStatus(); }, 3000); } 
+            if(result.status === 'success') { 
+                let attempts = 0;
+                // 开启轮询，每 2 秒查一次状态
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    if (attempts > 60) { // 约 2 分钟超时 (防止网络卡死无限轮询)
+                        clearInterval(pollInterval);
+                        checkGeoStatus(); // 超时后恢复常规检查状态
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/get-geo-status');
+                        const statusData = await res.json();
+                        // 只有当后端真实下发了 'latest'，才意味着后台下载并入库完毕了
+                        if(statusData.status === 'success' && statusData.data.state === 'latest') {
+                            clearInterval(pollInterval); // 停止轮询
+                            document.getElementById('sysGeoLocalVersion').innerText = statusData.data.local_version || '--';
+                            renderGeoBtn('latest');
+                        }
+                    } catch(e) {}
+                }, 2000);
+            } 
             else { alert("指令发送失败: " + result.message); renderGeoBtn('update'); }
         } catch(e) { alert("请求错误"); renderGeoBtn('update'); }
     }
+
     function renderGeoBtn(state, isNotFound = false) {
         geoState = state;
         const btn = document.getElementById('btnSysGeoUpdate');
@@ -1011,6 +1092,99 @@
         }
     }
 
+    // ================= Mihomo 核心管理 =================
+    async function checkMihomoStatus() {
+        hasCheckedMihomo = true;
+        renderMihomoBtn('checking');
+        try {
+            const res = await fetch('/api/get-mihomo-status');
+            const result = await res.json();
+            if(result.status === 'success') {
+                const data = result.data;
+                document.getElementById('sysMihomoLocalVersion').innerText = data.local_version || '未下载';
+                document.getElementById('sysMihomoRemoteVersion').innerText = data.remote_version || '未知';
+                let uiState = 'error';
+                if (data.state === 'latest') uiState = 'latest';
+                else if (data.state === 'update_available' || data.state === 'not_found') uiState = 'update';
+                renderMihomoBtn(uiState, data.state === 'not_found');
+            } else { throw new Error(result.message); }
+        } catch(e) {
+            document.getElementById('sysMihomoRemoteVersion').innerText = "网络错误";
+            renderMihomoBtn('error');
+        }
+    }
+
+    function handleMihomoBtnClick() { 
+        if (mihomoState === 'update') updateMihomoCore(); 
+        else if (mihomoState === 'error') checkMihomoStatus(); 
+    }
+
+    async function updateMihomoCore() {
+        renderMihomoBtn('updating');
+        try {
+            const response = await fetch('/api/update-mihomo', { method: 'POST' });
+            const result = await response.json();
+            if(result.status === 'success') { 
+                let attempts = 0;
+                // 开启轮询，每 2 秒查一次状态
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    if (attempts > 60) { // 约 2 分钟超时
+                        clearInterval(pollInterval);
+                        checkMihomoStatus();
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/get-mihomo-status');
+                        const statusData = await res.json();
+                        // 当状态更新为 latest 时，说明后台任务圆满完成
+                        if(statusData.status === 'success' && statusData.data.state === 'latest') {
+                            clearInterval(pollInterval);
+                            document.getElementById('sysMihomoLocalVersion').innerText = statusData.data.local_version || '--';
+                            renderMihomoBtn('latest');
+                        }
+                    } catch(e) {}
+                }, 2000);
+            } else { 
+                alert("指令发送失败: " + result.message); 
+                renderMihomoBtn('update'); 
+            }
+        } catch(e) { 
+            alert("请求错误"); 
+            renderMihomoBtn('update'); 
+        }
+    }
+
+    function renderMihomoBtn(state, isNotFound = false) {
+        mihomoState = state;
+        const btn = document.getElementById('btnSysMihomoUpdate');
+        const desc = document.getElementById('sysMihomoActionDesc');
+        const rVer = document.getElementById('sysMihomoRemoteVersion');
+        if (state === 'checking') {
+            btn.className = 'btn-sys-geo-action btn-sys-geo-loading';
+            btn.innerHTML = '<svg class="sys-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在比对版本...';
+            desc.innerText = '正在连接 GitHub API 获取核心版本信息...';
+            if(rVer.innerText === '--') rVer.innerText = '检查中...';
+        } else if (state === 'updating') {
+            btn.className = 'btn-sys-geo-action btn-sys-geo-loading';
+            btn.innerHTML = '<svg class="sys-spin" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 正在后台下载更新...';
+            btn.style.cursor = 'default';
+            desc.innerText = '后端正在执行下载和解压核心任务，请稍候...';
+        } else if (state === 'latest') {
+            btn.className = 'btn-sys-geo-action btn-sys-geo-latest';
+            btn.innerHTML = '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 已是最新版本';
+            desc.innerText = '当前核心已是最新版本，无需执行任何操作。';
+        } else if (state === 'update') {
+            btn.className = 'btn-sys-geo-action btn-sys-geo-update';
+            const actionText = isNotFound ? '立即下载核心' : '立即更新核心';
+            btn.innerHTML = `<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${actionText}`;
+            desc.innerText = isNotFound ? '本地未找到核心文件，请下载以启用测速及其他核心功能。' : '检测到新版本，建议更新以获得最新的特性。';
+        } else if (state === 'error') {
+            btn.className = 'btn-sys-geo-action btn-sys-geo-error';
+            btn.innerHTML = '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg> 检查失败，点击重试';
+            desc.innerText = '无法获取版本信息，请检查网络连接或稍后重试。';
+        }
+    }
 
     // ================= ✨ 系统监控拉取与渲染 =================
     function formatBytes(bytes) {
