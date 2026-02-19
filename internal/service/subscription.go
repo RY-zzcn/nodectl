@@ -63,9 +63,7 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 		}
 	}
 
-	// -----------------------------------------------------------------------
-	// [新增逻辑] 注入机场订阅节点 (Airport Nodes)
-	// -----------------------------------------------------------------------
+	// 注入机场订阅节点 (Airport Nodes)
 	var airportNodes []database.AirportNode
 	// 根据 routingType (1=直连, 2=落地) 获取启用的机场节点，并按订阅源和原始顺序排序
 	if err := database.DB.Where("routing_type = ?", routingType).
@@ -86,7 +84,6 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 		}
 	}
 
-	// [新增修复逻辑] ---------------------------------------------------------
 	// 如果遍历完数据库后，proxyList 依然为空（说明用户没配节点，或节点都被禁用了）
 	// 强制插入一个 "直连" 类型的占位节点，防止客户端报错，并实现自动直连
 	if len(proxyList) == 0 {
@@ -118,7 +115,6 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 	}
 	encoder.Close()
 
-	// 2. 修复 yaml.v3 的 Emoji \Uxxxxxxxx 转义以及双引号问题
 	yamlStr := buf.String()
 
 	// 正则匹配 \U0001F1ED 这种 8 位的 Unicode 逃义符并将其转换回真实的 Emoji
@@ -190,9 +186,7 @@ func GenerateV2RaySubBase64(useFlag bool) (string, error) {
 		}
 	}
 
-	// -----------------------------------------------------------------------
-	// [新增逻辑] 注入机场订阅节点 (Airport Nodes)
-	// -----------------------------------------------------------------------
+	// 注入机场订阅节点 (Airport Nodes)
 	var airportNodes []database.AirportNode
 	// 获取所有启用的机场节点 (包括直连1 和 落地2)
 	if err := database.DB.Where("routing_type IN ?", []int{1, 2}).
@@ -318,9 +312,7 @@ func ReplaceLinkIP(link string, newIP string) string {
 	return u.String()
 }
 
-// ---------------------------------------------------------
 // 节点重命名引擎
-// ---------------------------------------------------------
 
 // RenameNodeLink 修改节点分享链接的名字后缀 (#name)
 // 智能重命名引擎：已支持解析各种 Base64 嵌套进行安全重命名
@@ -349,7 +341,6 @@ func RenameNodeLink(link string, newName string) string {
 		if decoded == "" {
 			return link
 		}
-		// SSR 格式: host:port:protocol:method:obfs:base64pass/?obfsparam=...&remarks=base64(name)
 		if strings.Contains(decoded, "remarks=") {
 			parts := strings.Split(decoded, "remarks=")
 			prefix := parts[0]

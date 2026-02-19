@@ -35,7 +35,7 @@ func initBasicSettings() {
 	defaultConfigs := []SysConfig{
 		{Key: "panel_url", Value: "", Description: "面板外部访问地址"},
 		{Key: "sub_token", Value: defaultToken, Description: "订阅访问 Token"},
-		// [新增] 初始化 Clash 分流规则的存储 Key
+		// 初始化 Clash 分流规则的存储 Key
 		{Key: "clash_active_modules", Value: "", Description: "Clash 分流规则启用列表"},
 		{Key: "pref_use_emoji_flag", Value: "true", Description: "订阅节点是否添加国旗前缀"},
 		{Key: "sub_custom_name", Value: "NodeCTL", Description: "自定义订阅名称"},
@@ -44,9 +44,9 @@ func initBasicSettings() {
 		{Key: "clash_custom_modules", Value: "[]", Description: "用户自定义的 Clash 分流模块"},
 		{Key: "clash_custom_proxy_rules", Value: "[]", Description: "自定义分流策略组配置"},
 		{Key: "clash_custom_direct_raw", Value: "", Description: "自定义直连规则原始文本"},
-		// [修正] 将 sys_force_https 改为 sys_force_http
+		// 将 sys_force_https 改为 sys_force_http
 		{Key: "sys_force_http", Value: "false", Description: "是否强制允许 HTTP (忽略安全)"},
-		// [新增] Cloudflare API 配置预留
+		// Cloudflare API 配置预留
 		{Key: "cf_email", Value: "", Description: "Cloudflare 账号邮箱"},
 		{Key: "cf_api_key", Value: "", Description: "Cloudflare API Token"},
 		{Key: "cf_domain", Value: "", Description: "证书绑定的主域名"},

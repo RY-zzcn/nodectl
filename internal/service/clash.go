@@ -105,10 +105,7 @@ func SaveActiveClashModules(modules []string) error {
 		FirstOrCreate(&database.SysConfig{}).Error
 }
 
-// ---------------------------------------------------------
 // Clash 模板渲染逻辑
-// ---------------------------------------------------------
-
 type ClashTemplateData struct {
 	RelaySubURL             string
 	ExitSubURL              string
@@ -132,7 +129,7 @@ func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error)
 
 	var finalActiveMods []ClashModuleDef
 
-	// [修复点] 初始化 dnsPolicyList，并包含基础规则 "CN_域"
+	// 初始化 dnsPolicyList，并包含基础规则 "CN_域"
 	dnsPolicyList := []string{"CN_域"}
 
 	for _, m := range allModules {
@@ -191,10 +188,7 @@ func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error)
 	return re2.ReplaceAllString(step1, "\n\n"), nil
 }
 
-// ---------------------------------------------------------
 // 自定义规则处理逻辑
-// ---------------------------------------------------------
-
 func ParseCustomRules(raw string) string {
 	var result []string
 	lines := strings.Split(strings.ReplaceAll(raw, "\r\n", "\n"), "\n")

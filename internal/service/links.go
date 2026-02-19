@@ -10,9 +10,7 @@ import (
 	"nodectl/internal/logger"
 )
 
-// ---------------------------------------------------------
 // 1. 数据结构定义
-// ---------------------------------------------------------
 
 // ClashNode 统一节点结构体，强制规范 YAML 输出格式
 type ClashNode struct {
@@ -75,9 +73,7 @@ type vmessJSON struct {
 	Fp   string      `json:"fp"`
 }
 
-// ---------------------------------------------------------
 // 2. 通用辅助函数
-// ---------------------------------------------------------
 
 // parseInt 统一处理解析引擎中可能是 interface{} 或 string 的端口类型
 func parseInt(port interface{}) int {
@@ -116,9 +112,7 @@ func safeBase64Decode(str string) string {
 	return ""
 }
 
-// ---------------------------------------------------------
 // 3. 核心分发调度中心
-// ---------------------------------------------------------
 
 // ParseLinkToClashNode 将分享链接解析并映射为 Clash 节点对象
 func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {

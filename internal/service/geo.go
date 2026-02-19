@@ -85,7 +85,7 @@ func (s *GeoService) Reload() error {
 
 // GetLocalVersion 读取本地版本号 (双重校验机制)
 func (s *GeoService) GetLocalVersion() string {
-	// 1. [核心修复] 必须先校验物理文件是否真实存在！
+	// 1. 必须先校验物理文件是否真实存在！
 	if _, err := os.Stat(s.path); os.IsNotExist(err) {
 		return "" // 如果物理文件丢失，无视数据库记录，直接视为“未下载”
 	}

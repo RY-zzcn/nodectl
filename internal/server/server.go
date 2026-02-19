@@ -28,7 +28,6 @@ func TriggerRestart() {
 // ------------------- [中间件包装函数] -------------------
 
 // withSecure 仅强制 HTTPS (用于登录页、订阅链接、公开接口)
-// 功能：如果开启了强制 HTTPS，将 HTTP 请求重定向到 HTTPS
 func withSecure(h http.HandlerFunc) http.HandlerFunc {
 	return middleware.ForceHTTPS(h)
 }
@@ -75,7 +74,7 @@ func Start(tmplFS embed.FS) {
 	// 证书与重启 (关键接口)
 	mux.HandleFunc("/api/save-cert", withAuthAndSecure(apiSaveCert))    // 手动上传证书
 	mux.HandleFunc("/api/apply-cert", withAuthAndSecure(apiApplyCert))  // 申请证书
-	mux.HandleFunc("/api/cert-logs", withAuthAndSecure(apiGetCertLogs)) // ✨ 新增：拉取实时申请日志
+	mux.HandleFunc("/api/cert-logs", withAuthAndSecure(apiGetCertLogs)) // 拉取实时申请日志
 	mux.HandleFunc("/api/restart", withAuthAndSecure(apiRestartCore))   // 热重启核心
 
 	// Clash 与规则管理
@@ -106,7 +105,7 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/airport/list", withAuthAndSecure(apiAirportList))                // 获取订阅列表
 	mux.HandleFunc("/api/airport/add", withAuthAndSecure(apiAirportAdd))                  // 添加订阅
 	mux.HandleFunc("/api/airport/update", withAuthAndSecure(apiAirportUpdate))            // 更新订阅(同步)
-	mux.HandleFunc("/api/airport/edit", withAuthAndSecure(apiAirportEdit))                // ✨ 新增：编辑订阅(名称/URL)
+	mux.HandleFunc("/api/airport/edit", withAuthAndSecure(apiAirportEdit))                // 编辑订阅(名称/URL)
 	mux.HandleFunc("/api/airport/delete", withAuthAndSecure(apiAirportDelete))            // 删除订阅
 	mux.HandleFunc("/api/airport/nodes", withAuthAndSecure(apiAirportNodes))              // 获取订阅下节点
 	mux.HandleFunc("/api/airport/node/routing", withAuthAndSecure(apiAirportNodeRouting)) // 修改节点状态

@@ -249,7 +249,6 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 			// 保护 1: 禁止修改或删除 IPv4 和 IPv6
 			if targetNode.IPV4 != req.IPV4 || targetNode.IPV6 != req.IPV6 {
 				logger.Log.Warn("演示模式拦截: 尝试修改或删除内置节点 IP", "uuid", req.UUID, "ip", clientIP)
-				// [优化] 更专业的提示语
 				sendJSON(w, "error", "【演示模式保护】禁止修改或清空。如需体验修改功能，请新建节点。")
 				return
 			}
@@ -269,7 +268,6 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 				// 如果前端传来的值与数据库原有值不同 (并且排除了系统占位符 "__KEEP_EXISTING__")，说明尝试修改
 				if newVal != oldVal && newVal != "__KEEP_EXISTING__" {
 					logger.Log.Warn("演示模式拦截: 尝试修改内置节点协议内容", "uuid", req.UUID, "protocol", protoKey, "ip", clientIP)
-					// [优化] 更专业的提示语
 					sendJSON(w, "error", "【演示模式保护】禁止修改内容。如需体验完整编辑功能，请新建节点。")
 					return
 				}
@@ -451,7 +449,7 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, "success", "节点添加成功")
 }
 
-// apiGetNodes 获取所有节点列表 (已修复：增加分类逻辑适配前端)
+// apiGetNodes 获取所有节点列表
 func apiGetNodes(w http.ResponseWriter, r *http.Request) {
 	// 1. 从数据库查询所有节点，按 SortIndex 排序
 	var nodes []database.NodePool
@@ -587,7 +585,6 @@ func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
 
 		if targetNode.CreatedAt.Before(AppStartTime) {
 			logger.Log.Warn("尝试在演示模式下删除初始节点，已被拦截", "uuid", req.UUID, "name", targetNode.Name, "ip", clientIP)
-			// [优化] 更专业的提示语
 			sendJSON(w, "error", "【演示模式保护】禁止删除。您可自由测试并删除您自行创建的节点。")
 			return
 		}

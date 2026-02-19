@@ -24,7 +24,7 @@ func Init() {
 		MaxSize:    2,                                            // 每个日志文件保存的最大尺寸 (单位: MB)，超过该大小会自动切割
 		MaxBackups: 3,                                            // 系统中最多保留的旧日志文件个数
 		MaxAge:     30,                                           // 保留旧日志文件的最大天数 (单位: 天)
-		Compress:   true,                                         // 是否对切割后的旧日志文件进行 gzip 压缩 (强烈建议开启，节省空间)
+		Compress:   true,                                         // 是否对切割后的旧日志文件进行 gzip 压缩
 	}
 
 	multiWriter := io.MultiWriter(os.Stdout, logFile)

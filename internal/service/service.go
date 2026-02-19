@@ -71,7 +71,7 @@ func UpdateNode(uuid string, name string, routingType int, links map[string]stri
 	node.IPV4 = ipv4
 	node.IPV6 = ipv6
 
-	// [新增] 解析 Region
+	// 解析 Region
 	if GlobalGeoIP != nil {
 		region := ""
 		if ipv4 != "" {
@@ -81,7 +81,7 @@ func UpdateNode(uuid string, name string, routingType int, links map[string]stri
 			region = GlobalGeoIP.GetCountryIsoCode(ipv6)
 		}
 		// 如果解析到了，就更新；如果没解析到但IP变空了，可能需要清空 region？
-		// 这里策略是：只要解析出有效代码就覆盖，否则保留原样(或根据需求清空)
+		// 这里策略是：只要解析出有效代码就覆盖，否则保留原样
 		if region != "" {
 			node.Region = region
 			logger.Log.Debug("服务层: 节点 GeoIP 区域自动匹配成功", "uuid", uuid, "region", region)
@@ -165,9 +165,7 @@ func RenderInstallScript() (string, error) {
 
 	// 尝试读取外部文件
 	if content, err := os.ReadFile(debugPath); err == nil {
-		// 如果文件存在且有权限读取，则直接覆盖 tplContent
 		tplContent = string(content)
-		// 打印一条提示日志，方便你在控制台/Docker logs 中确认热更新生效
 		logger.Log.Info("【调试模式】已拦截并使用外部安装模板", "path", debugPath)
 	}
 

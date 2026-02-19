@@ -75,7 +75,7 @@ func (SysConfig) TableName() string {
 	return "sys_config"
 }
 
-// ------------------- [新增：机场订阅相关模型] -------------------
+// ------------------- 机场订阅相关模型] -------------------
 
 // AirportSub 机场订阅源表
 type AirportSub struct {
@@ -118,7 +118,7 @@ func (n *AirportNode) BeforeCreate(tx *gorm.DB) (err error) {
 	return
 }
 
-// ------------------- [数据库初始化] -------------------
+// ------------------- 数据库初始化 -------------------
 
 // InitDB 初始化数据库连接并同步表结构
 func InitDB() {

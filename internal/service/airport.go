@@ -58,7 +58,6 @@ func SyncAirportSubscription(subID string) error {
 
 	// 4. 事务更新：删除旧节点 -> 插入新节点 (保留状态)
 
-	// [新增读取过滤配置]
 	var filterConf database.SysConfig
 	filterInvalid := false
 	if err := database.DB.Where("key = ?", "airport_filter_invalid").First(&filterConf).Error; err == nil {
