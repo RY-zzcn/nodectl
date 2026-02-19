@@ -92,7 +92,7 @@
     
     .release-body {
         font-size: 14px; color: #333; line-height: 1.7;
-        white-space: pre-wrap; word-wrap: break-word;
+        word-wrap: break-word;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
@@ -271,8 +271,12 @@
     // 简单的 Markdown 解析器
     function parseReleaseBody(body) {
         if (!body) return "<span style='color:#999;'>此版本无详细说明。</span>";
+        
+        // ✨ 核心修复：抹除 Windows 系统的 \r 回车符，防止产生双重换行
+        let html = body.replace(/\r/g, '');
+
         // 转义 HTML 以防止 XSS
-        let html = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         
         // 处理标题
         html = html.replace(/^### (.*$)/gm, '<strong>$1</strong>');
@@ -287,7 +291,10 @@
         // 处理代码块
         html = html.replace(/`(.*?)`/g, '<code style="background:#f0f0f5;padding:2px 4px;border-radius:4px;font-family:monospace;font-size:13px;">$1</code>');
         
-        // 将换行符转换为 <br>
+        // ✨ 核心修复：防止在块级元素 </div> 之后追加 <br> 导致原生无序列表多出空行
+        html = html.replace(/<\/div>\n/g, '</div>');
+
+        // 将剩余的换行符转换为 <br>
         return html.replace(/\n/g, '<br>');
     }
 
