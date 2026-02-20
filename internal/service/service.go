@@ -9,6 +9,7 @@ import (
 	"nodectl/internal/logger"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"gorm.io/gorm"
@@ -126,7 +127,7 @@ func ReorderNodes(routingType int, uuids []string) error {
 }
 
 // RenderInstallScript 渲染安装脚本 (只填充静态端口配置)
-func RenderInstallScript() (string, error) {
+func RenderInstallScript(node database.NodePool) (string, error) {
 	var configs []database.SysConfig
 	if err := database.DB.Find(&configs).Error; err != nil {
 		logger.Log.Error("服务层异常: 渲染脚本时读取配置失败", "error", err)
@@ -142,7 +143,9 @@ func RenderInstallScript() (string, error) {
 	panelURL := configMap["panel_url"]
 	reportURL := ""
 	if panelURL != "" {
-		reportURL = panelURL + "/api/callback/report"
+		// 去除面板 URL 末尾可能存在的所有斜杠，防止拼接出双斜杠
+		cleanPanelURL := strings.TrimRight(panelURL, "/")
+		reportURL = cleanPanelURL + "/api/callback/report"
 	}
 
 	data := map[string]string{
@@ -156,6 +159,9 @@ func RenderInstallScript() (string, error) {
 		"Socks5User":  configMap["proxy_socks5_user"],
 		"Socks5Pass":  configMap["proxy_socks5_pass"],
 		"ReportURL":   reportURL,
+		// [新增] 将节点专属参数硬编码注入到脚本中
+		"InstallID": node.InstallID,
+		"ResetDay":  fmt.Sprintf("%d", node.ResetDay), // int 转 string
 	}
 
 	tplContent := SingboxScriptTpl // 默认使用打包在二进制里的 embed 模板

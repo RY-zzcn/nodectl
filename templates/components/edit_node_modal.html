@@ -15,11 +15,41 @@
     
     /* 窄模式 380px，展开后 800px */
     .edit-modal-card {
-        background: #ffffff; width: 100%; max-width: 380px; height: 550px; border-radius: 12px; 
+        background: #ffffff; width: 100%; max-width: 380px; height: 85vh; border-radius: 12px; 
         box-shadow: 0 20px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;
         transition: max-width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
-    .edit-modal-card.has-content { max-width: 800px; }
+    .edit-modal-card.has-content { max-width: 900px; }
+
+    /* 优雅的流量组合框 (Input Group) 样式 */
+    .traffic-input-group {
+        display: flex; flex: 1; align-items: center;
+        border: 1px solid #d1d1d6; border-radius: 8px; background: #fafbfc;
+        transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+        overflow: hidden; /* 实现边缘裁切 */
+    }
+    .traffic-input-group:focus-within {
+        border-color: #007aff; background: #fff; box-shadow: 0 0 0 2px rgba(0,122,255,0.1);
+    }
+    .traffic-input-group input {
+        flex: 1; min-width: 0; padding: 8px 12px; font-size: 15px; font-weight: 600;
+        border: none; outline: none; background: transparent; color: #1d1d1f;
+    }
+    .traffic-input-group input::placeholder { color: #bbb; font-weight: 500; }
+    .traffic-input-group .select-wrapper {
+        position: relative; display: flex; align-items: center;
+        border-left: 1px solid #e5e5ea; background: #f4f5f7; height: 100%;
+    }
+    .traffic-input-group select {
+        appearance: none; -webkit-appearance: none; /* 隐藏原生巨丑的箭头 */
+        background: transparent; border: none; outline: none;
+        padding: 0 24px 0 12px; font-size: 13px; font-weight: 600; color: #555;
+        cursor: pointer; height: 100%;
+    }
+    .traffic-input-group select:hover { color: #1d1d1f; }
+    .traffic-input-group .arrow {
+        position: absolute; right: 8px; color: #888; pointer-events: none;
+    }
 
     /* Header */
     .edit-header { 
@@ -222,9 +252,30 @@
             
             <div class="edit-body no-scrollbar">
                 <div class="edit-left-col no-scrollbar">
+                    <div class="edit-section" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <label class="section-label" style="margin-bottom: 0; white-space: nowrap; width: 70px;">节点名称</label>
+                        <input type="text" id="editNodeName" class="title-input" placeholder="例如：HK-CN2" oninput="triggerNodeAutoSave()" style="flex: 1;">
+                    </div>
+
                     <div class="edit-section">
-                        <label class="section-label">节点名称</label>
-                        <input type="text" id="editNodeName" class="title-input" placeholder="例如：HK-CN2" oninput="triggerNodeAutoSave()">
+                        <div style="display: flex; gap: 15px; margin-bottom: 8px;">
+                            <label class="section-label" style="flex: 1; margin: 0;">重置日 (每月)</label>
+                            <label class="section-label" style="flex: 1; margin: 0;">流量限额</label>
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <input type="number" id="editNodeResetDay" class="title-input" placeholder="1-31" min="0" max="31" oninput="triggerNodeAutoSave()" style="flex: 1;">
+                            
+                            <div class="traffic-input-group">
+                                <input type="number" id="editNodeTrafficLimit" placeholder="" min="0" oninput="triggerNodeAutoSave()">
+                                <div class="select-wrapper">
+                                    <select id="editNodeTrafficUnit" onchange="triggerNodeAutoSave()">
+                                        <option value="GB">GB</option>
+                                        <option value="TB">TB</option>
+                                    </select>
+                                    <svg class="arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="edit-section">
@@ -277,9 +328,30 @@
         if (!node) { alert('数据加载异常，请刷新'); return; }
 
         // 1. 基础信息填充
-        document.getElementById('editSaveIndicator').style.opacity = '0';
         document.getElementById('editNodeUUID').value = node.uuid;
         document.getElementById('editNodeName').value = node.name;
+        document.getElementById('editNodeResetDay').value = node.reset_day || 0;
+
+        // [新增] 处理流量限额回显 (Bytes -> GB/TB)
+        const limitBytes = node.traffic_limit || 0;
+        let limitVal = "";
+        let limitUnit = "GB";
+        
+        if (limitBytes > 0) {
+            const tb = 1024 * 1024 * 1024 * 1024;
+            const gb = 1024 * 1024 * 1024;
+            // 如果能整除 1TB，优先显示 TB，否则显示 GB
+            if (limitBytes >= tb && limitBytes % tb === 0) {
+                limitVal = limitBytes / tb;
+                limitUnit = "TB";
+            } else {
+                // 保留两位小数并去除末尾的 .00
+                limitVal = parseFloat((limitBytes / gb).toFixed(2));
+                limitUnit = "GB";
+            }
+        }
+        document.getElementById('editNodeTrafficLimit').value = limitVal;
+        document.getElementById('editNodeTrafficUnit').value = limitUnit;
         
         // 2. 路由类型状态
         if (!node.is_blocked) {
@@ -493,7 +565,17 @@
         editNodeAutoSaveTimer = setTimeout(async () => {
             const name = document.getElementById('editNodeName').value;
             const uiState = parseInt(document.getElementById('editNodeUIState').value);
+            const resetDay = parseInt(document.getElementById('editNodeResetDay').value) || 0; 
             
+            // [新增] 获取流量限额并转为 Bytes
+            const limitInput = parseFloat(document.getElementById('editNodeTrafficLimit').value) || 0;
+            const limitUnit = document.getElementById('editNodeTrafficUnit').value;
+            let trafficLimit = 0;
+            if (limitInput > 0) {
+                const multiplier = limitUnit === 'TB' ? (1024**4) : (1024**3);
+                trafficLimit = Math.floor(limitInput * multiplier);
+            }
+
             const v4El = document.getElementById('editNodeIPV4');
             const v6El = document.getElementById('editNodeIPV6');
             const ipv4 = v4El ? v4El.value.trim() : "";
@@ -549,7 +631,9 @@
                         links, 
                         is_blocked: finalIsBlocked,
                         disabled_links: disabledLinks,
-                        ipv4, ipv6 
+                        ipv4, ipv6,
+                        reset_day: resetDay,
+                        traffic_limit: trafficLimit // [新增] 提交限额 (Bytes)
                     })
                 });
                 const res = await response.json();

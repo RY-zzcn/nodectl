@@ -185,23 +185,24 @@
     function updateScriptCmd() {
         if (!currentScriptNode) return;
 
-        const host = window.panelUrl || window.location.origin;
-        // 抓取当前所有被选中的复选框的值
+        let host = window.panelUrl || window.location.origin;
+        host = host.replace(/\/+$/, "");
+        
         const checkedBoxes = checkboxContainer.querySelectorAll('input[type="checkbox"]:checked');
         const selectedArgs = Array.from(checkedBoxes).map(cb => cb.value);
 
         const protocolsArgHtml = selectedArgs.map(p => `<span class="hl-proto">${p}</span>`).join(" ");
         const protocolsArgRaw = selectedArgs.join(" ");
         
-        // [修改后] 将 install_id 拼接到 URL 参数中
+        // URL 已经包含了 id 参数，后端可通过它获取该节点所有信息
         const scriptUrl = `${host}/api/public/install-script?id=${currentScriptNode.install_id}`;
 
-        // 构建带有高亮的 HTML 命令展示 (浅色主题)
+        // 构建带有高亮的 HTML 命令展示 (极致精简，仅传协议参数)
         const cmdHtml = 
-            `<span class="hl-cmd">bash</span> <span class="hl-param">-c</span> <span class="hl-string">"$(curl -fsSL ${scriptUrl})"</span> <span class="hl-param">--</span> ${protocolsArgHtml} <span class="hl-param">-t</span> <span class="hl-string hl-id">"${currentScriptNode.install_id}"</span>`;
+            `<span class="hl-cmd">bash</span> <span class="hl-param">-c</span> <span class="hl-string">"$(curl -fsSL ${scriptUrl})"</span> <span class="hl-param">--</span> ${protocolsArgHtml}`;
         
-        // 构建纯文本用于剪贴板
-        const rawCmd = `bash -c "$(curl -fsSL ${scriptUrl})" -- ${protocolsArgRaw} -t "${currentScriptNode.install_id}"`;
+        // 构建纯文本用于剪贴板 (极致精简)
+        const rawCmd = `bash -c "$(curl -fsSL ${scriptUrl})" -- ${protocolsArgRaw}`;
         
         cmdDisplay.innerHTML = cmdHtml;
         cmdDisplay.setAttribute('data-clipboard-text', rawCmd);

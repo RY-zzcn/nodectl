@@ -284,6 +284,8 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	targetNode.DisabledLinks = req.DisabledLinks
 	targetNode.IPV4 = req.IPV4
 	targetNode.IPV6 = req.IPV6
+	targetNode.ResetDay = req.ResetDay
+	targetNode.TrafficLimit = req.TrafficLimit
 
 	// 4. 安全检查：判断是否处于安全环境
 	isSecure := service.CheckRequestSecure(r)
@@ -432,6 +434,7 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
 		RoutingType int    `json:"routing_type"`
+		ResetDay    int    `json:"reset_day"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
@@ -444,6 +447,13 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 		logger.Log.Error("添加节点入库失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据库写入失败")
 		return
+	}
+
+	if req.ResetDay > 0 {
+		if err := database.DB.Model(&database.NodePool{}).Where("uuid = ?", node.UUID).Update("reset_day", req.ResetDay).Error; err != nil {
+			logger.Log.Error("补充更新重置日失败", "uuid", node.UUID, "error", err)
+			// 即使这个失败了，节点也算创建成功，只记录日志即可
+		}
 	}
 
 	logger.Log.Info("节点添加成功", "uuid", node.UUID, "name", node.Name, "routing_type", node.RoutingType, "ip", clientIP, "path", reqPath)
@@ -622,7 +632,8 @@ func apiPublicScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scriptContent, err := service.RenderInstallScript()
+	// 传递查出来的 node 对象给模板渲染函数
+	scriptContent, err := service.RenderInstallScript(node)
 	if err != nil {
 		logger.Log.Error("安装脚本模板渲染失败", "error", err, "ip", clientIP, "path", reqPath)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -1637,4 +1648,65 @@ func apiTestAirportNodes(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush() // 立即把缓冲区数据推给前端
 	}
+}
+
+// apiCallbackTraffic 处理节点定期的流量上报
+// 功能：接收节点服务器通过 crontab 脚本上报的本周期上传/下载流量并直接覆盖更新到数据库
+func apiCallbackTraffic(w http.ResponseWriter, r *http.Request) {
+	clientIP := r.RemoteAddr
+	reqPath := r.URL.Path
+
+	// 仅允许 POST 请求
+	if r.Method != http.MethodPost {
+		logger.Log.Warn("非法请求方法", "method", r.Method, "ip", clientIP, "path", reqPath)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 定义接收流量数据的结构体
+	var report struct {
+		InstallID string `json:"install_id"`
+		RXBytes   int64  `json:"rx_bytes"` // 节点下载流量 (VPS 网卡的接收流量)
+		TXBytes   int64  `json:"tx_bytes"` // 节点上传流量 (VPS 网卡的发送流量)
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
+		logger.Log.Warn("解析流量上报 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
+		sendJSON(w, "error", "JSON 解析失败")
+		return
+	}
+
+	// 验证必要参数
+	if report.InstallID == "" {
+		logger.Log.Warn("流量上报缺少 install_id", "ip", clientIP, "path", reqPath)
+		sendJSON(w, "error", "缺少 install_id")
+		return
+	}
+
+	// 更新对应节点的流量信息
+	// 注意：因为计算逻辑交给了 Bash 脚本，所以这里直接接收并覆盖当期的流量消耗即可
+	result := database.DB.Model(&database.NodePool{}).
+		Where("install_id = ?", report.InstallID).
+		Updates(map[string]interface{}{
+			"traffic_down": report.RXBytes,
+			"traffic_up":   report.TXBytes,
+			"updated_at":   time.Now(), // 刷新最后更新时间，方便前端判断节点是否离线
+		})
+
+	if result.Error != nil {
+		logger.Log.Error("更新节点流量失败", "error", result.Error, "install_id", report.InstallID)
+		sendJSON(w, "error", "数据库更新失败")
+		return
+	}
+
+	// 如果没有影响任何行，说明没找到这个 InstallID 对应的节点
+	if result.RowsAffected == 0 {
+		logger.Log.Warn("收到未知节点的流量上报", "install_id", report.InstallID, "ip", clientIP)
+		sendJSON(w, "error", "节点不存在")
+		return
+	}
+
+	// 仅打印 Debug 日志，避免频繁上报导致日志刷屏
+	logger.Log.Debug("节点流量更新成功", "install_id", report.InstallID, "rx", report.RXBytes, "tx", report.TXBytes)
+	sendJSON(w, "success", "流量上报接收成功")
 }

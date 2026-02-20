@@ -105,6 +105,10 @@
                     
                     <input type="text" id="nodeNameInput" class="add-input" placeholder="节点名称 (可选)">
                 </div>
+                <div class="add-row" style="margin-top: 15px;">
+                    <label style="font-size: 13px; color: #666; font-weight: 600; white-space: nowrap;">流量重置日</label>
+                    <input type="number" id="nodeResetDayInput" class="add-input" placeholder="1-31 (0为不重置)" value="0" min="0" max="31">
+                </div>
             </div>
 
             <div class="add-footer">
@@ -159,6 +163,7 @@
         const indicator = document.getElementById('addNodeIndicator');
         const nodeName = document.getElementById('nodeNameInput').value.trim();
         const routingType = parseInt(document.getElementById('nodeGroupVal').value);
+        const resetDay = parseInt(document.getElementById('nodeResetDayInput').value) || 0; // 新增获取重置日
 
         btn.disabled = true;
         btn.innerText = '处理中...';
@@ -168,7 +173,8 @@
             const response = await fetch('/api/add-node', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: nodeName, routing_type: routingType })
+                // 新增传递 reset_day 参数
+                body: JSON.stringify({ name: nodeName, routing_type: routingType, reset_day: resetDay }) 
             });
             const data = await response.json();
             

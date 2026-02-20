@@ -12,7 +12,8 @@ FIXED_PORT_SOCKS5={{.PortSocks5}}
 FIXED_SOCKS5_USER="{{.Socks5User}}"
 FIXED_SOCKS5_PASS="{{.Socks5Pass}}"
 REPORT_URL="{{.ReportURL}}"
-INSTALL_ID=""
+INSTALL_ID="{{.InstallID}}" # 直接由后端渲染注入
+RESET_DAY="{{.ResetDay}}"
 # -----------------------
 # 彩色输出函数
 info() { echo -e "\033[1;34m[INFO]\033[0m $*"; }
@@ -176,6 +177,15 @@ select_protocols() {
                         shift 
                     else
                         warn "-t/--token 参数后面必须跟 ID 字符串"
+                    fi
+                    ;;
+                --reset-day)
+                    if [[ -n "${2:-}" ]]; then
+                        RESET_DAY="$2"
+                        info "-> 设定流量重置日: 每月 $RESET_DAY 号"
+                        shift 
+                    else
+                        warn "--reset-day 参数后面必须跟日期数字"
                     fi
                     ;;
 
@@ -955,6 +965,153 @@ curl_post_submit() {
 }
 
 # -----------------------
+# [新增] 确保 Cron 环境存在并启动 (兼容跨平台及 Docker 环境)
+# -----------------------
+ensure_cron() {
+    # 如果系统已经存在 crontab 命令，直接返回成功
+    if command -v crontab >/dev/null 2>&1; then
+        return 0
+    fi
+
+    info "未检测到 cron 服务，正在尝试自动安装..."
+    
+    # 智能识别包管理器并进行安装
+    if command -v apt-get >/dev/null 2>&1; then
+        # Debian / Ubuntu 系列
+        apt-get update -q >/dev/null 2>&1
+        apt-get install -y cron >/dev/null 2>&1
+        # 尝试启动 (兼容 Systemd 和 传统 init，如果在纯 Docker 无 init 环境则直接后台运行守护进程)
+        systemctl enable cron --now >/dev/null 2>&1 || service cron start >/dev/null 2>&1 || cron &
+    
+    elif command -v yum >/dev/null 2>&1; then
+        # CentOS / RHEL 系列 (包名通常叫 cronie)
+        yum install -y cronie >/dev/null 2>&1
+        systemctl enable crond --now >/dev/null 2>&1 || service crond start >/dev/null 2>&1 || crond &
+    
+    elif command -v apk >/dev/null 2>&1; then
+        # Alpine Linux 系列 (常用于极简 Docker)
+        apk add --no-cache dcron >/dev/null 2>&1
+        # Alpine 容器通常没有 systemd，直接运行守护进程
+        crond &
+    
+    else
+        warn "未知的系统环境，无法自动安装 cron，流量上报可能失效！"
+        return 1
+    fi
+    
+    info "cron 服务安装并启动完成。"
+}
+
+# -----------------------
+# [修改] 配置流量监控与定时上报机制 (Bash + Cron 伪 Agent)
+# -----------------------
+setup_traffic_monitor() {
+    # 如果没有提供参数，则不配置流量监控
+    if [ -z "$REPORT_URL" ] || [ -z "$INSTALL_ID" ]; then
+        info "未提供上报参数，跳过流量监控配置"
+        return 0
+    fi
+
+    # 1. 确保系统有 cron 环境
+    ensure_cron || true # 即使安装失败也继续尝试，利用兜底逻辑
+
+    TRAFFIC_SCRIPT="/usr/local/bin/singbox_traffic.sh"
+    
+    # [优化 1] 精准替换 URL 末尾的 report 为 traffic，防止误伤域名
+    TRAFFIC_URL=$(echo "$REPORT_URL" | sed 's|/report$|/traffic|')
+    RESET_VAL="${RESET_DAY:-0}"
+    
+    info "配置流量监控机制 (重置日: ${RESET_VAL:-不重置})..."
+    
+    # 动态生成我们的 "伪 Agent" 脚本
+    cat > "$TRAFFIC_SCRIPT" <<EOF
+#!/bin/bash
+REPORT_URL="$TRAFFIC_URL"
+INSTALL_ID="$INSTALL_ID"
+RESET_DAY="$RESET_VAL"
+
+# 智能获取主网卡接口名称
+IFACE=\$(ip route get 1.1.1.1 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++) if(\$i=="dev") print \$(i+1)}' | head -n1)
+if [ -z "\$IFACE" ]; then exit 0; fi
+
+# 读取系统当前网卡统计 (单位: Bytes)
+RAW_RX=\$(cat /sys/class/net/\$IFACE/statistics/rx_bytes 2>/dev/null || echo 0)
+RAW_TX=\$(cat /sys/class/net/\$IFACE/statistics/tx_bytes 2>/dev/null || echo 0)
+
+CACHE_FILE="/etc/sing-box/.traffic_cache"
+
+# [优化 2] 确保缓存目录存在，防止误删导致写入失败
+mkdir -p "\$(dirname "\$CACHE_FILE")"
+
+# 加载本地历史缓存
+if [ -f "\$CACHE_FILE" ]; then
+    source "\$CACHE_FILE"
+else
+    PREV_RAW_RX=\$RAW_RX
+    PREV_RAW_TX=\$RAW_TX
+    ACCUMULATED_RX=0
+    ACCUMULATED_TX=0
+    LAST_RESET_MONTH=\$(date +%Y%m)
+fi
+
+# ================= 流量重置逻辑 =================
+CURRENT_DAY=\$(date +%d)
+CURRENT_MONTH=\$(date +%Y%m)
+CURRENT_DAY_NUM=\$((10#\$CURRENT_DAY)) # 强制按10进制解析，防止08/09报错
+
+if [ "\$RESET_DAY" -gt 0 ] && [ "\$CURRENT_MONTH" != "\$LAST_RESET_MONTH" ] && [ "\$CURRENT_DAY_NUM" -ge "\$RESET_DAY" ]; then
+    ACCUMULATED_RX=0
+    ACCUMULATED_TX=0
+    LAST_RESET_MONTH=\$CURRENT_MONTH
+fi
+
+# ================= 计算增量逻辑 =================
+# 检测服务器是否发生过重启 (当前网卡值小于记录的网卡值)
+if [ "\$RAW_RX" -lt "\${PREV_RAW_RX:-0}" ]; then
+    DELTA_RX=\$RAW_RX
+    DELTA_TX=\$RAW_TX
+else
+    DELTA_RX=\$((\$RAW_RX - \$PREV_RAW_RX))
+    DELTA_TX=\$((\$RAW_TX - \$PREV_RAW_TX))
+fi
+
+[ "\$DELTA_RX" -lt 0 ] && DELTA_RX=0
+[ "\$DELTA_TX" -lt 0 ] && DELTA_TX=0
+
+ACCUMULATED_RX=\$((ACCUMULATED_RX + DELTA_RX))
+ACCUMULATED_TX=\$((ACCUMULATED_TX + DELTA_TX))
+
+# ================= 保存缓存并上报 =================
+cat > "\$CACHE_FILE" <<CACHE_EOF
+PREV_RAW_RX=\$RAW_RX
+PREV_RAW_TX=\$RAW_TX
+ACCUMULATED_RX=\$ACCUMULATED_RX
+ACCUMULATED_TX=\$ACCUMULATED_TX
+LAST_RESET_MONTH=\$LAST_RESET_MONTH
+CACHE_EOF
+
+JSON_DATA="{\\"install_id\\": \\"\$INSTALL_ID\\", \\"rx_bytes\\": \$ACCUMULATED_RX, \\"tx_bytes\\": \$ACCUMULATED_TX}"
+
+curl -s -4 -X POST -H "Content-Type: application/json" -d "\$JSON_DATA" "\$REPORT_URL" >/dev/null 2>&1 || \\
+curl -s -6 -X POST -H "Content-Type: application/json" -d "\$JSON_DATA" "\$REPORT_URL" >/dev/null 2>&1
+
+EOF
+
+    chmod +x "$TRAFFIC_SCRIPT"
+
+    # 清洗并挂载到 crontab 中
+    crontab -l 2>/dev/null | grep -v "singbox_traffic.sh" > /tmp/crontab.tmp || true
+    echo "*/5 * * * * bash $TRAFFIC_SCRIPT" >> /tmp/crontab.tmp
+    crontab /tmp/crontab.tmp
+    rm -f /tmp/crontab.tmp
+    
+    # [优化 3] 挂载完成后，立即在后台静默触发一次首报 (让面板瞬间变绿)
+    bash "$TRAFFIC_SCRIPT" >/dev/null 2>&1 &
+    
+    info "✅ 流量监控配置完成 (上报间隔: 5 分钟，已触发首次心跳)"
+}
+
+# -----------------------
 # [新增] 上报节点信息到后端
 # -----------------------
 report_nodes() {
@@ -1064,8 +1221,11 @@ fi
 echo ""
 echo "=========================================="
 
-# [新增] 执行上报
+# 执行上报
 report_nodes
+
+# 配置并启动流量监控
+setup_traffic_monitor
 
 # -----------------------
 # 创建 sb 管理脚本
