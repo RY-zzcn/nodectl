@@ -460,85 +460,209 @@ func (s *MihomoService) RunBatchTest(ctx context.Context, nodes []database.Airpo
 
 			// --- 步骤 A: 基础测延迟 (Ping) ---
 			delayURL := fmt.Sprintf("http://127.0.0.1:%d/proxies/%s/delay?timeout=5000&url=http://cp.cloudflare.com/generate_204", apiPort, url.PathEscape(node.Name))
-			resp, err := client.Get(delayURL)
-			if err != nil {
-				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: "超时"}
-				return
-			}
-			var delayRes struct {
-				Delay int `json:"delay"`
-			}
-			json.NewDecoder(resp.Body).Decode(&delayRes)
-			resp.Body.Close()
 
-			if delayRes.Delay > 0 {
-				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "ping", Text: fmt.Sprintf("%d ms", delayRes.Delay)}
+			var totalPing int
+			var pingSuccess int
+
+			// 循环测试 3 次，取成功次数的平均值
+			for i := 0; i < 3; i++ {
+				resp, err := client.Get(delayURL)
+				if err == nil {
+					var delayRes struct {
+						Delay int `json:"delay"`
+					}
+					// 解析 JSON 并确认 Delay > 0
+					if decodeErr := json.NewDecoder(resp.Body).Decode(&delayRes); decodeErr == nil && delayRes.Delay > 0 {
+						totalPing += delayRes.Delay
+						pingSuccess++
+					}
+					resp.Body.Close() // 循环内必须手动关闭 Body 释放连接
+				}
+				// 每次请求间隔 100ms，防止被目标服务器限流
+				if i < 2 {
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+
+			// === 核心修改区：引入 TCP Fallback 兜底逻辑 ===
+			var totalTCPDelay int64
+			var tcpSuccess int
+
+			// 触发 TCP 测试的两个条件：
+			// 1. testMode == "all" (用户本来就要求完整测试 TCP 延迟)
+			// 2. pingSuccess == 0 (Ping不通，需要用 TCP Fallback 验证节点是否真死了)
+			if testMode == "all" || pingSuccess == 0 {
+				tcpClient := &http.Client{
+					Transport: proxyTransport,
+					Timeout:   3 * time.Second,
+				}
+				// 循环测试 3 次
+				for i := 0; i < 3; i++ {
+					reqTCP, _ := http.NewRequest("HEAD", "http://1.1.1.1", nil)
+					reqTCP.Close = true // 强制禁止 Keep-Alive，保证每次都是真实握手
+
+					startTCP := time.Now()
+					tcpResp, err := tcpClient.Do(reqTCP)
+					if err == nil {
+						tcpResp.Body.Close() // 循环内手动关闭
+						totalTCPDelay += time.Since(startTCP).Milliseconds()
+						tcpSuccess++
+					}
+					if i < 2 {
+						time.Sleep(100 * time.Millisecond)
+					}
+				}
+			}
+
+			var avgTCPDelay int64
+			if tcpSuccess > 0 {
+				avgTCPDelay = totalTCPDelay / int64(tcpSuccess)
+			}
+
+			if pingSuccess > 0 {
+				// 存活情况 1：常规 Ping 正常通车
+				avgPing := totalPing / pingSuccess
+				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "ping", Text: fmt.Sprintf("%d ms", avgPing)}
+			} else if tcpSuccess > 0 {
+				// 存活情况 2：Ping 阵亡，但 TCP 握手存活 (Fallback 成功)
+				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "ping", Text: fmt.Sprintf("TCP %dms", avgTCPDelay)}
 			} else {
+				// 绝望情况：双双阵亡，正式宣告死刑
 				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: "无效节点"}
-				return
+				return // 彻底终止该节点的后续带宽测速
 			}
 
 			if testMode == "ping_only" {
 				return
 			}
 
-			// --- 步骤 B: TCP 握手延迟 ---
+			// 如果是 all 模式，且既然活到了这里，正常填补前端 tcp 列的数据
 			if testMode == "all" {
-				tcpClient := &http.Client{
-					Transport: proxyTransport,
-					Timeout:   3 * time.Second,
-				}
-
-				// [修复] 1. 改用不带域名的 IP (1.1.1.1) 彻底消除 DNS 解析带来的额外延迟干扰
-				// [修复] 2. 采用轻量级的 HEAD 请求，只拿响应头，避免下载任何多余 Body
-				reqTCP, _ := http.NewRequest("HEAD", "http://1.1.1.1", nil)
-				reqTCP.Close = true // 强制禁止 Keep-Alive，测完即关，保证每次都是全新干净的握手
-
-				startTCP := time.Now()
-				tcpResp, err := tcpClient.Do(reqTCP)
-				if err == nil {
-					tcpResp.Body.Close()
-					tcpDelay := time.Since(startTCP).Milliseconds()
-					resultChan <- SpeedTestResult{NodeID: node.ID, Type: "tcp", Text: fmt.Sprintf("%d ms", tcpDelay)}
+				if tcpSuccess > 0 {
+					resultChan <- SpeedTestResult{NodeID: node.ID, Type: "tcp", Text: fmt.Sprintf("%d ms", avgTCPDelay)}
 				} else {
-					resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: "TCP超时"}
+					// 走到这里的极端边缘情况：Ping 通了，但 TCP 却死了。不适合继续测速。
+					resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: "TCP异常"}
 					return
 				}
 			}
 
-			// --- 步骤 C: 测真实带宽 ---
+			// --- 步骤 C: 测真实带宽 (通过 Mihomo /traffic 接口获取内核级真实峰值) ---
 			speedClient := &http.Client{
 				Transport: proxyTransport,
-				Timeout:   5 * time.Second, // 限制最多测速5秒，防止卡死
+				Timeout:   8 * time.Second, // 延长到 8 秒
 			}
-			startSpeed := time.Now()
 
-			// [修复] 伪装正常的浏览器 User-Agent，防止被 Cloudflare 无情拦截
-			reqSpeed, _ := http.NewRequest("GET", "https://speed.cloudflare.com/__down?bytes=20971520", nil)
-			reqSpeed.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+			// 1. 建立备用测速池：提升测速包体积，拉长整个连接过程给足充分时间去冲高并发流量
+			speedURLs := []string{
+				"https://speed.cloudflare.com/__down?bytes=50000000", // 50MB
+				"http://speedtest.tele2.net/50MB.zip",
+				"https://proof.ovh.net/files/50Mb.dat",
+			}
 
-			speedResp, err := speedClient.Do(reqSpeed)
-			if err == nil {
-				defer speedResp.Body.Close()
+			var finalSpeedMBps float64
+			var speedSuccess bool
+			var interceptCode int // 专门记录是否真的被拉黑
+			var speedMu sync.Mutex
 
-				// [修复] 必须是 200 OK，才说明真正拿到了测速包，而不是 403 报错页面
-				if speedResp.StatusCode == http.StatusOK {
-					written, _ := io.Copy(io.Discard, speedResp.Body)
+			// 启动独立的 traffic 监听协程
+			ctxTraffic, cancelTraffic := context.WithCancel(context.Background())
+			defer cancelTraffic()
+
+			go func() {
+				trafficReq, err := http.NewRequestWithContext(ctxTraffic, "GET", fmt.Sprintf("http://127.0.0.1:%d/traffic", apiPort), nil)
+				if err != nil {
+					return
+				}
+				trafficClient := &http.Client{Timeout: 0}
+				trafficResp, err := trafficClient.Do(trafficReq)
+				if err != nil {
+					return
+				}
+				defer trafficResp.Body.Close()
+
+				decoder := json.NewDecoder(trafficResp.Body)
+				for {
+					var traffic struct {
+						Up   int64 `json:"up"`
+						Down int64 `json:"down"`
+					}
+					if err := decoder.Decode(&traffic); err != nil {
+						break
+					}
+					// Mihomo traffic 接口返回的是每秒的 Byte 数 (B/s)
+					currentMBps := float64(traffic.Down) / 1024 / 1024
+
+					speedMu.Lock()
+					if currentMBps > finalSpeedMBps {
+						finalSpeedMBps = currentMBps
+					}
+					speedMu.Unlock()
+				}
+			}()
+
+			for _, targetURL := range speedURLs {
+				reqSpeed, _ := http.NewRequest("GET", targetURL, nil)
+				reqSpeed.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+				reqSpeed.Header.Set("Cache-Control", "no-cache")
+
+				speedResp, err := speedClient.Do(reqSpeed)
+				if err != nil {
+					continue
+				}
+
+				statusCode := speedResp.StatusCode
+				if statusCode == http.StatusOK {
+					startSpeed := time.Now()
+
+					maxTestTimer := time.AfterFunc(4*time.Second, func() {
+						speedResp.Body.Close()
+					})
+
+					buf := make([]byte, 256*1024)
+					written, _ := io.CopyBuffer(io.Discard, speedResp.Body, buf)
+
+					maxTestTimer.Stop()
 					duration := time.Since(startSpeed).Seconds()
+					speedResp.Body.Close()
 
-					if duration > 0 && written > 0 {
-						speedMBps := (float64(written) / 1024 / 1024) / duration
-						resultChan <- SpeedTestResult{NodeID: node.ID, Type: "speed", Text: fmt.Sprintf("%.2f MB/s", speedMBps)}
-					} else {
-						resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: "测速无数据"}
+					time.Sleep(200 * time.Millisecond)
+
+					speedMu.Lock()
+					currentMax := finalSpeedMBps
+					speedMu.Unlock()
+
+					// 兜底机制：如果没能捕捉到 traffic峰值（网速过快或测速极其短暂），但确实下载到了大量数据
+					if currentMax == 0 && duration > 0 && written > 1024 {
+						speedMu.Lock()
+						finalSpeedMBps = (float64(written) / 1024 / 1024) / duration
+						speedMu.Unlock()
+					}
+
+					// 只要从 traffic 接口采集到了峰值速度，或者下载了足够的数据，就认为测速成功
+					if currentMax > 0 || written > 1024 {
+						speedSuccess = true
+						break // 只要有一个源测速成功，立刻跳出循环
 					}
 				} else {
-					resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: fmt.Sprintf("节点拦截(%d)", speedResp.StatusCode)}
+					speedResp.Body.Close()
+					if statusCode == 429 || statusCode == 403 {
+						interceptCode = statusCode
+					}
 				}
+			}
+
+			// 综合裁决输出
+			if speedSuccess {
+				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "speed", Text: fmt.Sprintf("%.2f MB/s", finalSpeedMBps)}
+			} else if interceptCode > 0 {
+				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: fmt.Sprintf("节点拦截(%d)", interceptCode)}
 			} else {
 				resultChan <- SpeedTestResult{NodeID: node.ID, Type: "error", Text: "测速超时"}
-				return
 			}
+
+			// 4. 温和测速：当前节点测试完毕后，强制休眠 300 毫秒
+			time.Sleep(300 * time.Millisecond)
 		}(n) // 将当前节点传入匿名函数执行
 	}
 }
