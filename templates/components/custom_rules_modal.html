@@ -893,7 +893,14 @@
             if (!currentProxyId && editor.innerHTML === '') renderProxyEditor();
         }
     }
-    window.addEventListener('resize', adjustEditorPosition);
+    let crLastIsMobile = window.innerWidth <= 768;
+    window.addEventListener('resize', () => {
+        const currentIsMobile = window.innerWidth <= 768;
+        if (currentIsMobile !== crLastIsMobile) {
+            crLastIsMobile = currentIsMobile;
+            adjustEditorPosition();
+        }
+    });
 
     function renderProxyGroupsList() {
         // 先将编辑器节点安全移出，防止被 innerHTML 覆盖销毁

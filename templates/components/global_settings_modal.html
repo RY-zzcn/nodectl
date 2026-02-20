@@ -706,9 +706,14 @@
         }
     }
 
+    let gsLastIsMobile = window.innerWidth <= 768;
     window.addEventListener('resize', () => {
-        if (gsModal.classList.contains('active')) {
-            adjustGsLayout();
+        const currentIsMobile = window.innerWidth <= 768;
+        if (currentIsMobile !== gsLastIsMobile) {
+            gsLastIsMobile = currentIsMobile;
+            if (gsModal.classList.contains('active')) {
+                adjustGsLayout();
+            }
         }
     });
 

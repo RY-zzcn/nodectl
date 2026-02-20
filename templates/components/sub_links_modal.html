@@ -553,7 +553,14 @@
         }
         resizeSubLinkTextarea();
     }
-    window.addEventListener('resize', adjustRightPanelPosition);
+    let subLastIsMobile = window.innerWidth <= 768;
+    window.addEventListener('resize', () => {
+        const currentIsMobile = window.innerWidth <= 768;
+        if (currentIsMobile !== subLastIsMobile) {
+            subLastIsMobile = currentIsMobile;
+            adjustRightPanelPosition();
+        }
+    });
 
     // 格式卡片点击切换逻辑
     function selectSubFormat(formatKey, cardElement) {

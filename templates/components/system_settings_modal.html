@@ -1637,8 +1637,13 @@
         }
     }
 
+    let sysLastIsMobile = window.innerWidth <= 768;
     window.addEventListener('resize', () => {
-        if (sysModal.classList.contains('active')) adjustSysLayout();
+        const currentIsMobile = window.innerWidth <= 768;
+        if (currentIsMobile !== sysLastIsMobile) {
+            sysLastIsMobile = currentIsMobile;
+            if (sysModal.classList.contains('active')) adjustSysLayout();
+        }
     });
 
     function generateNewSubToken() {
