@@ -745,13 +745,14 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
 		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "pref_use_emoji_flag", "sub_custom_name", "pref_ip_strategy",
 		"sys_force_http", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid", "pref_speed_test_mode", "pref_speed_test_file_size",
+		"tg_bot_token", "tg_bot_whitelist", "tg_bot_register_commands",
 	}).Find(&configs).Error; err != nil {
 		logger.Log.Error("读取系统配置失败", "error", err, "ip", clientIP, "path", reqPath)
 	}
 
 	data := make(map[string]string)
 	for _, c := range configs {
-		if c.Key == "cf_api_key" && c.Value != "" {
+		if (c.Key == "cf_api_key" || c.Key == "tg_bot_token") && c.Value != "" {
 			data[c.Key] = "********"
 		} else {
 			data[c.Key] = c.Value
@@ -792,18 +793,35 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"sub_custom_name": true, "pref_ip_strategy": true,
 		"sys_force_http": true, "cf_email": true, "cf_api_key": true, "cf_domain": true, "cf_auto_renew": true,
 		"airport_filter_invalid": true, "pref_speed_test_mode": true, "pref_speed_test_file_size": true,
+		"tg_bot_token": true, "tg_bot_whitelist": true, "tg_bot_register_commands": true,
 	}
+
+	needRestartTgBot := false
 
 	for k, v := range req {
 		if validKeys[k] {
-			if k == "cf_api_key" && v == "********" {
+			if (k == "cf_api_key" || k == "tg_bot_token") && v == "********" {
 				continue
 			}
+
+			if k == "tg_bot_token" || k == "tg_bot_whitelist" || k == "tg_bot_register_commands" {
+				var oldConfig database.SysConfig
+				database.DB.Where("key = ?", k).First(&oldConfig)
+				if oldConfig.Value != v {
+					needRestartTgBot = true
+				}
+			}
+
 			if err := database.DB.Model(&database.SysConfig{}).Where("key = ?", k).Update("value", v).Error; err != nil {
 				logger.Log.Error("更新系统配置异常", "key", k, "error", err, "ip", clientIP, "path", reqPath)
 			}
 		}
 	}
+
+	if needRestartTgBot {
+		go service.RestartTelegramBot()
+	}
+
 	logger.Log.Info("系统全局配置已更新", "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "设置已保存")
 }

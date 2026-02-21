@@ -116,6 +116,9 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/airport/node/routing", withAuthAndSecure(apiAirportNodeRouting)) // 修改节点状态
 	mux.HandleFunc("/api/airport/test-nodes", withAuthAndSecure(apiTestAirportNodes))     // 新增测速接口
 
+	// 启动 Telegram Bot 后台服务 (不阻塞 Web 线程)
+	go service.StartTelegramBot()
+
 	// 4. 进入服务守护主循环 (实现热重启的核心逻辑)
 	for {
 		// 每次进入循环前，尝试加载证书

@@ -958,6 +958,81 @@
         border-color: #b3d7ff;
     }
 
+    /* ================= TG Bot 白名单列表界面 ================= */
+    .sys-list-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: #f4f5f7;
+        padding: 4px 10px;
+        border-radius: 6px;
+        transition: 0.2s;
+    }
+
+    .sys-list-row:hover {
+        background: #eef0f5;
+    }
+
+    .sys-list-input {
+        background: transparent;
+        border: 1px solid transparent;
+        outline: none;
+        padding: 6px 8px;
+        border-radius: 4px;
+        transition: 0.2s;
+        color: #333;
+        font-size: 13px;
+    }
+
+    .sys-list-input:focus {
+        background: #fff;
+        border-color: #007aff;
+    }
+
+    .sys-list-del {
+        color: #ff3b30;
+        cursor: pointer;
+        padding: 6px;
+        opacity: 0;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+    }
+
+    .sys-list-row:hover .sys-list-del {
+        opacity: 1;
+    }
+
+    .sys-list-del:hover {
+        background: #ffe5e5;
+        border-radius: 4px;
+    }
+
+    .sys-btn-add-dashed {
+        width: 100%;
+        padding: 12px;
+        background: #eff6ff;
+        border: 1px dashed #007aff;
+        border-radius: 10px;
+        color: #007aff;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.2s;
+        box-sizing: border-box;
+        margin-top: 10px;
+    }
+
+    .sys-btn-add-dashed:hover {
+        background: #e0efff;
+        transform: translateY(-1px);
+    }
+
     /* ================= 证书管理================= */
 
     /* ================= 移动端适配 ================= */
@@ -1065,6 +1140,14 @@
                         </svg></div>
                 </div>
 
+                <div class="sys-nav-card" data-sys-id="tgbot" onclick="selectSysCategory('tgbot', this)">
+                    <div class="sys-nav-name">🤖 TG Bot</div>
+                    <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg></div>
+                </div>
+
                 <div class="sys-nav-card" data-sys-id="cert" onclick="selectSysCategory('cert', this)">
                     <div class="sys-nav-name">🔐 安全证书</div>
                     <div class="sys-expand-indicator"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"
@@ -1124,6 +1207,44 @@
                             <button type="button" class="btn-sys-regen" onclick="generateNewSubToken()">重新生成</button>
                         </div>
                         <div class="sys-desc">这是您的核心订阅鉴权标识。如遭泄露，请点击重新生成，旧链接将立即失效。</div>
+                    </div>
+                </div>
+
+                <div class="sys-form-section" id="sys-form-tgbot" style="display:none;">
+                    <div class="sys-field">
+                        <label class="sys-label">Telegram Bot Token</label>
+                        <input type="password" id="sys_tg_bot_token" class="sys-input"
+                            placeholder="例如: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz" oninput="triggerSysAutoSave()">
+                        <div class="sys-desc">通过 BotFather 创建机器人获取的 Token。</div>
+                    </div>
+
+                    <div class="sys-pref-row" style="align-items: center; margin-bottom: 20px;">
+                        <div class="sys-pref-info">
+                            <span class="sys-pref-title">🧹 清理菜单并注册面板</span>
+                            <span class="sys-pref-desc">开启后，更新为 Nodectl 管理面板的订阅菜单。</span>
+                        </div>
+                        <label class="sys-toggle-switch">
+                            <input type="checkbox" id="sys_tg_bot_register_commands" onchange="triggerSysAutoSave()">
+                            <span class="sys-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="sys-field">
+                        <label class="sys-label">允许查询的 TG 用户白名单</label>
+                        <div id="tgWhitelistContainer" class="sys-no-scrollbar"
+                            style="max-height: 250px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 0;">
+                            <!-- rows injected here -->
+                        </div>
+                        <button type="button" class="sys-btn-add-dashed" onclick="addTgWhitelistItem()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            添加白名单用户
+                        </button>
+                        <div class="sys-desc" style="margin-top:10px;">只有在此列表中的 TG
+                            用户可通过机器人获取订阅。</div>
                     </div>
                 </div>
 
@@ -1676,6 +1797,18 @@
                 document.getElementById('sys_pref_speed_test_mode').value = data.pref_speed_test_mode || 'ping_speed';
                 document.getElementById('sys_pref_speed_test_file_size').value = data.pref_speed_test_file_size || '';
 
+                // TG Bot 配置
+                document.getElementById('sys_tg_bot_token').value = data.tg_bot_token || '';
+                document.getElementById('sys_tg_bot_register_commands').checked = (data.tg_bot_register_commands === 'true');
+
+                // 解析白名单并渲染
+                const wListStr = data.tg_bot_whitelist || '';
+                tgBotWhitelistItems = wListStr.split(',').filter(Boolean).map(s => {
+                    const parts = s.split('=');
+                    return { id: parts[0], remark: parts[1] || '' };
+                });
+                renderTgWhitelist();
+
                 // 2. 证书与高级配置
                 document.getElementById('sys_force_http').checked = (data.sys_force_http === 'true');
                 // ✨ 新增：判断当前协议，若是 HTTP 则隐藏部分证书状态栏
@@ -1809,6 +1942,9 @@
                 "cf_api_key": document.getElementById('sys_cf_api_key').value,
                 "cf_domain": document.getElementById('sys_cf_domain').value,
                 "cf_auto_renew": document.getElementById('sys_cf_auto_renew').checked ? 'true' : 'false', // ✨ 新增
+                "tg_bot_token": document.getElementById('sys_tg_bot_token').value.trim(),
+                "tg_bot_whitelist": tgBotWhitelistItems.filter(item => item.id.trim() !== '').map(item => item.id.trim() + (item.remark.trim() ? '=' + item.remark.trim() : '')).join(','),
+                "tg_bot_register_commands": document.getElementById('sys_tg_bot_register_commands').checked ? 'true' : 'false'
             };
 
             if (!payload.sub_token) {
@@ -2264,6 +2400,102 @@
             btn.innerText = '🚀 重新提交申请';
             btn.disabled = false;
         }
+    }
+
+    // ================= ✨ TG Bot 白名单管理 =================
+    let tgBotWhitelistItems = [];
+
+    function renderTgWhitelist() {
+        const container = document.getElementById('tgWhitelistContainer');
+        if (!container) return;
+
+        if (tgBotWhitelistItems.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #999; font-size: 12px; padding: 10px;">暂无允许查询的白名单用户</div>';
+            return;
+        }
+
+        container.innerHTML = tgBotWhitelistItems.map((item, index) => `
+            <div class="sys-list-row">
+                <input type="text" class="sys-list-input" data-idx="${index}" value="${item.remark}" placeholder="备注 (例如: 张三)" style="flex: 1;" oninput="tgBotWhitelistItems[${index}].remark = this.value; triggerSysAutoSave();" onblur="scheduleCleanEmptyTgWhitelist()">
+                <input type="text" class="sys-list-input" data-idx="${index}" value="${item.id}" placeholder="TG ID" style="flex: 2; font-family: monospace;" oninput="tgBotWhitelistItems[${index}].id = this.value; triggerSysAutoSave();" onblur="scheduleCleanEmptyTgWhitelist()">
+                <div class="sys-list-del" onclick="deleteTgWhitelistItem(${index})" title="删除">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // 失去焦点时自动清理完全为空的白名单项，防止点击添加后不输入残留空行
+    function scheduleCleanEmptyTgWhitelist() {
+        setTimeout(() => {
+            const active = document.activeElement;
+            const activeIdxStr = active ? active.getAttribute('data-idx') : null;
+            const activePlaceholder = active ? active.getAttribute('placeholder') : null;
+
+            let needsClean = false;
+            for (let i = 0; i < tgBotWhitelistItems.length; i++) {
+                const item = tgBotWhitelistItems[i];
+                if (item.id.trim() === '' && item.remark.trim() === '' && String(i) !== activeIdxStr) {
+                    needsClean = true;
+                    break;
+                }
+            }
+
+            if (needsClean) {
+                // 计算需要保留焦点的元素的新 index
+                let newActiveIdx = -1;
+                if (activeIdxStr !== null) {
+                    const oldIdx = parseInt(activeIdxStr);
+                    let keptCount = 0;
+                    for (let i = 0; i < oldIdx; i++) {
+                        const item = tgBotWhitelistItems[i];
+                        if (item.id.trim() !== '' || item.remark.trim() !== '') keptCount++;
+                    }
+                    newActiveIdx = keptCount;
+                }
+
+                tgBotWhitelistItems = tgBotWhitelistItems.filter((item, index) => {
+                    // 保留非空的，以及当前正在聚焦的
+                    if (item.id.trim() !== '' || item.remark.trim() !== '') return true;
+                    if (String(index) === activeIdxStr) return true;
+                    return false;
+                });
+
+                renderTgWhitelist();
+                triggerSysAutoSave();
+
+                // 恢复焦点，防止渲染打断用户的连续输入体验
+                if (newActiveIdx !== -1 && activePlaceholder) {
+                    const container = document.getElementById('tgWhitelistContainer');
+                    if (container) {
+                        const inputs = container.querySelectorAll(`input[data-idx="${newActiveIdx}"][placeholder="${activePlaceholder}"]`);
+                        if (inputs.length > 0) {
+                            inputs[0].focus();
+                        }
+                    }
+                }
+            }
+        }, 150);
+    }
+
+    function addTgWhitelistItem() {
+        tgBotWhitelistItems.push({ id: '', remark: '' });
+        renderTgWhitelist();
+
+        setTimeout(() => {
+            const container = document.getElementById('tgWhitelistContainer');
+            container.scrollTop = container.scrollHeight;
+            const inputs = container.querySelectorAll('.sys-list-input[placeholder="TG ID"]');
+            if (inputs.length > 0) {
+                inputs[inputs.length - 1].focus();
+            }
+        }, 50);
+    }
+
+    function deleteTgWhitelistItem(index) {
+        tgBotWhitelistItems.splice(index, 1);
+        renderTgWhitelist();
+        triggerSysAutoSave();
     }
 </script>
 {{end}}
