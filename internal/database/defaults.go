@@ -45,6 +45,8 @@ func initBasicSettings() {
 		{Key: "clash_custom_modules", Value: "[]", Description: "用户自定义的 Clash 分流模块"},
 		{Key: "clash_custom_proxy_rules", Value: "[]", Description: "自定义分流策略组配置"},
 		{Key: "clash_custom_direct_raw", Value: "", Description: "自定义直连规则原始文本"},
+		{Key: "clash_proxies_update_interval", Value: "300", Description: "Clash节点自动更新间隔(秒)"},
+		{Key: "clash_rules_update_interval", Value: "300", Description: "Clash规则集自动更新间隔(秒)"},
 		// 将 sys_force_https 改为 sys_force_http
 		{Key: "sys_force_http", Value: "false", Description: "是否强制允许 HTTP (忽略安全)"},
 		// Cloudflare API 配置预留

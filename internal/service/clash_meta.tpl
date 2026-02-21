@@ -27,7 +27,7 @@ global-client-fingerprint: chrome
 proxy-providers:
   中转机场:
     type: http
-    interval: 300
+    interval: {{.ProxiesInterval}}
     url: "{{.RelaySubURL}}"
     path: ./proxy_providers/clash-node.yaml
     health-check:
@@ -36,7 +36,7 @@ proxy-providers:
       interval: 300
   落地机场:
     type: http
-    interval: 300
+    interval: {{.ProxiesInterval}}
     url: "{{.ExitSubURL}}"
     path: ./proxy_providers/exit.yaml
     health-check:
@@ -172,11 +172,11 @@ rule-anchor:
   Local: &Local
     {type: file, behavior: classical, format: text}
   Classical: &Classical
-    {type: http, behavior: classical, format: text, interval: 300}
+    {type: http, behavior: classical, format: text, interval: {{.RulesInterval}}}
   IPCIDR: &IPCIDR
-    {type: http, behavior: ipcidr, format: mrs, interval: 300}
+    {type: http, behavior: ipcidr, format: mrs, interval: {{.RulesInterval}}}
   Domain: &Domain
-    {type: http, behavior: domain, format: mrs, interval: 300}
+    {type: http, behavior: domain, format: mrs, interval: {{.RulesInterval}}}
 
 # -------------------- 规则集自动挂载 --------------------
 rule-providers:

@@ -115,6 +115,8 @@ type ClashTemplateData struct {
 	GlobalDirectIcon        string
 	CustomProxies           []CustomProxyRule
 	NameserverPolicyRuleSet string // 用于存储动态生成的 DNS 策略字符串，例如 "CN_域,Apple_域"
+	ProxiesInterval         string
+	RulesInterval           string
 }
 
 func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error) {
@@ -163,6 +165,21 @@ func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error)
 		}
 	}
 
+	// 获取 Clash 更新间隔
+	var proxiesIntervalConf database.SysConfig
+	database.DB.Where("key = ?", "clash_proxies_update_interval").First(&proxiesIntervalConf)
+	proxiesInterval := proxiesIntervalConf.Value
+	if proxiesInterval == "" {
+		proxiesInterval = "300"
+	}
+
+	var rulesIntervalConf database.SysConfig
+	database.DB.Where("key = ?", "clash_rules_update_interval").First(&rulesIntervalConf)
+	rulesInterval := rulesIntervalConf.Value
+	if rulesInterval == "" {
+		rulesInterval = "300"
+	}
+
 	data := ClashTemplateData{
 		RelaySubURL:             exitURL,
 		ExitSubURL:              relayURL,
@@ -172,6 +189,8 @@ func RenderClashConfig(relayURL, exitURL, baseURL, token string) (string, error)
 		GlobalDirectIcon:        getEmojiURL(GetCustomDirectIcon()),
 		CustomProxies:           validCustomProxies, // 替换为过滤后的有效分组
 		NameserverPolicyRuleSet: dnsPolicyStr,
+		ProxiesInterval:         proxiesInterval,
+		RulesInterval:           rulesInterval,
 	}
 
 	tmpl, err := template.New("clash").Parse(ClashTemplateStr)

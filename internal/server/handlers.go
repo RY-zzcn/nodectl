@@ -745,7 +745,7 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		"proxy_port_reality", "proxy_reality_sni", "proxy_ss_method",
 		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "pref_use_emoji_flag", "sub_custom_name", "pref_ip_strategy",
 		"sys_force_http", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid", "pref_speed_test_mode", "pref_speed_test_file_size",
-		"tg_bot_enabled", "tg_bot_token", "tg_bot_whitelist", "tg_bot_register_commands",
+		"tg_bot_enabled", "tg_bot_token", "tg_bot_whitelist", "tg_bot_register_commands", "clash_proxies_update_interval", "clash_rules_update_interval",
 	}).Find(&configs).Error; err != nil {
 		logger.Log.Error("读取系统配置失败", "error", err, "ip", clientIP, "path", reqPath)
 	}
@@ -794,6 +794,7 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"sys_force_http": true, "cf_email": true, "cf_api_key": true, "cf_domain": true, "cf_auto_renew": true,
 		"airport_filter_invalid": true, "pref_speed_test_mode": true, "pref_speed_test_file_size": true,
 		"tg_bot_enabled": true, "tg_bot_token": true, "tg_bot_whitelist": true, "tg_bot_register_commands": true,
+		"clash_proxies_update_interval": true, "clash_rules_update_interval": true,
 	}
 
 	needRestartTgBot := false
