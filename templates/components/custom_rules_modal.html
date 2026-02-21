@@ -225,13 +225,9 @@
     }
 
     .cr-item-actions {
-        display: none;
+        display: flex;
         align-items: center;
         gap: 2px;
-    }
-
-    .cr-rule-item:hover .cr-item-actions {
-        display: flex;
     }
 
     .cr-rule-edit,
@@ -243,17 +239,22 @@
         border-radius: 6px;
         cursor: pointer;
         transition: 0.2s;
-        color: #888;
+    }
+
+    .cr-rule-edit {
+        color: #007aff;
+    }
+
+    .cr-rule-delete {
+        color: #ff3b30;
     }
 
     .cr-rule-edit:hover {
         background: #cce4ff;
-        color: #007aff;
     }
 
     .cr-rule-delete:hover {
         background: #ffe5e5;
-        color: #ff3b30;
     }
 
     .cr-rule-delete.confirming {
@@ -551,10 +552,6 @@
         <div class="cr-header">
             <div class="cr-title-area">
                 <div class="cr-title">⚡ 自定义分流规则</div>
-                <div class="cr-tab-menu">
-                    <button class="cr-tab-btn active" onclick="switchCrTab('proxy')">多组分流出站</button>
-                    <button class="cr-tab-btn" onclick="switchCrTab('direct')">全局直连出站</button>
-                </div>
             </div>
             <div class="cr-save-indicator" id="saveIndicator">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -574,17 +571,7 @@
                 <div class="cr-right-panel" id="proxyEditorContainer"></div>
             </div>
 
-            <div id="cr-tab-direct" class="cr-tab-direct">
-                <div class="cr-desc">
-                    💡 <b>智能解析：</b>填写的域名和IP将<b>不经过代理</b>直接访问网络。
-                </div>
-                <div class="rule-items-container no-scrollbar" id="directItemsContainer"></div>
-                <div class="cr-add-row">
-                    <input type="text" id="directNewInput" class="cr-add-input" placeholder="输入域名或IP"
-                        onkeydown="if(event.key==='Enter') addDirectItem()">
-                    <button class="cr-btn-parse" onclick="addDirectItem()">解析写入</button>
-                </div>
-            </div>
+
         </div>
 
         <div class="cr-footer">
@@ -677,10 +664,10 @@
         return val;
     }
 
-    // --- [修改] 全局查重工具：增加 fromTab 参数 ('direct' 或 'proxy') ---
     function checkDuplicateGlobal(rule, fromTab) {
         // 1. 检查直连列表
         if (directItems.some(item => item.rule === rule)) {
+            if (fromTab === 'direct') return "当前组 (全局直连)";
             return "全局直连";
         }
 
@@ -749,7 +736,7 @@
             return;
         }
 
-        if (currentProxyId) {
+        if (currentProxyId && currentProxyId !== 'direct') {
             const ruleObj = proxyRules.find(r => r.id === currentProxyId);
             if (ruleObj) ruleObj.content = serializeItemsToContent(currentProxyItems);
         }
@@ -778,21 +765,13 @@
     // --- 弹窗基础交互 ---
     async function openCustomRulesModal() {
         document.getElementById('customRulesModal').classList.add('active');
-        switchCrTab('proxy');
         try {
             const res = await fetch('/api/custom-rules/get');
             const result = await res.json();
             if (result.status === 'success') {
                 directItems = parseContentToItems(result.data.direct || '');
-                renderDirectItems();
-
                 proxyRules = result.data.proxy || [];
-                if (proxyRules.length > 0) {
-                    selectProxyGroup(proxyRules[0].id);
-                } else {
-                    renderProxyGroupsList();
-                    renderProxyEditor();
-                }
+                selectProxyGroup('direct');
             }
         } catch (e) { console.error("加载失败", e); }
     }
@@ -801,32 +780,7 @@
         document.getElementById('customRulesModal').classList.remove('active');
     }
 
-    function switchCrTab(tab) {
-        document.querySelectorAll('.cr-tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('cr-tab-proxy').classList.remove('active');
-        document.getElementById('cr-tab-direct').classList.remove('active');
 
-        if (tab === 'proxy') {
-            document.querySelectorAll('.cr-tab-btn')[0].classList.add('active');
-            document.getElementById('cr-tab-proxy').classList.add('active');
-        } else {
-            document.querySelectorAll('.cr-tab-btn')[1].classList.add('active');
-            document.getElementById('cr-tab-direct').classList.add('active');
-        }
-    }
-
-    // --- 【直连 Tab】逻辑 ---
-    function renderDirectItems() {
-        const container = document.getElementById('directItemsContainer');
-        container.innerHTML = directItems.map((item, index) => `
-            <div class="cr-item-row">
-                <input type="text" class="cr-item-remark" placeholder="备注" value="${item.remark}" oninput="directItems[${index}].remark = this.value; triggerAutoSave();">
-                <input type="text" class="cr-item-rule" value="${item.rule}" oninput="directItems[${index}].rule = this.value; triggerAutoSave();">
-                <div class="cr-item-del" onclick="deleteDirectItem(${index})" title="删除">${trashSvg}</div>
-            </div>
-        `).join('');
-        container.scrollTop = container.scrollHeight;
-    }
 
     // --- [修改] 显示重复警告 (支持显示来源) ---
     function showDuplicateTip(sourceName) {
@@ -843,33 +797,7 @@
         }, 2500); //稍微延长一点时间让用户看清
     }
 
-    function addDirectItem() {
-        const input = document.getElementById('directNewInput');
-        const raw = input.value.trim();
-        if (!raw) return;
 
-        const finalRule = cleanDisplayRule(raw);
-
-        // 【修改点】传入 'direct' 标识
-        const duplicateSource = checkDuplicateGlobal(finalRule, 'direct');
-
-        if (duplicateSource) {
-            showDuplicateTip(duplicateSource);
-            return;
-        }
-
-        directItems.push({ remark: '', rule: finalRule });
-
-        input.value = '';
-        renderDirectItems();
-        triggerAutoSave();
-    }
-
-    function deleteDirectItem(index) {
-        directItems.splice(index, 1);
-        renderDirectItems();
-        triggerAutoSave();
-    }
 
     // --- 【分流 Proxy Tab】核心响应式排版逻辑 ---
     function adjustEditorPosition() {
@@ -913,8 +841,16 @@
             document.getElementById('cr-tab-proxy').appendChild(editor);
         }
 
+        const directHtml = `
+            <div class="cr-rule-item ${currentProxyId === 'direct' ? 'active' : ''}" id="rule_item_direct">
+                <div class="cr-rule-item-header" onclick="selectProxyGroup('direct')">
+                    <span class="cr-group-name" id="name_disp_direct">🌐 全局直连</span>
+                </div>
+            </div>
+        `;
+
         const listDiv = document.getElementById('proxyGroupList');
-        listDiv.innerHTML = proxyRules.map(rule => `
+        listDiv.innerHTML = directHtml + proxyRules.map(rule => `
             <div class="cr-rule-item ${rule.id === currentProxyId ? 'active' : ''}" id="rule_item_${rule.id}">
                 <div class="cr-rule-item-header" onclick="selectProxyGroup('${rule.id}')">
                     <span class="cr-group-name" id="name_disp_${rule.id}">🎯 ${rule.name || '未命名'}</span>
@@ -999,8 +935,12 @@
             }
         }
         currentProxyId = id;
-        const ruleObj = proxyRules.find(r => r.id === id);
-        currentProxyItems = parseContentToItems(ruleObj.content || '');
+        if (id === 'direct') {
+            currentProxyItems = directItems;
+        } else {
+            const ruleObj = proxyRules.find(r => r.id === id);
+            currentProxyItems = parseContentToItems(ruleObj.content || '');
+        }
         renderProxyGroupsList();
         renderProxyEditor();
     }
@@ -1020,9 +960,10 @@
     // --- 【分流 Proxy Tab】右侧编辑器内容逻辑 ---
     function renderProxyEditor() {
         const container = document.getElementById('proxyEditorContainer');
+        const isDirect = currentProxyId === 'direct';
         const ruleObj = proxyRules.find(r => r.id === currentProxyId);
 
-        if (!ruleObj) {
+        if (!isDirect && !ruleObj) {
             if (window.innerWidth <= 768) {
                 container.style.display = 'none'; // 手机端置空时彻底隐藏
                 container.innerHTML = '';
@@ -1035,6 +976,7 @@
 
         container.style.display = 'flex';
         container.innerHTML = `
+            ${isDirect ? '<div class="cr-desc" style="flex-shrink:0;">💡 <b>智能解析：</b>填写的域名和IP将<b>不经过代理</b>直接访问网络。</div>' : ''}
             <div class="rule-items-container no-scrollbar" id="proxyItemsContainer"></div>
             <div class="cr-add-row">
                 <input type="text" id="proxyNewInput" class="cr-add-input" placeholder="输入域名或IP" onkeydown="if(event.key==='Enter') addProxyItem()">
@@ -1064,8 +1006,8 @@
 
         const finalRule = cleanDisplayRule(raw);
 
-        // 【修改点】传入 'proxy' 标识
-        const duplicateSource = checkDuplicateGlobal(finalRule, 'proxy');
+        // 【修改点】传入 'proxy' 或 'direct' 标识
+        const duplicateSource = checkDuplicateGlobal(finalRule, currentProxyId === 'direct' ? 'direct' : 'proxy');
 
         if (duplicateSource) {
             showDuplicateTip(duplicateSource);
