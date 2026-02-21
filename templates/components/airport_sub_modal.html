@@ -1415,9 +1415,16 @@
             const res = await fetch(apiPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const data = await res.json();
             if (res.ok && data.status === 'success') {
-                resetForm(); loadAirSubs();
-                if (!isEdit) showAirSaveStatus("添加成功，后台正在同步");
-                else showAirSaveStatus("修改成功");
+                resetForm();
+                await loadAirSubs();
+                if (!isEdit) {
+                    showAirSaveStatus("添加成功");
+                    if (data.id) {
+                        selectAirSub(data.id);
+                    }
+                } else {
+                    showAirSaveStatus("修改成功");
+                }
             } else { showAirSaveStatus((isEdit ? "修改失败: " : "添加失败: ") + (data.message || "未知错误"), true); }
         } catch (e) { showAirSaveStatus("网络错误", true); } finally { btn.innerText = '确认'; btn.disabled = false; }
     }

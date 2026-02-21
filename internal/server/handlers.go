@@ -1392,9 +1392,14 @@ func apiAirportAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 自动触发一次同步
-	go service.SyncAirportSubscription(sub.ID)
+	if err := service.SyncAirportSubscription(sub.ID); err != nil {
+		logger.Log.Error("同步订阅失败", "error", err)
+	}
 
-	sendJSON(w, "success", "添加成功，后台正在尝试同步节点...")
+	sendJSON(w, "success", map[string]interface{}{
+		"message": "添加成功",
+		"id":      sub.ID,
+	})
 }
 
 // apiAirportUpdate 手动更新订阅
