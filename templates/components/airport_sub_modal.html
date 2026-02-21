@@ -211,6 +211,12 @@
         gap: 6px;
     }
 
+    .air-sub-name-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
     .air-sub-name {
         font-size: 13px;
         font-weight: 500;
@@ -220,6 +226,15 @@
         text-overflow: ellipsis;
         transition: color 0.2s ease;
         line-height: normal;
+        flex-shrink: 1;
+    }
+
+    .air-sub-traffic-inline {
+        font-size: 11px;
+        color: #888;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: none;
     }
 
     .air-sub-card.active .air-sub-name {
@@ -714,8 +729,16 @@
         animation: spin 1s linear infinite;
     }
 
-    /* ================= 移动端适配 ================= */
+    .air-sub-traffic-inline {
+        display: none;
+    }
+
+    /* ================= 移动端手风琴响应式 ================= */
     @media (max-width: 768px) {
+        .air-sub-traffic-inline {
+            display: inline-block;
+        }
+
         .air-modal-card {
             max-width: 95%;
             height: 85vh;
@@ -1027,18 +1050,23 @@
 
             // 流量进度条样式
             let trafficHtml = '';
+            let trafficInlineTxt = '';
             if (total > 0) {
                 trafficHtml = `
                     <div class="air-traffic-bar-bg" style="display:block;">
                         <div class="air-traffic-bar-fill" style="width: ${percent}%; background-color: ${colorStr};"></div>
                     </div>
                 `;
+                trafficInlineTxt = `<span class="air-sub-traffic-inline">${formatBytes(used)} / ${formatBytes(total)}</span>`;
             }
 
             card.innerHTML = `
                 <div class="air-sub-header-row" onclick="selectAirSub('${sub.id}')">
                     <div class="air-sub-name-wrap">
-                        <span class="air-sub-name">${sub.name}</span>
+                        <div class="air-sub-name-header">
+                            <span class="air-sub-name">${sub.name}</span>
+                            ${trafficInlineTxt}
+                        </div>
                         ${trafficHtml}
                     </div>
                     <div class="air-sub-actions">
