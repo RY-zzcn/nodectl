@@ -339,15 +339,62 @@ func handleMenuNodes(bot *tgbotapi.BotAPI, chatID int64, messageID int, data str
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("📊 **服务器流量排行榜 (第 %d/%d 页)**\n\n", page, totalPages))
 
+	getStringWidth := func(s string) int {
+		width := 0
+		for _, r := range s {
+			if r > 127 {
+				width += 2
+			} else {
+				width += 1
+			}
+		}
+		return width
+	}
+
+	var maxNameWidth int
+	var maxUsedWidth int
+
+	type listNodeInfo struct {
+		id    string
+		name  string
+		used  string
+		limit string
+	}
+	var infos []listNodeInfo
+
 	for _, node := range nodes {
-		upStr := formatBytes(node.TrafficUp)
-		downStr := formatBytes(node.TrafficDown)
+		nameWidth := getStringWidth(node.Name)
+		if nameWidth > maxNameWidth {
+			maxNameWidth = nameWidth
+		}
+
+		usedStr := formatBytes(node.TrafficUp + node.TrafficDown)
+		usedWidth := getStringWidth(usedStr)
+		if usedWidth > maxUsedWidth {
+			maxUsedWidth = usedWidth
+		}
+
 		limitStr := "不限量"
 		if node.TrafficLimit > 0 {
 			limitStr = formatBytes(node.TrafficLimit)
 		}
+		infos = append(infos, listNodeInfo{node.UUID, node.Name, usedStr, limitStr})
+	}
 
-		sb.WriteString(fmt.Sprintf("`%s` | %s %s %s\n", node.Name, upStr, downStr, limitStr))
+	for _, info := range infos {
+		namePad := maxNameWidth - getStringWidth(info.name)
+		if namePad < 0 {
+			namePad = 0
+		}
+		paddedName := info.name + strings.Repeat(" ", namePad)
+
+		usedPad := maxUsedWidth - getStringWidth(info.used)
+		if usedPad < 0 {
+			usedPad = 0
+		}
+		paddedUsed := strings.Repeat(" ", usedPad) + info.used
+
+		sb.WriteString(fmt.Sprintf("`%s | %s | %s`\n", paddedName, paddedUsed, info.limit))
 	}
 
 	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, sb.String())
@@ -400,9 +447,20 @@ func handleNodeInfo(bot *tgbotapi.BotAPI, chatID int64, messageID int, data stri
 		routingType = "中转/落地节点"
 	}
 
+	upStr := formatBytes(node.TrafficUp)
+	downStr := formatBytes(node.TrafficDown)
+	usedStr := formatBytes(node.TrafficUp + node.TrafficDown)
+	limitStr := "不限量"
+	if node.TrafficLimit > 0 {
+		limitStr = formatBytes(node.TrafficLimit)
+	}
+
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💻 **[%s] 的专属信息**\n\n", node.Name))
 	sb.WriteString(fmt.Sprintf("▪️ **网络组：** %s\n", routingType))
+	sb.WriteString(fmt.Sprintf("▪️ **已用上传：** %s\n", upStr))
+	sb.WriteString(fmt.Sprintf("▪️ **已用下载：** %s\n", downStr))
+	sb.WriteString(fmt.Sprintf("▪️ **总计消耗：** %s / %s\n", usedStr, limitStr))
 	if node.Remark != "" {
 		sb.WriteString(fmt.Sprintf("▪️ **备注：** %s\n", node.Remark))
 	}
