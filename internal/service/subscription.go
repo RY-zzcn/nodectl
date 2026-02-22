@@ -303,17 +303,17 @@ func determineIPs(node database.NodePool, strategy string, protoIPMode int) []IP
 	var ips []IPOption
 	if genV4 && genV6 {
 		if hasV4 && hasV6 {
-			ips = append(ips, IPOption{IP: node.IPV4, Suffix: "-V4"})
-			ips = append(ips, IPOption{IP: node.IPV6, Suffix: "-V6"})
+			ips = append(ips, IPOption{IP: node.IPV4})
+			ips = append(ips, IPOption{IP: node.IPV6})
 		} else if len(ips) == 0 && hasV4 {
-			ips = append(ips, IPOption{IP: node.IPV4, Suffix: ""})
+			ips = append(ips, IPOption{IP: node.IPV4})
 		} else if len(ips) == 0 && hasV6 {
-			ips = append(ips, IPOption{IP: node.IPV6, Suffix: ""})
+			ips = append(ips, IPOption{IP: node.IPV6})
 		}
 	} else if genV4 && hasV4 {
-		ips = append(ips, IPOption{IP: node.IPV4, Suffix: ""})
+		ips = append(ips, IPOption{IP: node.IPV4})
 	} else if genV6 && hasV6 {
-		ips = append(ips, IPOption{IP: node.IPV6, Suffix: ""})
+		ips = append(ips, IPOption{IP: node.IPV6})
 	}
 
 	// Falls through to empty if gen requirements are not met and strict matching fails.
@@ -322,16 +322,26 @@ func determineIPs(node database.NodePool, strategy string, protoIPMode int) []IP
 	if len(ips) == 0 && (genV4 || genV6) {
 		if effectiveNodeMode == 5 || effectiveNodeMode == 2 { // prefer v6 fallback
 			if hasV6 {
-				ips = append(ips, IPOption{IP: node.IPV6, Suffix: ""})
+				ips = append(ips, IPOption{IP: node.IPV6})
 			} else if hasV4 {
-				ips = append(ips, IPOption{IP: node.IPV4, Suffix: ""})
+				ips = append(ips, IPOption{IP: node.IPV4})
 			}
 		} else { // prefer v4 fallback
 			if hasV4 {
-				ips = append(ips, IPOption{IP: node.IPV4, Suffix: ""})
+				ips = append(ips, IPOption{IP: node.IPV4})
 			} else if hasV6 {
-				ips = append(ips, IPOption{IP: node.IPV6, Suffix: ""})
+				ips = append(ips, IPOption{IP: node.IPV6})
 			}
+		}
+	}
+
+	// 统一在最后根据 IP 格式决定是否追加后缀
+	// 这样无论来源于直接匹配还是 Fallback，只要最后实质上使用了 IPv6，全部加上 -V6 后缀
+	for i := range ips {
+		if strings.Contains(ips[i].IP, ":") {
+			ips[i].Suffix = "-V6"
+		} else {
+			ips[i].Suffix = ""
 		}
 	}
 
