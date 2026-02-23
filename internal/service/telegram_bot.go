@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -184,6 +185,9 @@ func sendSubMenu(bot *tgbotapi.BotAPI, chatID int64) {
 			tgbotapi.NewInlineKeyboardButtonData("🌐 订阅中心", "menu_sub_center"),
 			tgbotapi.NewInlineKeyboardButtonData("📡 服务器列表", "menu_nodes:1"),
 		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🛡️ TG 代理", "menu_tg_proxy"),
+		),
 	)
 
 	msg.ReplyMarkup = keyboard
@@ -232,6 +236,9 @@ func handleCallbackQuery(bot *tgbotapi.BotAPI, callbackQuery *tgbotapi.CallbackQ
 					tgbotapi.NewInlineKeyboardButtonData("🌐 订阅中心", "menu_sub_center"),
 					tgbotapi.NewInlineKeyboardButtonData("📡 服务器列表", "menu_nodes:1"),
 				),
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("🛡️ TG 代理", "menu_tg_proxy"),
+				),
 			)
 			editMsg.ReplyMarkup = &keyboard
 			bot.Send(editMsg)
@@ -268,6 +275,49 @@ func handleCallbackQuery(bot *tgbotapi.BotAPI, callbackQuery *tgbotapi.CallbackQ
 				}(chatID, sentMsg.MessageID)
 			}
 
+		case "menu_tg_proxy":
+			var nodes []database.NodePool
+			database.DB.Where("is_blocked = ? AND ipv6 != ''", false).Find(&nodes)
+
+			var tgProxies []string
+			for _, node := range nodes {
+				if link, ok := node.Links["socks5"]; ok && link != "" {
+					parsedNode := ParseLinkToClashNode(link, "")
+					if parsedNode != nil && parsedNode.Type == "socks5" {
+						params := url.Values{}
+						params.Add("server", node.IPV6)
+						params.Add("port", strconv.Itoa(parsedNode.Port))
+						if parsedNode.Username != "" {
+							params.Add("user", parsedNode.Username)
+						}
+						if parsedNode.Password != "" {
+							params.Add("pass", parsedNode.Password)
+						}
+
+						proxyLink := "https://t.me/socks?" + params.Encode()
+						escapedName := escapeMarkdown(node.Name)
+						tgProxies = append(tgProxies, fmt.Sprintf("▪️ **%s** | [👉 代理直链](%s)", escapedName, proxyLink))
+					}
+				}
+			}
+
+			var replyText string
+			if len(tgProxies) == 0 {
+				replyText = "📭 目前没有任何支持 IPv6 的 Socks5 节点。"
+			} else {
+				replyText = "🛡️ **可用的 TG 代理：**\n\n" + strings.Join(tgProxies, "\n")
+			}
+
+			msg := tgbotapi.NewMessage(chatID, replyText)
+			msg.ParseMode = "Markdown"
+			sentMsg, err := bot.Send(msg)
+			if err == nil && len(tgProxies) > 0 {
+				go func(cID int64, mID int) {
+					time.Sleep(30 * time.Second)
+					bot.Request(tgbotapi.NewDeleteMessage(cID, mID))
+				}(chatID, sentMsg.MessageID)
+			}
+
 		case "reset_sub_token":
 			secureBytes := make([]byte, 16)
 			rand.Read(secureBytes)
@@ -296,6 +346,14 @@ func handleCallbackQuery(bot *tgbotapi.BotAPI, callbackQuery *tgbotapi.CallbackQ
 			}
 		}
 	}()
+}
+
+func escapeMarkdown(text string) string {
+	text = strings.ReplaceAll(text, "_", "\\_")
+	text = strings.ReplaceAll(text, "*", "\\*")
+	text = strings.ReplaceAll(text, "`", "\\`")
+	text = strings.ReplaceAll(text, "[", "\\[")
+	return text
 }
 
 func formatBytes(b int64) string {
