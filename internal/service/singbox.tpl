@@ -831,7 +831,7 @@ INBOUND_VMESS_WST
       "type": "vmess", "tag": "vmess-h2t-in",
       "listen": "::", "listen_port": PORT_VMESS_H2T_PH,
       "users": [{"uuid": "UUID_VMESS_PH6", "alterId": 0}],
-      "tls": {"enabled": true,
+      "tls": {"enabled": true, "alpn": ["h2"],
         "certificate_path": "/etc/sing-box/certs/fullchain.pem",
         "key_path": "/etc/sing-box/certs/privkey.pem"},
       "transport": {"type": "http", "path": "PATH_TP_PH4"}
@@ -849,7 +849,7 @@ INBOUND_VMESS_H2T
       "type": "vmess", "tag": "vmess-hut-in",
       "listen": "::", "listen_port": PORT_VMESS_HUT_PH,
       "users": [{"uuid": "UUID_VMESS_PH7", "alterId": 0}],
-      "tls": {"enabled": true,
+      "tls": {"enabled": true, "alpn": ["http/1.1"],
         "certificate_path": "/etc/sing-box/certs/fullchain.pem",
         "key_path": "/etc/sing-box/certs/privkey.pem"},
       "transport": {"type": "httpupgrade", "path": "PATH_TP_PH5"}
@@ -885,7 +885,7 @@ INBOUND_VLESS_WST
       "type": "vless", "tag": "vless-h2t-in",
       "listen": "::", "listen_port": PORT_VLESS_H2T_PH,
       "users": [{"uuid": "UUID_VLESS_TLS_PH2"}],
-      "tls": {"enabled": true,
+      "tls": {"enabled": true, "alpn": ["h2"],
         "certificate_path": "/etc/sing-box/certs/fullchain.pem",
         "key_path": "/etc/sing-box/certs/privkey.pem"},
       "transport": {"type": "http", "path": "PATH_TP_PH7"}
@@ -903,7 +903,7 @@ INBOUND_VLESS_H2T
       "type": "vless", "tag": "vless-hut-in",
       "listen": "::", "listen_port": PORT_VLESS_HUT_PH,
       "users": [{"uuid": "UUID_VLESS_TLS_PH3"}],
-      "tls": {"enabled": true,
+      "tls": {"enabled": true, "alpn": ["http/1.1"],
         "certificate_path": "/etc/sing-box/certs/fullchain.pem",
         "key_path": "/etc/sing-box/certs/privkey.pem"},
       "transport": {"type": "httpupgrade", "path": "PATH_TP_PH8"}
@@ -939,7 +939,7 @@ INBOUND_TROJAN_WST
       "type": "trojan", "tag": "trojan-h2t-in",
       "listen": "::", "listen_port": PORT_TROJAN_H2T_PH,
       "users": [{"password": "PSK_TROJAN_TLS_PH2"}],
-      "tls": {"enabled": true,
+      "tls": {"enabled": true, "alpn": ["h2"],
         "certificate_path": "/etc/sing-box/certs/fullchain.pem",
         "key_path": "/etc/sing-box/certs/privkey.pem"},
       "transport": {"type": "http", "path": "PATH_TP_PH10"}
@@ -957,7 +957,7 @@ INBOUND_TROJAN_H2T
       "type": "trojan", "tag": "trojan-hut-in",
       "listen": "::", "listen_port": PORT_TROJAN_HUT_PH,
       "users": [{"password": "PSK_TROJAN_TLS_PH3"}],
-      "tls": {"enabled": true,
+      "tls": {"enabled": true, "alpn": ["http/1.1"],
         "certificate_path": "/etc/sing-box/certs/fullchain.pem",
         "key_path": "/etc/sing-box/certs/privkey.pem"},
       "transport": {"type": "httpupgrade", "path": "PATH_TP_PH11"}
@@ -1341,7 +1341,9 @@ generate_uris() {
     # VMess base64 URI 生成器
     vmess_b64() {
         local ps="$1" addr="$2" port="$3" uuid="$4" net="$5" tls="${6:-}" path="${7:-}" host="${8:-$2}"
-        local json="{\"v\":\"2\",\"ps\":\"$ps\",\"add\":\"$addr\",\"port\":\"$port\",\"id\":\"$uuid\",\"aid\":\"0\",\"net\":\"$net\",\"type\":\"none\",\"host\":\"$host\",\"path\":\"$path\",\"tls\":\"$tls\",\"sni\":\"$host\",\"alpn\":\"\"}"
+        local allow_insecure="false"
+        [ "$tls" = "tls" ] && allow_insecure="true"
+        local json="{\"v\":\"2\",\"ps\":\"$ps\",\"add\":\"$addr\",\"port\":\"$port\",\"id\":\"$uuid\",\"aid\":\"0\",\"net\":\"$net\",\"type\":\"none\",\"host\":\"$host\",\"path\":\"$path\",\"tls\":\"$tls\",\"sni\":\"$host\",\"alpn\":\"\",\"allowInsecure\":$allow_insecure}"
         printf 'vmess://%s' "$(printf '%s' "$json" | base64 | tr -d '\n')"
     }
 
@@ -1705,7 +1707,9 @@ report_nodes() {
     # 内部 vmess b64 辅助
     _vmess_b64_report() {
         local ps="$1" addr="$2" port="$3" uuid="$4" net="$5" tls="${6:-}" path="${7:-}" host="${8:-$2}"
-        local json="{\"v\":\"2\",\"ps\":\"$ps\",\"add\":\"$addr\",\"port\":\"$port\",\"id\":\"$uuid\",\"aid\":\"0\",\"net\":\"$net\",\"type\":\"none\",\"host\":\"$host\",\"path\":\"$path\",\"tls\":\"$tls\",\"sni\":\"$host\",\"alpn\":\"\"}"
+        local allow_insecure="false"
+        [ "$tls" = "tls" ] && allow_insecure="true"
+        local json="{\"v\":\"2\",\"ps\":\"$ps\",\"add\":\"$addr\",\"port\":\"$port\",\"id\":\"$uuid\",\"aid\":\"0\",\"net\":\"$net\",\"type\":\"none\",\"host\":\"$host\",\"path\":\"$path\",\"tls\":\"$tls\",\"sni\":\"$host\",\"alpn\":\"\",\"allowInsecure\":$allow_insecure}"
         printf 'vmess://%s' "$(printf '%s' "$json" | base64 | tr -d '\n')"
     }
 
@@ -2123,7 +2127,9 @@ generate_uris() {
     # VMess base64 URI 辅助函数
     _vmess_b64() {
         local ps="$1" addr="$2" port="$3" uuid="$4" net="$5" tls="${6:-}" path="${7:-}" host="${8:-$2}"
-        local json="{\"v\":\"2\",\"ps\":\"$ps\",\"add\":\"$addr\",\"port\":\"$port\",\"id\":\"$uuid\",\"aid\":\"0\",\"net\":\"$net\",\"type\":\"none\",\"host\":\"$host\",\"path\":\"$path\",\"tls\":\"$tls\",\"sni\":\"$host\",\"alpn\":\"\"}"
+        local allow_insecure="false"
+        [ "$tls" = "tls" ] && allow_insecure="true"
+        local json="{\"v\":\"2\",\"ps\":\"$ps\",\"add\":\"$addr\",\"port\":\"$port\",\"id\":\"$uuid\",\"aid\":\"0\",\"net\":\"$net\",\"type\":\"none\",\"host\":\"$host\",\"path\":\"$path\",\"tls\":\"$tls\",\"sni\":\"$host\",\"alpn\":\"\",\"allowInsecure\":$allow_insecure}"
         printf 'vmess://%s' "$(printf '%s' "$json" | base64 | tr -d '\n')"
     }
 

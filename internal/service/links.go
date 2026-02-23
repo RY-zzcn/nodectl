@@ -37,6 +37,7 @@ type ClashNode struct {
 	PluginOpts           map[string]interface{} `yaml:"plugin-opts,omitempty"`
 	WSOpts               map[string]interface{} `yaml:"ws-opts,omitempty"`
 	HTTPUpgradeOpts      map[string]interface{} `yaml:"httpupgrade-opts,omitempty"`
+	HTTPOpts             map[string]interface{} `yaml:"http-opts,omitempty"`
 	H2Opts               map[string]interface{} `yaml:"h2-opts,omitempty"`
 	GRPCOpts             map[string]interface{} `yaml:"grpc-opts,omitempty"`
 	RealityOpts          map[string]interface{} `yaml:"reality-opts,omitempty"`
@@ -57,21 +58,22 @@ type ClashNode struct {
 
 // vmessJSON 定义 VMess 协议特有的 JSON 结构
 type vmessJSON struct {
-	V    interface{} `json:"v"`
-	Ps   string      `json:"ps"`
-	Add  string      `json:"add"`
-	Port interface{} `json:"port"`
-	Id   string      `json:"id"`
-	Aid  interface{} `json:"aid"`
-	Scy  string      `json:"scy"`
-	Net  string      `json:"net"`
-	Type string      `json:"type"`
-	Host interface{} `json:"host"`
-	Path string      `json:"path"`
-	Tls  string      `json:"tls"`
-	Sni  string      `json:"sni"`
-	Alpn string      `json:"alpn"`
-	Fp   string      `json:"fp"`
+	V             interface{} `json:"v"`
+	Ps            string      `json:"ps"`
+	Add           string      `json:"add"`
+	Port          interface{} `json:"port"`
+	Id            string      `json:"id"`
+	Aid           interface{} `json:"aid"`
+	Scy           string      `json:"scy"`
+	Net           string      `json:"net"`
+	Type          string      `json:"type"`
+	Host          interface{} `json:"host"`
+	Path          string      `json:"path"`
+	Tls           string      `json:"tls"`
+	Sni           string      `json:"sni"`
+	Alpn          string      `json:"alpn"`
+	Fp            string      `json:"fp"`
+	AllowInsecure bool        `json:"allowInsecure"` // 自定义扩展字段：自签证书跳过验证
 }
 
 // 2. 通用辅助函数
@@ -154,6 +156,9 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 		if vj.Tls == "tls" {
 			node.TLS = true
 		}
+		if vj.AllowInsecure {
+			node.SkipCertVerify = true
+		}
 		if vj.Alpn != "" {
 			node.ALPN = strings.Split(vj.Alpn, ",")
 		}
@@ -186,6 +191,12 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 			node.HTTPUpgradeOpts = map[string]interface{}{"path": vj.Path}
 			if hostStr != "" {
 				node.HTTPUpgradeOpts["host"] = hostStr
+			}
+		} else if node.Network == "http" {
+			// VMess-HTTP (HTTP/1.1 无 TLS) 需要显式 http-opts 传递 path
+			node.HTTPOpts = map[string]interface{}{"path": []string{vj.Path}}
+			if hostStr != "" {
+				node.HTTPOpts["headers"] = map[string]interface{}{"Host": []string{hostStr}}
 			}
 		}
 		return node
@@ -318,6 +329,9 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 		if u.Query().Get("security") == "tls" || u.Query().Get("security") == "reality" {
 			node.TLS = true
 		}
+		if insecure := u.Query().Get("allowInsecure"); insecure == "1" || insecure == "true" {
+			node.SkipCertVerify = true
+		}
 		if u.Query().Get("security") == "reality" {
 			node.RealityOpts = map[string]interface{}{
 				"public-key": u.Query().Get("pbk"),
@@ -433,6 +447,8 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 			node.ALPN = strings.Split(alpn, ",")
 		}
 		if insecure := u.Query().Get("allow_insecure"); insecure == "1" || insecure == "true" {
+			node.SkipCertVerify = true
+		} else if insecure := u.Query().Get("insecure"); insecure == "1" || insecure == "true" {
 			node.SkipCertVerify = true
 		}
 		return node
