@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -386,6 +387,48 @@ func ReplaceLinkIP(link string, newIP string) string {
 	if newIP == "" {
 		return link
 	}
+
+	lowerLink := strings.ToLower(link)
+
+	// VMess 是 vmess://base64(json) 结构，不能按 URL Host 直接替换
+	if strings.HasPrefix(lowerLink, "vmess://") {
+		body := safeBase64Decode(link[8:])
+		if body == "" {
+			return link
+		}
+
+		var vj map[string]interface{}
+		if err := json.Unmarshal([]byte(body), &vj); err != nil {
+			return link
+		}
+
+		oldAdd := ""
+		if add, ok := vj["add"].(string); ok {
+			oldAdd = add
+		}
+
+		// vmess JSON 中地址字段不应携带 IPv6 方括号
+		rawIP := strings.TrimPrefix(strings.TrimSuffix(newIP, "]"), "[")
+		vj["add"] = rawIP
+
+		if host, ok := vj["host"].(string); ok {
+			if host == "" || host == oldAdd {
+				vj["host"] = rawIP
+			}
+		}
+		if sni, ok := vj["sni"].(string); ok {
+			if sni == "" || sni == oldAdd {
+				vj["sni"] = rawIP
+			}
+		}
+
+		newBody, err := json.Marshal(vj)
+		if err != nil {
+			return link
+		}
+		return "vmess://" + base64.StdEncoding.EncodeToString(newBody)
+	}
+
 	u, err := url.Parse(link)
 	if err != nil || u.Host == "" {
 		return link // 解析失败或极其特殊的格式，原样返回防报错
@@ -393,9 +436,13 @@ func ReplaceLinkIP(link string, newIP string) string {
 
 	port := u.Port()
 	if port != "" {
-		u.Host = newIP + ":" + port
+		u.Host = net.JoinHostPort(newIP, port)
 	} else {
-		u.Host = newIP
+		if strings.Contains(newIP, ":") && !strings.HasPrefix(newIP, "[") {
+			u.Host = "[" + newIP + "]"
+		} else {
+			u.Host = newIP
+		}
 	}
 
 	return u.String()

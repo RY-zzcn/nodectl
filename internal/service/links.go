@@ -36,7 +36,6 @@ type ClashNode struct {
 	Plugin               string                 `yaml:"plugin,omitempty"`
 	PluginOpts           map[string]interface{} `yaml:"plugin-opts,omitempty"`
 	WSOpts               map[string]interface{} `yaml:"ws-opts,omitempty"`
-	HTTPUpgradeOpts      map[string]interface{} `yaml:"httpupgrade-opts,omitempty"`
 	HTTPOpts             map[string]interface{} `yaml:"http-opts,omitempty"`
 	H2Opts               map[string]interface{} `yaml:"h2-opts,omitempty"`
 	GRPCOpts             map[string]interface{} `yaml:"grpc-opts,omitempty"`
@@ -80,6 +79,11 @@ type vmessJSON struct {
 
 // ptrInt 返回指向整数的指针，用于 AlterId 字段（omitempty 不会忽略 *int 指向的 0 值）
 func ptrInt(v int) *int { return &v }
+
+func parseBool(v string) bool {
+	v = strings.TrimSpace(strings.ToLower(v))
+	return v == "1" || v == "true" || v == "yes" || v == "on"
+}
 
 // parseInt 统一处理解析引擎中可能是 interface{} 或 string 的端口类型
 func parseInt(port interface{}) int {
@@ -188,9 +192,14 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 				node.H2Opts["host"] = []string{hostStr}
 			}
 		} else if node.Network == "httpupgrade" {
-			node.HTTPUpgradeOpts = map[string]interface{}{"path": vj.Path}
+			// Mihomo 侧使用 ws + v2ray-http-upgrade 表达 HTTPUpgrade 传输
+			node.Network = "ws"
+			node.WSOpts = map[string]interface{}{
+				"path":               vj.Path,
+				"v2ray-http-upgrade": true,
+			}
 			if hostStr != "" {
-				node.HTTPUpgradeOpts["host"] = hostStr
+				node.WSOpts["headers"] = map[string]string{"Host": hostStr}
 			}
 		} else if node.Network == "http" {
 			// VMess-HTTP (HTTP/1.1 无 TLS) 需要显式 http-opts 传递 path
@@ -227,7 +236,7 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 		if node.SNI == "" {
 			node.SNI = u.Query().Get("peer")
 		}
-		if insecure := u.Query().Get("allowInsecure"); insecure == "1" || insecure == "true" {
+		if insecure := u.Query().Get("allowInsecure"); parseBool(insecure) {
 			node.SkipCertVerify = true
 		}
 		if alpn := u.Query().Get("alpn"); alpn != "" {
@@ -246,9 +255,14 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 				node.H2Opts["host"] = []string{host}
 			}
 		} else if node.Network == "httpupgrade" {
-			node.HTTPUpgradeOpts = map[string]interface{}{"path": u.Query().Get("path")}
+			// Mihomo 侧使用 ws + v2ray-http-upgrade 表达 HTTPUpgrade 传输
+			node.Network = "ws"
+			node.WSOpts = map[string]interface{}{
+				"path":               u.Query().Get("path"),
+				"v2ray-http-upgrade": true,
+			}
 			if host := u.Query().Get("host"); host != "" {
-				node.HTTPUpgradeOpts["host"] = host
+				node.WSOpts["headers"] = map[string]string{"Host": host}
 			}
 		}
 		return node
@@ -329,7 +343,7 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 		if u.Query().Get("security") == "tls" || u.Query().Get("security") == "reality" {
 			node.TLS = true
 		}
-		if insecure := u.Query().Get("allowInsecure"); insecure == "1" || insecure == "true" {
+		if insecure := u.Query().Get("allowInsecure"); parseBool(insecure) {
 			node.SkipCertVerify = true
 		}
 		if u.Query().Get("security") == "reality" {
@@ -358,9 +372,14 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 				node.H2Opts["host"] = []string{host}
 			}
 		} else if node.Network == "httpupgrade" {
-			node.HTTPUpgradeOpts = map[string]interface{}{"path": u.Query().Get("path")}
+			// Mihomo 侧使用 ws + v2ray-http-upgrade 表达 HTTPUpgrade 传输
+			node.Network = "ws"
+			node.WSOpts = map[string]interface{}{
+				"path":               u.Query().Get("path"),
+				"v2ray-http-upgrade": true,
+			}
 			if host := u.Query().Get("host"); host != "" {
-				node.HTTPUpgradeOpts["host"] = host
+				node.WSOpts["headers"] = map[string]string{"Host": host}
 			}
 		}
 		return node
@@ -391,7 +410,7 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 		if alpn := u.Query().Get("alpn"); alpn != "" {
 			node.ALPN = strings.Split(alpn, ",")
 		}
-		if insecure := u.Query().Get("insecure"); insecure == "1" {
+		if insecure := u.Query().Get("insecure"); parseBool(insecure) {
 			node.SkipCertVerify = true
 		}
 		if obfs := u.Query().Get("obfs"); obfs != "" && obfs != "none" {
@@ -415,7 +434,7 @@ func ParseLinkToClashNode(link string, nameSuffix string) *ClashNode {
 			Up:      parseInt(u.Query().Get("upmbps")),
 			Down:    parseInt(u.Query().Get("downmbps")),
 		}
-		if insecure := u.Query().Get("insecure"); insecure == "1" {
+		if insecure := u.Query().Get("insecure"); parseBool(insecure) {
 			node.SkipCertVerify = true
 		}
 		if alpn := u.Query().Get("alpn"); alpn != "" {
