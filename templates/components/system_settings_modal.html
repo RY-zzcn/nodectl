@@ -436,6 +436,81 @@
         transform: translateX(20px);
     }
 
+    /* ===== 默认安装协议分组选择（对齐安装脚本弹窗风格） ===== */
+    .sys-proto-groups-wrap {
+        width: 100%;
+    }
+
+    .sys-proto-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 7px;
+    }
+
+    .sys-proto-row-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #666;
+        min-width: 46px;
+        flex-shrink: 0;
+        padding-top: 5px;
+        text-align: right;
+        letter-spacing: 0.2px;
+    }
+
+    .sys-proto-row-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        flex: 1;
+    }
+
+    .sys-proto-singles-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-top: 8px;
+        margin-top: 2px;
+        border-top: 1px dashed #e1e4e8;
+    }
+
+    .sys-variant-check-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #444;
+        background: #f4f5f7;
+        border: 1px solid #e1e4e8;
+        transition: all 0.15s;
+        user-select: none;
+    }
+
+    .sys-variant-check-item:hover {
+        background: #eef4ff;
+        border-color: #b3d1ff;
+        color: #0062cc;
+    }
+
+    .sys-variant-check-item input[type="checkbox"] {
+        width: 13px;
+        height: 13px;
+        margin: 0;
+        cursor: pointer;
+        accent-color: #007aff;
+    }
+
+    .sys-variant-check-item:has(input:checked) {
+        background: #e8f2ff;
+        border-color: #007aff;
+        color: #007aff;
+    }
+
     /* ================= ✨ 系统监控专属样式 ================= */
     .sys-mon-header-info {
         display: flex;
@@ -1491,6 +1566,13 @@
                         </label>
                     </div>
 
+                    <div class="sys-pref-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+                        <div class="sys-pref-info" style="width: 100%; flex-direction: row; align-items: center; gap: 6px;">
+                            <span class="sys-pref-title">🚀 默认安装协议</span>
+                        </div>
+                        <div class="sys-proto-groups-wrap" id="sysDefaultInstallProtocolGroups"></div>
+                    </div>
+
 
                 </div>
 
@@ -1838,6 +1920,81 @@
         triggerSysAutoSave();
     }
 
+    function renderSysDefaultInstallProtocolGroups() {
+        const wrap = document.getElementById('sysDefaultInstallProtocolGroups');
+        if (!wrap) return;
+
+        const protoGroups = window.NODECTL_INSTALL_PROTO_GROUPS || [];
+        if (!Array.isArray(protoGroups) || protoGroups.length === 0) {
+            wrap.innerHTML = '<div style="font-size:12px;color:#999;">协议定义尚未加载，请先刷新页面。</div>';
+            return;
+        }
+
+        const multiGroups = protoGroups.filter(g => (g.variants || []).length > 1);
+        const singleGroups = protoGroups.filter(g => (g.variants || []).length === 1);
+
+        wrap.innerHTML = '';
+
+        for (const group of multiGroups) {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'sys-proto-row';
+            rowEl.innerHTML = `
+                <span class="sys-proto-row-label">${group.name}</span>
+                <div class="sys-proto-row-chips">
+                    ${(group.variants || []).map(v => `
+                        <label class="sys-variant-check-item">
+                            <input type="checkbox" name="sys_pref_default_install_protocols" value="${v.key}" onchange="triggerSysAutoSave()">
+                            <span>${v.label}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+            wrap.appendChild(rowEl);
+        }
+
+        if (singleGroups.length > 0) {
+            const singlesEl = document.createElement('div');
+            singlesEl.className = 'sys-proto-singles-row';
+            singlesEl.innerHTML = singleGroups.map(g => {
+                const v = g.variants[0];
+                return `
+                    <label class="sys-variant-check-item">
+                        <input type="checkbox" name="sys_pref_default_install_protocols" value="${v.key}" onchange="triggerSysAutoSave()">
+                        <span>${g.name}</span>
+                    </label>
+                `;
+            }).join('');
+            wrap.appendChild(singlesEl);
+        }
+    }
+
+    function loadSysDefaultInstallProtocols(rawValue) {
+        renderSysDefaultInstallProtocolGroups();
+
+        const all = document.querySelectorAll('input[name="sys_pref_default_install_protocols"]');
+        all.forEach(cb => cb.checked = false);
+
+        if (!rawValue) return;
+
+        let protocolList = [];
+        try {
+            const parsed = JSON.parse(rawValue);
+            if (Array.isArray(parsed)) protocolList = parsed;
+        } catch (_) {
+            protocolList = String(rawValue).split(',').map(v => v.trim()).filter(Boolean);
+        }
+
+        all.forEach(cb => {
+            if (protocolList.includes(cb.value)) cb.checked = true;
+        });
+    }
+
+    function collectSysDefaultInstallProtocols() {
+        const list = Array.from(document.querySelectorAll('input[name="sys_pref_default_install_protocols"]:checked'))
+            .map(cb => cb.value);
+        return JSON.stringify(list);
+    }
+
     // 功能：拉取所有后端设置，并渲染到表单和证书状态 UI 中
     async function loadAllSystemSettings() {
         try {
@@ -1858,6 +2015,7 @@
                 document.getElementById('sys_clash_proxies_update_interval').value = data.clash_proxies_update_interval || '300';
                 document.getElementById('sys_clash_rules_update_interval').value = data.clash_rules_update_interval || '3600';
                 document.getElementById('sys_clash_public_rules_update_interval').value = data.clash_public_rules_update_interval || '86400';
+                loadSysDefaultInstallProtocols(data.pref_default_install_protocols || '[]');
 
 
                 // TG Bot 配置
@@ -1998,6 +2156,7 @@
                 "sub_token": document.getElementById('sys_sub_token').value.trim(),
                 "pref_use_emoji_flag": document.getElementById('sys_pref_flag').checked ? "true" : "false",
                 "pref_ip_strategy": document.getElementById('sys_pref_ip_strategy').value,
+                "pref_default_install_protocols": collectSysDefaultInstallProtocols(),
                 "airport_filter_invalid": document.getElementById('sys_airport_filter_invalid').checked ? "true" : "false", // ✨ 新增：提交剔除无效节点开关
                 "pref_speed_test_mode": document.getElementById('sys_pref_speed_test_mode').value,
                 "pref_speed_test_file_size": document.getElementById('sys_pref_speed_test_file_size').value,

@@ -30,79 +30,6 @@ func initDefaultConfigs() {
 
 	// 3. 初始化singbox安装脚本模板参数
 	initProxySettings()
-
-	// 4. 清理历史 h2 协议相关数据
-	cleanupLegacyH2Data()
-}
-
-func cleanupLegacyH2Data() {
-	legacyConfigKeys := []string{
-		"proxy_port_vless_h2i",
-		"proxy_port_vmess_h2t",
-		"proxy_port_vless_h2t",
-		"proxy_port_trojan_h2t",
-	}
-
-	if err := DB.Where("key IN ?", legacyConfigKeys).Delete(&SysConfig{}).Error; err != nil {
-		logger.Log.Error("清理历史 h2 配置键失败", "err", err.Error())
-	}
-
-	legacyProtocols := map[string]bool{
-		"vless_h2i":  true,
-		"vmess_h2t":  true,
-		"vless_h2t":  true,
-		"trojan_h2t": true,
-	}
-
-	var nodes []NodePool
-	if err := DB.Find(&nodes).Error; err != nil {
-		logger.Log.Error("读取节点池失败（h2 清理）", "err", err.Error())
-		return
-	}
-
-	for _, node := range nodes {
-		changed := false
-
-		if node.Links != nil {
-			for key := range node.Links {
-				if legacyProtocols[key] {
-					delete(node.Links, key)
-					changed = true
-				}
-			}
-		}
-
-		if node.LinkIPModes != nil {
-			for key := range node.LinkIPModes {
-				if legacyProtocols[key] {
-					delete(node.LinkIPModes, key)
-					changed = true
-				}
-			}
-		}
-
-		if len(node.DisabledLinks) > 0 {
-			filtered := make([]string, 0, len(node.DisabledLinks))
-			for _, protocol := range node.DisabledLinks {
-				if legacyProtocols[protocol] {
-					changed = true
-					continue
-				}
-				filtered = append(filtered, protocol)
-			}
-			node.DisabledLinks = filtered
-		}
-
-		if changed {
-			if err := DB.Model(&NodePool{}).Where("uuid = ?", node.UUID).Updates(map[string]interface{}{
-				"links":          node.Links,
-				"link_ip_modes":  node.LinkIPModes,
-				"disabled_links": node.DisabledLinks,
-			}).Error; err != nil {
-				logger.Log.Error("更新节点 h2 清理结果失败", "uuid", node.UUID, "err", err.Error())
-			}
-		}
-	}
 }
 
 func initBasicSettings() {
@@ -118,6 +45,7 @@ func initBasicSettings() {
 		{Key: "clash_active_modules", Value: "", Description: "Clash 分流规则启用列表"},
 		{Key: "pref_use_emoji_flag", Value: "true", Description: "订阅节点是否添加国旗前缀"},
 		{Key: "sub_custom_name", Value: "NodeCTL", Description: "自定义订阅名称"},
+		{Key: "pref_default_install_protocols", Value: "[]", Description: "默认安装协议列表(JSON数组)"},
 		{Key: "geo_db_version", Value: "", Description: "GeoIP 数据库版本号"},
 		{Key: "mihomo_core_version", Value: "", Description: "Mihomo 核心版本号"},
 		{Key: "pref_ip_strategy", Value: "ipv4_prefer", Description: "节点IP生成策略"},

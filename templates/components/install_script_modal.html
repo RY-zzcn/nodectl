@@ -336,7 +336,7 @@
     let currentScriptNode = null;
 
     // ─── 协议分组定义 ───
-    const protoGroups = [
+    const installProtoGroups = [
         {
             id: 'vless', name: 'VLESS',
             variants: [
@@ -390,12 +390,15 @@
         },
     ];
 
+    // 全局单一数据源：供安装脚本弹窗与系统偏好设置共用
+    window.NODECTL_INSTALL_PROTO_GROUPS = installProtoGroups;
+
     // ─── 渲染协议面板（行内展开，无折叠）───
     function renderGroups(activeSet) {
         groupsWrap.innerHTML = '';
 
-        const multiGroups  = protoGroups.filter(g => g.variants.length > 1);
-        const singleGroups = protoGroups.filter(g => g.variants.length === 1);
+        const multiGroups  = installProtoGroups.filter(g => g.variants.length > 1);
+        const singleGroups = installProtoGroups.filter(g => g.variants.length === 1);
 
         // 多变种协议：每组独占一行，左侧显示协议名标签
         for (const group of multiGroups) {
@@ -437,7 +440,35 @@
     }
 
     // ─── 打开弹窗 ───
-    function openScriptModal(uuid) {
+    async function loadDefaultInstallProtoKeys() {
+        try {
+            const res = await fetch(`/api/get-settings?_t=${Date.now()}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            const result = await res.json();
+            if (result?.status !== 'success') return new Set();
+            const rawValue = result?.data?.pref_default_install_protocols || '[]';
+
+            let keys = [];
+            try {
+                const parsed = JSON.parse(rawValue);
+                if (Array.isArray(parsed)) keys = parsed;
+            } catch (_) {
+                keys = String(rawValue).split(',').map(v => v.trim()).filter(Boolean);
+            }
+
+            const allKeys = new Set(installProtoGroups.flatMap(g => g.variants.map(v => v.key)));
+            return new Set(keys.filter(k => allKeys.has(k)));
+        } catch (_) {
+            return new Set();
+        }
+    }
+
+    async function openScriptModal(uuid) {
         currentScriptNode = window.allNodesData[uuid];
         if (!currentScriptNode) return;
 
@@ -446,9 +477,13 @@
             return;
         }
 
-        // 解析已启用的协议 key 集合
+        // 选择优先级：偏好设置 > 节点当前已启用协议
         const activeSet = new Set();
-        if (currentScriptNode.links) {
+        const defaultSet = await loadDefaultInstallProtoKeys();
+
+        if (defaultSet.size > 0) {
+            defaultSet.forEach(k => activeSet.add(k));
+        } else if (currentScriptNode.links) {
             const disabledSet = new Set(currentScriptNode.disabled_links || []);
             Object.keys(currentScriptNode.links).forEach(k => {
                 if (!disabledSet.has(k)) activeSet.add(k);
