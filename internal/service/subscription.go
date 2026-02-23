@@ -489,43 +489,23 @@ func RenameNodeLink(link string, newName string) string {
 	return link
 }
 
-// GetSubscriptionUserinfo 聚合所有节点和机场订阅的流量数据，
+// GetSubscriptionUserinfo 聚合所有自建节点的流量数据，
 // 返回标准 Subscription-Userinfo 格式字符串（单位：字节）
 // 格式: upload=X; download=Y; total=Z
 // 如果 total 为 0（没有配置任何限额），返回空字符串
 func GetSubscriptionUserinfo() string {
-	var totalUp, totalDown, totalLimit int64
-
-	// 1. 汇总 NodePool 的流量数据
-	var nodeResult struct {
+	var result struct {
 		SumUp    int64
 		SumDown  int64
 		SumLimit int64
 	}
 	database.DB.Model(&database.NodePool{}).
 		Select("COALESCE(SUM(traffic_up),0) as sum_up, COALESCE(SUM(traffic_down),0) as sum_down, COALESCE(SUM(traffic_limit),0) as sum_limit").
-		Scan(&nodeResult)
-	totalUp += nodeResult.SumUp
-	totalDown += nodeResult.SumDown
-	totalLimit += nodeResult.SumLimit
+		Scan(&result)
 
-	// 2. 汇总 AirportSub 的流量数据
-	var airportResult struct {
-		SumUpload   int64
-		SumDownload int64
-		SumTotal    int64
-	}
-	database.DB.Model(&database.AirportSub{}).
-		Select("COALESCE(SUM(upload),0) as sum_upload, COALESCE(SUM(download),0) as sum_download, COALESCE(SUM(total),0) as sum_total").
-		Scan(&airportResult)
-	totalUp += airportResult.SumUpload
-	totalDown += airportResult.SumDownload
-	totalLimit += airportResult.SumTotal
-
-	// 3. 如果没有配置任何限额，不返回header
-	if totalLimit == 0 {
+	if result.SumLimit == 0 {
 		return ""
 	}
 
-	return fmt.Sprintf("upload=%d; download=%d; total=%d", totalUp, totalDown, totalLimit)
+	return fmt.Sprintf("upload=%d; download=%d; total=%d", result.SumUp, result.SumDown, result.SumLimit)
 }
