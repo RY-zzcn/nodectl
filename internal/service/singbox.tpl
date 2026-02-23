@@ -13,7 +13,7 @@ FIXED_SOCKS5_USER="{{.Socks5User}}"
 FIXED_SOCKS5_PASS="{{.Socks5Pass}}"
 # 新增协议端口
 FIXED_PORT_TROJAN={{.PortTrojan}}
-FIXED_PORT_VLESS_H2={{.PortVlessH2}}
+FIXED_PORT_VLESS_H2I={{.PortVlessH2}}
 # 可配置 SNI（各协议客户端伪装域名）
 FIXED_HY2_SNI="{{.HY2SNI}}"
 FIXED_TUIC_SNI="{{.TUICSNI}}"
@@ -168,7 +168,7 @@ info "节点名称后缀已自动设置为: $suffix"
 select_protocols() {
     # 初始化所有协议开关
     ENABLE_SS=false; ENABLE_HY2=false; ENABLE_TUIC=false; ENABLE_REALITY=false; ENABLE_SOCKS5=false
-    ENABLE_TROJAN=false; ENABLE_VLESS_H2=false
+    ENABLE_TROJAN=false; ENABLE_VLESS_H2I=false
     # VMess 族
     ENABLE_VMESS_TCP=false; ENABLE_VMESS_WS=false; ENABLE_VMESS_HTTP=false; ENABLE_VMESS_QUIC=false
     # VMess+TLS 传输族
@@ -180,7 +180,7 @@ select_protocols() {
 
     _any_enabled() {
         $ENABLE_SS || $ENABLE_HY2 || $ENABLE_TUIC || $ENABLE_REALITY || $ENABLE_SOCKS5 || \
-        $ENABLE_TROJAN || $ENABLE_VLESS_H2 || \
+        $ENABLE_TROJAN || $ENABLE_VLESS_H2I || \
         $ENABLE_VMESS_TCP || $ENABLE_VMESS_WS || $ENABLE_VMESS_HTTP || $ENABLE_VMESS_QUIC || \
         $ENABLE_VMESS_WST || $ENABLE_VMESS_H2T || $ENABLE_VMESS_HUT || \
         $ENABLE_VLESS_WST || $ENABLE_VLESS_H2T || $ENABLE_VLESS_HUT || \
@@ -200,7 +200,7 @@ select_protocols() {
             vless|reality)          ENABLE_REALITY=true;    info "-> 启用 VLESS Reality" ;;
             socks5|socks)           ENABLE_SOCKS5=true;     info "-> 启用 SOCKS5" ;;
             trojan)                 ENABLE_TROJAN=true;     info "-> 启用 Trojan" ;;
-            vless-h2|vless_h2|vlessh2) ENABLE_VLESS_H2=true; info "-> 启用 VLESS-H2-Reality" ;;
+            vless-h2i|vless_h2i|vlessh2i) ENABLE_VLESS_H2I=true; info "-> 启用 VLESS-H2I-TLS" ;;
             vmess-tcp|vmess_tcp)    ENABLE_VMESS_TCP=true;  info "-> 启用 VMess-TCP" ;;
             vmess-ws|vmess_ws)      ENABLE_VMESS_WS=true;   info "-> 启用 VMess-WS" ;;
             vmess-http|vmess_http)  ENABLE_VMESS_HTTP=true; info "-> 启用 VMess-HTTP" ;;
@@ -209,7 +209,7 @@ select_protocols() {
             vmess-h2t|vmess_h2t|vmess-h2-tls)   ENABLE_VMESS_H2T=true;  info "-> 启用 VMess-H2-TLS" ;;
             vmess-hut|vmess_hut|vmess-httpupgrade-tls) ENABLE_VMESS_HUT=true; info "-> 启用 VMess-HTTPUpgrade-TLS" ;;
             vless-wst|vless_wst|vless-ws-tls)   ENABLE_VLESS_WST=true;  info "-> 启用 VLESS-WS-TLS" ;;
-            vless-h2t|vless_h2t|vless-h2-tls)   ENABLE_VLESS_H2T=true;  info "-> 启用 VLESS-H2-TLS" ;;
+            vless-h2t|vless_h2t|vless-h2-tls)   ENABLE_VLESS_H2T=true;  info "-> 启用 VLESS-H2T-TLS" ;;
             vless-hut|vless_hut|vless-httpupgrade-tls) ENABLE_VLESS_HUT=true; info "-> 启用 VLESS-HTTPUpgrade-TLS" ;;
             trojan-wst|trojan_wst|trojan-ws-tls) ENABLE_TROJAN_WST=true; info "-> 启用 Trojan-WS-TLS" ;;
             trojan-h2t|trojan_h2t|trojan-h2-tls) ENABLE_TROJAN_H2T=true; info "-> 启用 Trojan-H2-TLS" ;;
@@ -230,7 +230,7 @@ select_protocols() {
     $ENABLE_REALITY    && echo "  - VLESS Reality"
     $ENABLE_SOCKS5     && echo "  - SOCKS5"
     $ENABLE_TROJAN     && echo "  - Trojan"
-    $ENABLE_VLESS_H2   && echo "  - VLESS-H2-Reality"
+    $ENABLE_VLESS_H2I  && echo "  - VLESS-H2I-TLS"
     $ENABLE_VMESS_TCP  && echo "  - VMess-TCP"
     $ENABLE_VMESS_WS   && echo "  - VMess-WS"
     $ENABLE_VMESS_HTTP && echo "  - VMess-HTTP"
@@ -239,7 +239,7 @@ select_protocols() {
     $ENABLE_VMESS_H2T  && echo "  - VMess-H2-TLS"
     $ENABLE_VMESS_HUT  && echo "  - VMess-HTTPUpgrade-TLS"
     $ENABLE_VLESS_WST  && echo "  - VLESS-WS-TLS"
-    $ENABLE_VLESS_H2T  && echo "  - VLESS-H2-TLS"
+    $ENABLE_VLESS_H2T  && echo "  - VLESS-H2T-TLS"
     $ENABLE_VLESS_HUT  && echo "  - VLESS-HTTPUpgrade-TLS"
     $ENABLE_TROJAN_WST && echo "  - Trojan-WS-TLS"
     $ENABLE_TROJAN_H2T && echo "  - Trojan-H2-TLS"
@@ -253,7 +253,7 @@ ENABLE_TUIC=$ENABLE_TUIC
 ENABLE_REALITY=$ENABLE_REALITY
 ENABLE_SOCKS5=$ENABLE_SOCKS5
 ENABLE_TROJAN=$ENABLE_TROJAN
-ENABLE_VLESS_H2=$ENABLE_VLESS_H2
+ENABLE_VLESS_H2I=$ENABLE_VLESS_H2I
 ENABLE_VMESS_TCP=$ENABLE_VMESS_TCP
 ENABLE_VMESS_WS=$ENABLE_VMESS_WS
 ENABLE_VMESS_HTTP=$ENABLE_VMESS_HTTP
@@ -269,7 +269,7 @@ ENABLE_TROJAN_H2T=$ENABLE_TROJAN_H2T
 ENABLE_TROJAN_HUT=$ENABLE_TROJAN_HUT
 EOF
     export ENABLE_SS ENABLE_HY2 ENABLE_TUIC ENABLE_REALITY ENABLE_SOCKS5 \
-           ENABLE_TROJAN ENABLE_VLESS_H2 \
+           ENABLE_TROJAN ENABLE_VLESS_H2I \
            ENABLE_VMESS_TCP ENABLE_VMESS_WS ENABLE_VMESS_HTTP ENABLE_VMESS_QUIC \
            ENABLE_VMESS_WST ENABLE_VMESS_H2T ENABLE_VMESS_HUT \
            ENABLE_VLESS_WST ENABLE_VLESS_H2T ENABLE_VLESS_HUT \
@@ -374,10 +374,10 @@ get_config() {
         PSK_TROJAN=$(rand_pass)
     fi
 
-    # --- VLESS-H2-Reality ---
-    if $ENABLE_VLESS_H2; then
-        PORT_VLESS_H2="$FIXED_PORT_VLESS_H2"
-        UUID_VLESS_H2=$(rand_uuid)
+    # --- VLESS-H2I-TLS ---
+    if $ENABLE_VLESS_H2I; then
+        PORT_VLESS_H2I="$FIXED_PORT_VLESS_H2I"
+        UUID_VLESS_H2I=$(rand_uuid)
     fi
 
     # --- VMess 族 共用 UUID ---
@@ -465,8 +465,8 @@ install_singbox
 # -----------------------
 # 生成 Reality 密钥对（必须在 sing-box 安装之后）
 generate_reality_keys() {
-    if ! $ENABLE_REALITY && ! $ENABLE_VLESS_H2; then
-        info "跳过 Reality 密钥生成（未选择 Reality 或 VLESS-H2-Reality 协议）"
+    if ! $ENABLE_REALITY; then
+        info "跳过 Reality 密钥生成（未选择 Reality 协议）"
         return 0
     fi
     
@@ -508,7 +508,7 @@ generate_reality_keys
 generate_cert() {
     if ! $ENABLE_HY2 && ! $ENABLE_TUIC && ! $ENABLE_TROJAN && \
        ! $ENABLE_VMESS_QUIC && ! $ENABLE_VMESS_WST && ! $ENABLE_VMESS_H2T && ! $ENABLE_VMESS_HUT && \
-       ! $ENABLE_VLESS_WST && ! $ENABLE_VLESS_H2T && ! $ENABLE_VLESS_HUT && \
+    ! $ENABLE_VLESS_H2I && ! $ENABLE_VLESS_WST && ! $ENABLE_VLESS_H2T && ! $ENABLE_VLESS_HUT && \
        ! $ENABLE_TROJAN_WST && ! $ENABLE_TROJAN_H2T && ! $ENABLE_TROJAN_HUT; then
         info "跳过证书生成(未选择需要 TLS 证书的协议)"
         return 0
@@ -707,42 +707,35 @@ INBOUND_TROJAN
         need_comma=true
     fi
 
-    if $ENABLE_VLESS_H2; then
+        if $ENABLE_VLESS_H2I; then
         $need_comma && echo "," >> "$TEMP_INBOUNDS"
-        cat >> "$TEMP_INBOUNDS" <<'INBOUND_VLESS_H2'
+                cat >> "$TEMP_INBOUNDS" <<'INBOUND_VLESS_H2I'
     {
       "type": "vless",
-      "tag": "vless-h2-in",
+            "tag": "vless-h2i-in",
       "listen": "::",
-      "listen_port": PORT_VLESS_H2_PLACEHOLDER,
+            "listen_port": PORT_VLESS_H2I_PLACEHOLDER,
       "users": [
         {
-          "uuid": "UUID_VLESS_H2_PLACEHOLDER"
+                    "uuid": "UUID_VLESS_H2I_PLACEHOLDER"
         }
       ],
       "tls": {
         "enabled": true,
-        "server_name": "VLESS_H2_SNI_PLACEHOLDER",
-        "reality": {
-          "enabled": true,
-          "handshake": {
-            "server": "VLESS_H2_SNI_PLACEHOLDER",
-            "server_port": 443
-          },
-          "private_key": "VLESS_H2_PK_PLACEHOLDER",
-          "short_id": ["VLESS_H2_SID_PLACEHOLDER"]
-        }
+                                "server_name": "VLESS_H2I_SNI_PLACEHOLDER",
+                "alpn": ["h2"],
+                "certificate_path": "/etc/sing-box/certs/fullchain.pem",
+                "key_path": "/etc/sing-box/certs/privkey.pem"
       },
       "transport": {
-        "type": "http"
+                "type": "http",
+                "path": "/"
       }
     }
-INBOUND_VLESS_H2
-        sed -i "s|PORT_VLESS_H2_PLACEHOLDER|$PORT_VLESS_H2|g" "$TEMP_INBOUNDS"
-        sed -i "s|UUID_VLESS_H2_PLACEHOLDER|$UUID_VLESS_H2|g" "$TEMP_INBOUNDS"
-        sed -i "s|VLESS_H2_PK_PLACEHOLDER|$REALITY_PK|g" "$TEMP_INBOUNDS"
-        sed -i "s|VLESS_H2_SID_PLACEHOLDER|$REALITY_SID|g" "$TEMP_INBOUNDS"
-        sed -i "s|VLESS_H2_SNI_PLACEHOLDER|$REALITY_SNI|g" "$TEMP_INBOUNDS"
+    INBOUND_VLESS_H2I
+        sed -i "s|PORT_VLESS_H2I_PLACEHOLDER|$PORT_VLESS_H2I|g" "$TEMP_INBOUNDS"
+        sed -i "s|UUID_VLESS_H2I_PLACEHOLDER|$UUID_VLESS_H2I|g" "$TEMP_INBOUNDS"
+            sed -i "s|VLESS_H2I_SNI_PLACEHOLDER|$FIXED_VLESS_TLS_SNI|g" "$TEMP_INBOUNDS"
         need_comma=true
     fi
 
@@ -880,7 +873,7 @@ INBOUND_VLESS_WST
         need_comma=true
     fi
 
-    # --- VLESS-H2-TLS ---
+    # --- VLESS-H2T-TLS ---
     if $ENABLE_VLESS_H2T; then
         $need_comma && echo "," >> "$TEMP_INBOUNDS"
         cat >> "$TEMP_INBOUNDS" <<'INBOUND_VLESS_H2T'
@@ -1005,7 +998,7 @@ ENABLE_TUIC=$ENABLE_TUIC
 ENABLE_REALITY=$ENABLE_REALITY
 ENABLE_SOCKS5=$ENABLE_SOCKS5
 ENABLE_TROJAN=$ENABLE_TROJAN
-ENABLE_VLESS_H2=$ENABLE_VLESS_H2
+ENABLE_VLESS_H2I=$ENABLE_VLESS_H2I
 ENABLE_VMESS_TCP=$ENABLE_VMESS_TCP
 ENABLE_VMESS_WS=$ENABLE_VMESS_WS
 ENABLE_VMESS_HTTP=$ENABLE_VMESS_HTTP
@@ -1064,12 +1057,9 @@ TROJAN_PSK=$PSK_TROJAN
 TROJAN_SNI=$FIXED_TROJAN_SNI
 CACHEEOF
 
-    $ENABLE_VLESS_H2 && cat >> /etc/sing-box/.config_cache <<CACHEEOF
-VLESS_H2_PORT=$PORT_VLESS_H2
-VLESS_H2_UUID=$UUID_VLESS_H2
-VLESS_H2_PK=$REALITY_PK
-VLESS_H2_SID=$REALITY_SID
-VLESS_H2_PUB=$REALITY_PUB
+    $ENABLE_VLESS_H2I && cat >> /etc/sing-box/.config_cache <<CACHEEOF
+VLESS_H2I_PORT=$PORT_VLESS_H2I
+VLESS_H2I_UUID=$UUID_VLESS_H2I
 CACHEEOF
 
     # VMess 族
@@ -1338,9 +1328,9 @@ generate_uris() {
         echo ""
     fi
 
-    if $ENABLE_VLESS_H2; then
-        echo "=== VLESS-H2-Reality ==="
-        echo "vless://${UUID_VLESS_H2}@${host}:${PORT_VLESS_H2}?encryption=none&flow=&security=reality&sni=${REALITY_SNI}&fp=chrome&pbk=${REALITY_PUB}&sid=${REALITY_SID}&type=h2&path=/&alpn=h2#vless-h2${suffix}"
+    if $ENABLE_VLESS_H2I; then
+        echo "=== VLESS-H2I-TLS (allowInsecure) ==="
+        echo "vless://${UUID_VLESS_H2I}@${host}:${PORT_VLESS_H2I}?security=tls&sni=${FIXED_VLESS_TLS_SNI}&type=h2&path=/&host=${FIXED_VLESS_TLS_SNI}&allowInsecure=1&alpn=h2#vless-h2i${suffix}"
         echo ""
     fi
 
@@ -1416,7 +1406,7 @@ generate_uris() {
     fi
 
     if $ENABLE_VLESS_H2T; then
-        echo "=== VLESS-H2-TLS (allowInsecure) ==="
+        echo "=== VLESS-H2T-TLS (allowInsecure) ==="
         echo "vless://${UUID_VLESS_TLS}@${host}:${PORT_VLESS_H2T}?security=tls&sni=${vless_tls_sni}&type=h2&path=${PATH_TRANSPORT}&host=${vless_tls_sni}&allowInsecure=1&alpn=h2#vless-h2t${suffix}"
         echo ""
     fi
@@ -1715,11 +1705,11 @@ report_nodes() {
         curl_post_submit "$REPORT_URL" "$json_data" "Trojan"
     fi
 
-    # 7. VLESS-H2-Reality
-    if $ENABLE_VLESS_H2; then
-        local link="vless://${UUID_VLESS_H2}@${link_host}:${PORT_VLESS_H2}?encryption=none&flow=&security=reality&sni=${REALITY_SNI}&fp=chrome&pbk=${REALITY_PUB}&sid=${REALITY_SID}&type=h2&path=/&alpn=h2#vless-h2-${NODE_NAME}"
-        local json_data="{\"install_id\": \"$INSTALL_ID\", \"protocol\": \"vless_h2\", \"link\": \"$link\"}"
-        curl_post_submit "$REPORT_URL" "$json_data" "VLESS-H2"
+    # 7. VLESS-H2I-TLS
+    if $ENABLE_VLESS_H2I; then
+        local link="vless://${UUID_VLESS_H2I}@${link_host}:${PORT_VLESS_H2I}?security=tls&sni=${FIXED_VLESS_TLS_SNI}&type=h2&path=/&host=${FIXED_VLESS_TLS_SNI}&allowInsecure=1&alpn=h2#vless-h2i-${NODE_NAME}"
+        local json_data="{\"install_id\": \"$INSTALL_ID\", \"protocol\": \"vless_h2i\", \"link\": \"$link\"}"
+        curl_post_submit "$REPORT_URL" "$json_data" "VLESS-H2I"
     fi
 
     # 内部 vmess b64 辅助
@@ -1785,7 +1775,7 @@ report_nodes() {
         local link="vless://${UUID_VLESS_TLS}@${link_host}:${PORT_VLESS_WST}?security=tls&sni=${vless_tls_sni}&type=ws&path=${PATH_TRANSPORT}&allowInsecure=1&host=${vless_tls_sni}#vless-wst-${NODE_NAME}"
         curl_post_submit "$REPORT_URL" "{\"install_id\": \"$INSTALL_ID\", \"protocol\": \"vless_wst\", \"link\": \"$link\"}" "VLESS-WST"
     fi
-    # 16. VLESS-H2-TLS
+    # 16. VLESS-H2T-TLS
     if $ENABLE_VLESS_H2T; then
         local link="vless://${UUID_VLESS_TLS}@${link_host}:${PORT_VLESS_H2T}?security=tls&sni=${vless_tls_sni}&type=h2&path=${PATH_TRANSPORT}&host=${vless_tls_sni}&allowInsecure=1&alpn=h2#vless-h2t-${NODE_NAME}"
         curl_post_submit "$REPORT_URL" "{\"install_id\": \"$INSTALL_ID\", \"protocol\": \"vless_h2t\", \"link\": \"$link\"}" "VLESS-H2T"
@@ -1838,7 +1828,7 @@ $ENABLE_TUIC && echo "   TUIC 端口: $PORT_TUIC | UUID: $UUID_TUIC | 密码: $P
 $ENABLE_REALITY && echo "   Reality 端口: $PORT_REALITY | UUID: $UUID"
 $ENABLE_SOCKS5 && echo "   SOCKS5 端口: $PORT_SOCKS5 | 用户: $USER_SOCKS5 | 密码: $PASS_SOCKS5"
 $ENABLE_TROJAN && echo "   Trojan 端口: $PORT_TROJAN | 密码: $PSK_TROJAN | SNI: $FIXED_TROJAN_SNI"
-$ENABLE_VLESS_H2 && echo "   VLESS-H2-Reality 端口: $PORT_VLESS_H2 | UUID: $UUID_VLESS_H2"
+$ENABLE_VLESS_H2I && echo "   VLESS-H2I-TLS 端口: $PORT_VLESS_H2I | UUID: $UUID_VLESS_H2I"
 $ENABLE_VMESS_TCP  && echo "   VMess-TCP 端口: $PORT_VMESS_TCP | UUID: $UUID_VMESS"
 $ENABLE_VMESS_WS   && echo "   VMess-WS 端口: $PORT_VMESS_WS | UUID: $UUID_VMESS | Path: $PATH_TRANSPORT"
 $ENABLE_VMESS_HTTP && echo "   VMess-HTTP 端口: $PORT_VMESS_HTTP | UUID: $UUID_VMESS | Path: $PATH_TRANSPORT"
@@ -1847,13 +1837,13 @@ $ENABLE_VMESS_WST  && echo "   VMess-WS-TLS 端口: $PORT_VMESS_WST | UUID: $UUI
 $ENABLE_VMESS_H2T  && echo "   VMess-H2-TLS 端口: $PORT_VMESS_H2T | UUID: $UUID_VMESS | Path: $PATH_TRANSPORT"
 $ENABLE_VMESS_HUT  && echo "   VMess-HU-TLS 端口: $PORT_VMESS_HUT | UUID: $UUID_VMESS | Path: $PATH_TRANSPORT"
 $ENABLE_VLESS_WST  && echo "   VLESS-WS-TLS 端口: $PORT_VLESS_WST | UUID: $UUID_VLESS_TLS | Path: $PATH_TRANSPORT"
-$ENABLE_VLESS_H2T  && echo "   VLESS-H2-TLS 端口: $PORT_VLESS_H2T | UUID: $UUID_VLESS_TLS | Path: $PATH_TRANSPORT"
+$ENABLE_VLESS_H2T  && echo "   VLESS-H2T-TLS 端口: $PORT_VLESS_H2T | UUID: $UUID_VLESS_TLS | Path: $PATH_TRANSPORT"
 $ENABLE_VLESS_HUT  && echo "   VLESS-HU-TLS 端口: $PORT_VLESS_HUT | UUID: $UUID_VLESS_TLS | Path: $PATH_TRANSPORT"
 $ENABLE_TROJAN_WST && echo "   Trojan-WS-TLS 端口: $PORT_TROJAN_WST | 密码: $PSK_TROJAN_TLS | Path: $PATH_TRANSPORT"
 $ENABLE_TROJAN_H2T && echo "   Trojan-H2-TLS 端口: $PORT_TROJAN_H2T | 密码: $PSK_TROJAN_TLS | Path: $PATH_TRANSPORT"
 $ENABLE_TROJAN_HUT && echo "   Trojan-HU-TLS 端口: $PORT_TROJAN_HUT | 密码: $PSK_TROJAN_TLS | Path: $PATH_TRANSPORT"
 echo "   服务器: $PUB_IP"
-($ENABLE_REALITY || $ENABLE_VLESS_H2) && echo "   Reality server_name(SNI): ${REALITY_SNI:-addons.mozilla.org}"
+$ENABLE_REALITY && echo "   Reality server_name(SNI): ${REALITY_SNI:-addons.mozilla.org}"
 echo ""
 info "📂 文件位置:"
 echo "   配置: $CONFIG_PATH"
@@ -2013,12 +2003,10 @@ read_config() {
         TROJAN_SNI="${TROJAN_SNI:-www.bing.com}"
     fi
 
-    if [ "${ENABLE_VLESS_H2:-false}" = "true" ]; then
-        VLESS_H2_PORT=$(jq -r '.inbounds[] | select(.tag=="vless-h2-in") | .listen_port // empty' "$CONFIG_PATH" | head -n1)
-        VLESS_H2_UUID=$(jq -r '.inbounds[] | select(.tag=="vless-h2-in") | .users[0].uuid // empty' "$CONFIG_PATH" | head -n1)
-        # 共用 Reality 公鑰
-        [ -f /etc/sing-box/.reality_pub ] && VLESS_H2_PUB=$(cat /etc/sing-box/.reality_pub)
-        [ -z "${REALITY_SID:-}" ] && REALITY_SID=$(jq -r '.inbounds[] | select(.tag=="vless-h2-in") | .tls.reality.short_id[0] // empty' "$CONFIG_PATH" | head -n1)
+    if [ "${ENABLE_VLESS_H2I:-false}" = "true" ]; then
+        ENABLE_VLESS_H2I=true
+        VLESS_H2I_PORT=$(jq -r '.inbounds[] | select(.tag=="vless-h2i-in") | .listen_port // empty' "$CONFIG_PATH" | head -n1)
+        VLESS_H2I_UUID=$(jq -r '.inbounds[] | select(.tag=="vless-h2i-in") | .users[0].uuid // empty' "$CONFIG_PATH" | head -n1)
     fi
 
     # VMess 组（共用 UUID_VMESS 与 PATH_TRANSPORT，从缓存读取）
@@ -2145,12 +2133,10 @@ generate_uris() {
         echo "" >> "$URI_FILE"
     fi
 
-    if [ "${ENABLE_VLESS_H2:-false}" = "true" ]; then
-        local _vless_h2_sni="${REALITY_SNI:-addons.mozilla.org}"
-        local _vless_h2_pub="${VLESS_H2_PUB:-${REALITY_PUB:-}}"
-        local _vless_h2_sid="${VLESS_H2_SID:-${REALITY_SID:-}}"
-        echo "=== VLESS-H2-Reality ===" >> "$URI_FILE"
-        echo "vless://${VLESS_H2_UUID}@${link_host}:${VLESS_H2_PORT}?encryption=none&flow=&security=reality&sni=${_vless_h2_sni}&fp=chrome&pbk=${_vless_h2_pub}&sid=${_vless_h2_sid}&type=h2&path=/&alpn=h2#vless-h2${node_suffix}" >> "$URI_FILE"
+    if [ "${ENABLE_VLESS_H2I:-false}" = "true" ]; then
+        local _vless_h2_sni="${VLESS_TLS_SNI:-${TLS_SNI:-www.bing.com}}"
+        echo "=== VLESS-H2I-TLS (allowInsecure) ===" >> "$URI_FILE"
+        echo "vless://${VLESS_H2I_UUID}@${link_host}:${VLESS_H2I_PORT}?security=tls&sni=${_vless_h2_sni}&type=h2&path=/&host=${_vless_h2_sni}&allowInsecure=1&alpn=h2#vless-h2i${node_suffix}" >> "$URI_FILE"
         echo "" >> "$URI_FILE"
     fi
 
@@ -2214,7 +2200,7 @@ generate_uris() {
         echo "" >> "$URI_FILE"
     fi
     if [ "${ENABLE_VLESS_H2T:-false}" = "true" ]; then
-        echo "=== VLESS-H2-TLS ===" >> "$URI_FILE"
+        echo "=== VLESS-H2T-TLS ===" >> "$URI_FILE"
         echo "vless://${UUID_VLESS_TLS}@${link_host}:${VLESS_H2T_PORT}?security=tls&sni=${vless_tls_sni}&type=h2&path=${tp}&host=${vless_tls_sni}&allowInsecure=1&alpn=h2#vless-h2t${node_suffix}" >> "$URI_FILE"
         echo "" >> "$URI_FILE"
     fi
@@ -2434,25 +2420,25 @@ action_reset_trojan() {
     generate_uris || warn "生成 URI 失败"
 }
 
-# 重置VLESS-H2-Reality端口
-action_reset_vless_h2() {
+# 重置VLESS-H2I-TLS端口
+action_reset_vless_h2i() {
     read_config || return 1
-    if [ "${ENABLE_VLESS_H2:-false}" != "true" ]; then
-        err "VLESS-H2-Reality 协议未启用"
+    if [ "${ENABLE_VLESS_H2I:-false}" != "true" ]; then
+        err "VLESS-H2I-TLS 协议未启用"
         return 1
     fi
-    read -p "输入新的 VLESS-H2 端口(回车保持 $VLESS_H2_PORT): " new_port
-    new_port="${new_port:-$VLESS_H2_PORT}"
+    read -p "输入新的 VLESS-H2I 端口(回车保持 $VLESS_H2I_PORT): " new_port
+    new_port="${new_port:-$VLESS_H2I_PORT}"
 
     info "正在停止服务..."
     service_stop || warn "停止服务失败"
     cp "$CONFIG_PATH" "${CONFIG_PATH}.bak"
 
     jq --argjson port "$new_port" '
-    .inbounds |= map(if .tag=="vless-h2-in" then .listen_port = $port else . end)
+    .inbounds |= map(if .tag=="vless-h2i-in" then .listen_port = $port else . end)
     ' "$CONFIG_PATH" > "${CONFIG_PATH}.tmp" && mv "${CONFIG_PATH}.tmp" "$CONFIG_PATH"
 
-    info "已启动服务并更新 VLESS-H2 端口: $new_port"
+    info "已启动服务并更新 VLESS-H2I 端口: $new_port"
     service_start || warn "启动服务失败"
     sleep 1
     generate_uris || warn "生成 URI 失败"
@@ -2489,7 +2475,7 @@ action_reset_vmess_wst()  { _reset_port_by_tag "VMess-WS-TLS"   ENABLE_VMESS_WST
 action_reset_vmess_h2t()  { _reset_port_by_tag "VMess-H2-TLS"   ENABLE_VMESS_H2T  VMESS_H2T_PORT  "vmess-h2t-in";  }
 action_reset_vmess_hut()  { _reset_port_by_tag "VMess-HU-TLS"   ENABLE_VMESS_HUT  VMESS_HUT_PORT  "vmess-hut-in";  }
 action_reset_vless_wst()  { _reset_port_by_tag "VLESS-WS-TLS"   ENABLE_VLESS_WST  VLESS_WST_PORT  "vless-wst-in";  }
-action_reset_vless_h2t()  { _reset_port_by_tag "VLESS-H2-TLS"   ENABLE_VLESS_H2T  VLESS_H2T_PORT  "vless-h2t-in";  }
+action_reset_vless_h2t()  { _reset_port_by_tag "VLESS-H2T-TLS"  ENABLE_VLESS_H2T  VLESS_H2T_PORT  "vless-h2t-in";  }
 action_reset_vless_hut()  { _reset_port_by_tag "VLESS-HU-TLS"   ENABLE_VLESS_HUT  VLESS_HUT_PORT  "vless-hut-in";  }
 action_reset_trojan_wst() { _reset_port_by_tag "Trojan-WS-TLS"  ENABLE_TROJAN_WST TROJAN_WST_PORT "trojan-wst-in"; }
 action_reset_trojan_h2t() { _reset_port_by_tag "Trojan-H2-TLS"  ENABLE_TROJAN_H2T TROJAN_H2T_PORT "trojan-h2t-in"; }
@@ -2587,9 +2573,9 @@ MENU
         option=$((option + 1))
     fi
 
-    if [ "${ENABLE_VLESS_H2:-false}" = "true" ]; then
-        echo "$option) 重置 VLESS-H2 端口"
-        MENU_MAP[$option]="reset_vless_h2"
+    if [ "${ENABLE_VLESS_H2I:-false}" = "true" ]; then
+        echo "$option) 重置 VLESS-H2I 端口"
+        MENU_MAP[$option]="reset_vless_h2i"
         option=$((option + 1))
     fi
 
@@ -2634,7 +2620,7 @@ MENU
         option=$((option + 1))
     fi
     if [ "${ENABLE_VLESS_H2T:-false}" = "true" ]; then
-        echo "$option) 重置 VLESS-H2-TLS 端口"
+        echo "$option) 重置 VLESS-H2T-TLS 端口"
         MENU_MAP[$option]="reset_vless_h2t"
         option=$((option + 1))
     fi
@@ -2714,7 +2700,7 @@ while true; do
                 reset_reality) action_reset_reality ;;
                 reset_socks5) action_reset_socks5 ;;
                 reset_trojan) action_reset_trojan ;;
-                reset_vless_h2) action_reset_vless_h2 ;;
+                reset_vless_h2i) action_reset_vless_h2i ;;
                 reset_vmess_tcp)  action_reset_vmess_tcp ;;
                 reset_vmess_ws)   action_reset_vmess_ws ;;
                 reset_vmess_http) action_reset_vmess_http ;;

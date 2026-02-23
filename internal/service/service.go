@@ -165,7 +165,10 @@ func RenderInstallScript(node database.NodePool) (string, error) {
 	if portTrojan == "" {
 		portTrojan = "20006"
 	}
-	portVlessH2 := configMap["proxy_port_vless_h2"]
+	portVlessH2 := configMap["proxy_port_vless_h2i"]
+	if portVlessH2 == "" {
+		portVlessH2 = configMap["proxy_port_vless_h2"] // 兼容旧键，启动后会被迁移清理
+	}
 	if portVlessH2 == "" {
 		portVlessH2 = "20007"
 	}

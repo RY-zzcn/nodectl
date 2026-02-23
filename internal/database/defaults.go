@@ -13,7 +13,7 @@ import (
 
 // SupportedProtocols 定义系统支持的节点协议列表 (全局变量，供前端和逻辑使用)
 var SupportedProtocols = []string{
-	"vless", "hy2", "socks5", "tuic", "ss", "trojan", "vless_h2",
+	"vless", "hy2", "socks5", "tuic", "ss", "trojan", "vless_h2i",
 	"vmess_tcp", "vmess_ws", "vmess_http", "vmess_quic",
 	"vmess_wst", "vmess_h2t", "vmess_hut",
 	"vless_wst", "vless_h2t", "vless_hut",
@@ -130,7 +130,7 @@ func initProxySettings() {
 		{Key: "proxy_socks5_pass", Value: "123456", Description: "Socks5 默认密码"},
 		// 新增协议配置
 		{Key: "proxy_port_trojan", Value: "20006", Description: "Trojan 默认监听端口"},
-		{Key: "proxy_port_vless_h2", Value: "20007", Description: "VLESS-H2-Reality 默认监听端口"},
+		{Key: "proxy_port_vless_h2i", Value: "20007", Description: "VLESS-H2I-TLS 默认监听端口"},
 		// 可配置 SNI（原先硬编码 www.bing.com）
 		{Key: "proxy_hy2_sni", Value: "www.bing.com", Description: "HY2 客户端 SNI 伪装域名"},
 		{Key: "proxy_tuic_sni", Value: "www.bing.com", Description: "TUIC 客户端 SNI 伪装域名"},
@@ -147,7 +147,7 @@ func initProxySettings() {
 		{Key: "proxy_port_vmess_hut", Value: "20014", Description: "VMess-HTTPUpgrade-TLS 默认监听端口"},
 		// VLESS+TLS 传输族端口
 		{Key: "proxy_port_vless_wst", Value: "20015", Description: "VLESS-WS-TLS 默认监听端口"},
-		{Key: "proxy_port_vless_h2t", Value: "20016", Description: "VLESS-H2-TLS 默认监听端口"},
+		{Key: "proxy_port_vless_h2t", Value: "20016", Description: "VLESS-H2T-TLS 默认监听端口"},
 		{Key: "proxy_port_vless_hut", Value: "20017", Description: "VLESS-HTTPUpgrade-TLS 默认监听端口"},
 		// Trojan+TLS 传输族端口
 		{Key: "proxy_port_trojan_wst", Value: "20018", Description: "Trojan-WS-TLS 默认监听端口"},
@@ -166,8 +166,76 @@ func initProxySettings() {
 		}
 	}
 
+	// 兼容迁移：旧配置键 proxy_port_vless_h2 -> 新键 proxy_port_vless_h2i
+	var legacyPort SysConfig
+	if err := DB.Where("key = ?", "proxy_port_vless_h2").First(&legacyPort).Error; err == nil {
+		if legacyPort.Value != "" {
+			if err := DB.Where("key = ?", "proxy_port_vless_h2i").
+				Assign(SysConfig{Value: legacyPort.Value, Description: "VLESS-H2I-TLS 默认监听端口"}).
+				FirstOrCreate(&SysConfig{Key: "proxy_port_vless_h2i"}).Error; err != nil {
+				logger.Log.Error("迁移旧端口配置失败", "from", "proxy_port_vless_h2", "to", "proxy_port_vless_h2i", "err", err.Error())
+			}
+		}
+		if err := DB.Where("key = ?", "proxy_port_vless_h2").Delete(&SysConfig{}).Error; err != nil {
+			logger.Log.Error("清理旧端口配置失败", "key", "proxy_port_vless_h2", "err", err.Error())
+		}
+	}
+
 	// 清理已废弃配置项（改为复用 TLS 传输族默认 SNI）
 	if err := DB.Where("key IN ?", []string{"proxy_reality_sni", "proxy_trojan_sni"}).Delete(&SysConfig{}).Error; err != nil {
 		logger.Log.Error("清理废弃代理配置失败", "err", err.Error())
+	}
+
+	// 协议键迁移清理：vless_h2 -> vless_h2i
+	var nodes []NodePool
+	if err := DB.Find(&nodes).Error; err == nil {
+		for i := range nodes {
+			node := &nodes[i]
+			changed := false
+
+			if node.Links == nil {
+				node.Links = make(map[string]string)
+			}
+			if oldLink, ok := node.Links["vless_h2"]; ok {
+				if _, exists := node.Links["vless_h2i"]; !exists {
+					node.Links["vless_h2i"] = oldLink
+				}
+				delete(node.Links, "vless_h2")
+				changed = true
+			}
+
+			if node.LinkIPModes == nil {
+				node.LinkIPModes = make(map[string]int)
+			}
+			if oldMode, ok := node.LinkIPModes["vless_h2"]; ok {
+				if _, exists := node.LinkIPModes["vless_h2i"]; !exists {
+					node.LinkIPModes["vless_h2i"] = oldMode
+				}
+				delete(node.LinkIPModes, "vless_h2")
+				changed = true
+			}
+
+			if len(node.DisabledLinks) > 0 {
+				newDisabled := make([]string, 0, len(node.DisabledLinks))
+				seen := make(map[string]bool)
+				for _, p := range node.DisabledLinks {
+					if p == "vless_h2" {
+						p = "vless_h2i"
+						changed = true
+					}
+					if !seen[p] {
+						seen[p] = true
+						newDisabled = append(newDisabled, p)
+					}
+				}
+				node.DisabledLinks = newDisabled
+			}
+
+			if changed {
+				if err := DB.Save(node).Error; err != nil {
+					logger.Log.Error("迁移节点协议键失败", "uuid", node.UUID, "err", err.Error())
+				}
+			}
+		}
 	}
 }

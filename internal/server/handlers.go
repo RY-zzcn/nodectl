@@ -186,8 +186,8 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 				displayName = "Socks5"
 			case "trojan":
 				displayName = "Trojan"
-			case "vless_h2":
-				displayName = "VLESS-H2"
+			case "vless_h2i":
+				displayName = "VLESS-H2I-TLS"
 			case "vmess_tcp":
 				displayName = "VMess-TCP"
 			case "vmess_ws":
@@ -205,7 +205,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 			case "vless_wst":
 				displayName = "VLESS-WS-TLS"
 			case "vless_h2t":
-				displayName = "VLESS-H2-TLS"
+				displayName = "VLESS-H2T-TLS"
 			case "vless_hut":
 				displayName = "VLESS-HU-TLS"
 			case "trojan_wst":
@@ -801,7 +801,7 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		"sys_force_http", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid", "pref_speed_test_mode", "pref_speed_test_file_size",
 		"tg_bot_enabled", "tg_bot_token", "tg_bot_whitelist", "tg_bot_register_commands", "clash_proxies_update_interval", "clash_rules_update_interval", "clash_public_rules_update_interval",
 		// 新增协议与内核优化配置
-		"proxy_port_trojan", "proxy_port_vless_h2", "proxy_hy2_sni", "proxy_tuic_sni", "proxy_enable_bbr",
+		"proxy_port_trojan", "proxy_port_vless_h2i", "proxy_hy2_sni", "proxy_tuic_sni", "proxy_enable_bbr",
 		// VMess 族
 		"proxy_port_vmess_tcp", "proxy_port_vmess_ws", "proxy_port_vmess_http", "proxy_port_vmess_quic",
 		"proxy_port_vmess_wst", "proxy_port_vmess_h2t", "proxy_port_vmess_hut",
@@ -860,7 +860,7 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"tg_bot_enabled": true, "tg_bot_token": true, "tg_bot_whitelist": true, "tg_bot_register_commands": true,
 		"clash_proxies_update_interval": true, "clash_rules_update_interval": true, "clash_public_rules_update_interval": true,
 		// 新增协议与内核优化配置
-		"proxy_port_trojan": true, "proxy_port_vless_h2": true,
+		"proxy_port_trojan": true, "proxy_port_vless_h2i": true,
 		"proxy_hy2_sni": true, "proxy_tuic_sni": true, "proxy_enable_bbr": true,
 		// VMess 族
 		"proxy_port_vmess_tcp": true, "proxy_port_vmess_ws": true, "proxy_port_vmess_http": true, "proxy_port_vmess_quic": true,

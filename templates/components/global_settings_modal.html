@@ -663,8 +663,8 @@
                     </div>
                     <div class="variant-section">
                         <div class="variant-section-hd">
-                            <div class="variant-section-hd-title"><span class="proto-chip tcp">TCP</span> VLESS-H2-Reality</div>
-                            <input type="number" id="gs_proxy_port_vless_h2" class="variant-port-input" placeholder="20007" oninput="triggerGsAutoSave()">
+                            <div class="variant-section-hd-title"><span class="proto-chip tcp">TCP</span> VLESS-H2I-TLS</div>
+                            <input type="number" id="gs_proxy_port_vless_h2i" class="variant-port-input" placeholder="20007" oninput="triggerGsAutoSave()">
                         </div>
                         
                     </div>
@@ -677,7 +677,7 @@
                     </div>
                     <div class="variant-section">
                         <div class="variant-section-hd">
-                            <div class="variant-section-hd-title"><span class="proto-chip tcp">TCP</span> VLESS-H2-TLS</div>
+                            <div class="variant-section-hd-title"><span class="proto-chip tcp">TCP</span> VLESS-H2T-TLS</div>
                             <input type="number" id="gs_proxy_port_vless_h2t" class="variant-port-input" placeholder="20016" oninput="triggerGsAutoSave()">
                         </div>
                         
@@ -1023,7 +1023,7 @@
                 const d = result.data;
                 // VLESS 族
                 document.getElementById('gs_proxy_port_reality').value   = d.proxy_port_reality   || '';
-                document.getElementById('gs_proxy_port_vless_h2').value  = d.proxy_port_vless_h2  || '';
+                document.getElementById('gs_proxy_port_vless_h2i').value = d.proxy_port_vless_h2i || '';
                 document.getElementById('gs_proxy_port_vless_wst').value = d.proxy_port_vless_wst || '';
                 document.getElementById('gs_proxy_port_vless_h2t').value = d.proxy_port_vless_h2t || '';
                 document.getElementById('gs_proxy_port_vless_hut').value = d.proxy_port_vless_hut || '';
@@ -1089,7 +1089,7 @@
             const payload = {
                 // VLESS 族
                 "proxy_port_reality":   document.getElementById('gs_proxy_port_reality').value,
-                "proxy_port_vless_h2":  document.getElementById('gs_proxy_port_vless_h2').value,
+                "proxy_port_vless_h2i": document.getElementById('gs_proxy_port_vless_h2i').value,
                 "proxy_port_vless_wst": document.getElementById('gs_proxy_port_vless_wst').value,
                 "proxy_port_vless_h2t": document.getElementById('gs_proxy_port_vless_h2t').value,
                 "proxy_port_vless_hut": document.getElementById('gs_proxy_port_vless_hut').value,
