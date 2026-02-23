@@ -1061,7 +1061,7 @@ func apiSubClash(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Subscription-Userinfo", userinfo)
 	}
 
-	encodedName := url.QueryEscape(subName + ".yaml")
+	encodedName := url.QueryEscape(subName)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename*=utf-8''%s`, encodedName))
 
 	w.Write([]byte(yamlContent))
@@ -1103,7 +1103,7 @@ func apiSubV2ray(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Subscription-Userinfo", userinfo)
 	}
 
-	encodedName := url.QueryEscape(subName + ".txt")
+	encodedName := url.QueryEscape(subName)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename*=utf-8''%s`, encodedName))
 
 	w.Write([]byte(b64Content))
