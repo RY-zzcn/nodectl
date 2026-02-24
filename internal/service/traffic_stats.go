@@ -45,6 +45,7 @@ type TrafficSeriesOptions struct {
 	IntervalHours int
 	Mode          string // total | increment
 	Date          string // YYYY-MM-DD
+	Raw           bool   // true: 直接返回原始采样点
 }
 
 type TrafficSeriesPoint struct {
@@ -459,6 +460,55 @@ func QueryTrafficSeries(opts TrafficSeriesOptions) (*TrafficSeriesResult, error)
 		hasBaseline = true
 		baselineUp = baseline.TXBytes
 		baselineDown = baseline.RXBytes
+	}
+
+	if hasDate && opts.Raw {
+		points := make([]TrafficSeriesPoint, 0, len(samples))
+		prevUp := baselineUp
+		prevDown := baselineDown
+		hasPrev := hasBaseline
+
+		for _, s := range samples {
+			up := s.TXBytes
+			down := s.RXBytes
+
+			outUp := up
+			outDown := down
+			if mode == "increment" {
+				if hasPrev {
+					outUp = up - prevUp
+					outDown = down - prevDown
+					if outUp < 0 {
+						outUp = up
+					}
+					if outDown < 0 {
+						outDown = down
+					}
+				}
+			}
+
+			points = append(points, TrafficSeriesPoint{
+				Time:       s.ReportedAt.Format(time.RFC3339),
+				Label:      s.ReportedAt.Format("15:04"),
+				UpBytes:    outUp,
+				DownBytes:  outDown,
+				TotalBytes: outUp + outDown,
+			})
+
+			prevUp = up
+			prevDown = down
+			hasPrev = true
+		}
+
+		return &TrafficSeriesResult{
+			NodeUUID:      node.UUID,
+			NodeName:      node.Name,
+			Mode:          mode,
+			Hours:         hours,
+			IntervalHours: intervalHours,
+			GeneratedAt:   now.Format(time.RFC3339),
+			Points:        points,
+		}, nil
 	}
 
 	aggByHour := make(map[time.Time]hourlyAgg, hours+2)

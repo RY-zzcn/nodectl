@@ -716,7 +716,7 @@
             syncRankListHeight();
         }
 
-        async function fetchSeries(mode, intervalHours) {
+        async function fetchSeries(mode, intervalHours, rawPoints) {
             if (!state.selectedNodeUUID) return [];
             const q = new URLSearchParams({
                 node_uuid: state.selectedNodeUUID,
@@ -725,6 +725,9 @@
                 interval_hours: String(intervalHours),
                 date: state.rankDate || todayDateStr()
             });
+            if (rawPoints) {
+                q.set('raw', '1');
+            }
             const res = await fetch('/api/traffic/series?' + q.toString());
             const data = await res.json();
             if (!data || data.status !== 'success') throw new Error((data && data.message) || '读取统计失败');
@@ -861,8 +864,8 @@
         }
 
         async function loadSeriesAndRender() {
-            state.barPoints = await fetchSeries('increment', state.barInterval);
-            state.linePoints = await fetchSeries(state.trendMode, 1);
+            state.barPoints = await fetchSeries('increment', state.barInterval, false);
+            state.linePoints = await fetchSeries(state.trendMode, 1, true);
 
             renderBar();
             renderLine();

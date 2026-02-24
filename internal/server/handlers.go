@@ -2720,6 +2720,10 @@ func apiGetTrafficSeries(w http.ResponseWriter, r *http.Request) {
 
 	mode := strings.TrimSpace(r.URL.Query().Get("mode"))
 	rankDate := strings.TrimSpace(r.URL.Query().Get("date"))
+	rawPoints := false
+	if raw := strings.TrimSpace(r.URL.Query().Get("raw")); raw != "" {
+		rawPoints = raw == "1" || strings.EqualFold(raw, "true")
+	}
 
 	result, err := service.QueryTrafficSeries(service.TrafficSeriesOptions{
 		NodeUUID:      nodeUUID,
@@ -2727,6 +2731,7 @@ func apiGetTrafficSeries(w http.ResponseWriter, r *http.Request) {
 		IntervalHours: intervalHours,
 		Mode:          mode,
 		Date:          rankDate,
+		Raw:           rawPoints,
 	})
 	if err != nil {
 		logger.Log.Warn("查询流量统计数据失败", "error", err, "node_uuid", nodeUUID, "date", rankDate)

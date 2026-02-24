@@ -2,7 +2,6 @@ package database
 
 import (
 	"crypto/rand"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -149,89 +148,6 @@ func (n *AirportNode) BeforeCreate(tx *gorm.DB) (err error) {
 	return
 }
 
-func hasNodeTrafficStatsInstallIDColumn(db *gorm.DB) (bool, error) {
-	type tableInfo struct {
-		Name string `gorm:"column:name"`
-	}
-	var infos []tableInfo
-	if err := db.Raw("PRAGMA table_info(node_traffic_stats)").Scan(&infos).Error; err != nil {
-		return false, err
-	}
-	for _, c := range infos {
-		if c.Name == "install_id" {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func migrateDropInstallIDFromNodeTrafficStats(db *gorm.DB) error {
-	hasCol, err := hasNodeTrafficStatsInstallIDColumn(db)
-	if err != nil {
-		return err
-	}
-	if !hasCol {
-		return nil
-	}
-
-	// 优先尝试直接删列（SQLite 3.35+）
-	if err := db.Exec("ALTER TABLE node_traffic_stats DROP COLUMN install_id").Error; err == nil {
-		logger.Log.Info("数据库迁移完成", "table", "node_traffic_stats", "change", "drop install_id")
-		return nil
-	}
-
-	// 兼容旧 SQLite：重建表并复制数据
-	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec(`
-			CREATE TABLE IF NOT EXISTS node_traffic_stats_new (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				node_uuid varchar(36) NOT NULL,
-				reported_at datetime NOT NULL,
-				hour_key integer NOT NULL,
-				two_hour_key integer NOT NULL,
-				day_key integer NOT NULL,
-				tx_bytes integer DEFAULT 0,
-				rx_bytes integer DEFAULT 0,
-				created_at datetime,
-				CONSTRAINT fk_node_traffic_stats_node FOREIGN KEY (node_uuid)
-					REFERENCES node_pool(uuid) ON UPDATE CASCADE ON DELETE CASCADE
-			)
-		`).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Exec(`
-			INSERT INTO node_traffic_stats_new (id, node_uuid, reported_at, hour_key, two_hour_key, day_key, tx_bytes, rx_bytes, created_at)
-			SELECT id, node_uuid, reported_at, hour_key, two_hour_key, day_key, tx_bytes, rx_bytes, created_at
-			FROM node_traffic_stats
-		`).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Exec("DROP TABLE node_traffic_stats").Error; err != nil {
-			return err
-		}
-		if err := tx.Exec("ALTER TABLE node_traffic_stats_new RENAME TO node_traffic_stats").Error; err != nil {
-			return err
-		}
-
-		indexes := []string{
-			"CREATE INDEX IF NOT EXISTS idx_nts_node_hour ON node_traffic_stats(node_uuid, hour_key)",
-			"CREATE INDEX IF NOT EXISTS idx_nts_node_time ON node_traffic_stats(node_uuid, reported_at)",
-			"CREATE INDEX IF NOT EXISTS idx_nts_two_hour_key ON node_traffic_stats(two_hour_key)",
-			"CREATE INDEX IF NOT EXISTS idx_nts_day_key ON node_traffic_stats(day_key)",
-		}
-		for _, sql := range indexes {
-			if err := tx.Exec(sql).Error; err != nil {
-				return err
-			}
-		}
-
-		logger.Log.Info("数据库迁移完成", "table", "node_traffic_stats", "change", "rebuild and drop install_id")
-		return nil
-	})
-}
-
 // ------------------- 数据库初始化 -------------------
 
 // InitDB 初始化数据库连接并同步表结构
@@ -276,11 +192,6 @@ func InitDB() {
 	if err != nil {
 		logger.Log.Error("自动同步表结构失败", "err", err.Error())
 		panic("数据库表结构迁移失败")
-	}
-
-	if err := migrateDropInstallIDFromNodeTrafficStats(db); err != nil {
-		logger.Log.Error("数据库迁移失败", "err", err.Error(), "detail", fmt.Sprintf("drop legacy column install_id from %s", NodeTrafficStat{}.TableName()))
-		panic("数据库兼容迁移失败")
 	}
 
 	// 4. 赋值给全局变量
