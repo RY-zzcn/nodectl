@@ -175,7 +175,6 @@ func SaveNodeTrafficReport(installID string, rxBytes, txBytes int64, reportedAt 
 
 		rec := database.NodeTrafficStat{
 			NodeUUID:   node.UUID,
-			InstallID:  node.InstallID,
 			ReportedAt: reportedAt,
 			HourKey:    hourKey(reportedAt),
 			TwoHourKey: twoHourKey(reportedAt),
@@ -249,6 +248,12 @@ func GetTrafficConsumptionRank(limit int, rankDate string) (*TrafficConsumptionR
 	if err != nil {
 		return nil, err
 	}
+	if !hasDate {
+		now := time.Now()
+		y, m, d := now.Date()
+		selectedDate = time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+		hasDate = true
+	}
 
 	var nodes []database.NodePool
 	if err := database.DB.
@@ -257,61 +262,6 @@ func GetTrafficConsumptionRank(limit int, rankDate string) (*TrafficConsumptionR
 		Order("updated_at DESC").
 		Find(&nodes).Error; err != nil {
 		return nil, err
-	}
-
-	if !hasDate {
-		sort.SliceStable(nodes, func(i, j int) bool {
-			totalI := nodes[i].TrafficUp + nodes[i].TrafficDown
-			totalJ := nodes[j].TrafficUp + nodes[j].TrafficDown
-			if totalI == totalJ {
-				return nodes[i].UpdatedAt.After(nodes[j].UpdatedAt)
-			}
-			return totalI > totalJ
-		})
-
-		if len(nodes) > limit {
-			nodes = nodes[:limit]
-		}
-
-		items := make([]TrafficConsumptionItem, 0, len(nodes))
-		var totalUp int64
-		var totalDown int64
-
-		for _, n := range nodes {
-			total := n.TrafficUp + n.TrafficDown
-			totalUp += n.TrafficUp
-			totalDown += n.TrafficDown
-
-			ratio := "0.00"
-			if n.TrafficUp > 0 {
-				ratio = fmt.Sprintf("%.2f", float64(n.TrafficDown)/float64(n.TrafficUp))
-			}
-
-			updateAt := "--"
-			if n.TrafficUpdateAt != nil {
-				updateAt = n.TrafficUpdateAt.Format("2006-01-02 15:04")
-			}
-
-			items = append(items, TrafficConsumptionItem{
-				UUID:            n.UUID,
-				InstallID:       n.InstallID,
-				Name:            n.Name,
-				Region:          strings.ToUpper(strings.TrimSpace(n.Region)),
-				TrafficUp:       n.TrafficUp,
-				TrafficDown:     n.TrafficDown,
-				TotalBytes:      total,
-				UploadRatio:     ratio,
-				TrafficUpdateAt: updateAt,
-			})
-		}
-
-		return &TrafficConsumptionRank{
-			GeneratedAt: time.Now().Format("2006-01-02"),
-			TotalUp:     totalUp,
-			TotalDown:   totalDown,
-			TotalBytes:  totalUp + totalDown,
-			Items:       items,
-		}, nil
 	}
 
 	dayStart := selectedDate
