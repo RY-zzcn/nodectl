@@ -1,0 +1,661 @@
+{{define "logs_modal.html"}}
+<style>
+    .logv-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 3500;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .logv-modal-overlay.active {
+        display: flex;
+        opacity: 1;
+    }
+
+    .logv-modal-card {
+        background: #ffffff;
+        width: 100%;
+        max-width: 1040px;
+        height: 85vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .logv-header {
+        background: #f5f5f7;
+        border-bottom: 1px solid #e5e5ea;
+        padding: 15px 20px 15px 25px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .logv-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .logv-title-right {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 6px;
+    }
+
+    .logv-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .logv-capsule {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 20px;
+        padding: 2px;
+        transition: background-color 0.25s ease;
+        cursor: pointer;
+    }
+
+    .logv-capsule.expanded {
+        background: #f5f5f7;
+        border: 1px solid #e5e5ea;
+    }
+
+    .logv-capsule-left {
+        flex-direction: row-reverse;
+    }
+
+    .logv-capsule-item {
+        border: none;
+        background: transparent;
+        color: #86868b;
+        cursor: pointer;
+        border-radius: 16px;
+        height: 26px;
+        min-width: 0;
+        padding: 0;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 0;
+        opacity: 0;
+        overflow: hidden;
+        margin: 0;
+    }
+
+    .logv-capsule-item:hover {
+        background: #e5e5ea;
+        color: #333;
+    }
+
+    .logv-capsule-item.active {
+        max-width: 88px;
+        padding: 4px 10px;
+        opacity: 1;
+    }
+
+    .logv-capsule.expanded .logv-capsule-item {
+        max-width: 88px;
+        padding: 4px 10px;
+        opacity: 1;
+    }
+
+    .logv-capsule-item.active[data-level="all"] {
+        background: #6b7280;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-level="debug"] {
+        background: #7c3aed;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-level="info"] {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-level="warn"] {
+        background: #d97706;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-level="error"] {
+        background: #dc2626;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-limit="200"] {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-limit="500"] {
+        background: #0891b2;
+        color: #fff;
+    }
+
+    .logv-capsule-item.active[data-limit="1000"] {
+        background: #0f766e;
+        color: #fff;
+    }
+
+    .logv-select,
+    .logv-btn {
+        border: 1px solid #d1d1d6;
+        border-radius: 8px;
+        background: #fff;
+        color: #1d1d1f;
+        height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+        cursor: pointer;
+    }
+
+    .logv-close {
+        width: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f5f5f7;
+        color: #555;
+        border-color: #e5e5ea;
+    }
+
+    .logv-close:hover {
+        background: #e5e5ea;
+        border-color: #e5e5ea;
+        color: #333;
+    }
+
+    .logv-live-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 99px;
+        background: #22c55e;
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+        animation: logvPulse 1.8s ease-in-out infinite;
+        cursor: pointer;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .logv-live-dot:hover {
+        transform: scale(1.12);
+    }
+
+    .logv-live-dot.off {
+        background: #d74242;
+        box-shadow: 0 0 0 4px rgba(215, 66, 66, 0.22);
+        animation: none;
+    }
+
+    .logv-live-text {
+        font-size: 12px;
+        color: #0f766e;
+        font-weight: 600;
+        user-select: none;
+    }
+
+    .logv-live-text.off {
+        color: #d74242;
+    }
+
+    @keyframes logvPulse {
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        50% {
+            transform: scale(0.85);
+            opacity: 0.7;
+        }
+    }
+
+    .logv-body {
+        flex: 1;
+        padding: 16px;
+        overflow-y: auto;
+        background: #fafbfc;
+    }
+
+    .logv-empty {
+        text-align: center;
+        color: #999;
+        margin-top: 80px;
+        font-size: 13px;
+    }
+
+    .logv-item {
+        background: #fff;
+        border: 1px solid #e9e9ef;
+        border-radius: 9px;
+        padding: 9px 10px;
+        margin-bottom: 7px;
+    }
+
+    .logv-line {
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    .logv-time {
+        flex: 0 0 154px;
+        font-size: 11px;
+        color: #6b7280;
+        font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+    }
+
+    .logv-level {
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 99px;
+        padding: 2px 7px;
+        line-height: 1.4;
+    }
+
+    .logv-level.debug {
+        background: #f3e8ff;
+        color: #7c3aed;
+    }
+
+    .logv-level.info {
+        background: #e0f2fe;
+        color: #2563eb;
+    }
+
+    .logv-level.warn {
+        background: #fff8e6;
+        color: #d97706;
+    }
+
+    .logv-level.error {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .logv-op {
+        font-size: 11px;
+        color: #0f766e;
+        background: #ecfeff;
+        border: 1px solid #ccfbf1;
+        border-radius: 99px;
+        padding: 2px 8px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .logv-cn {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        color: #1d1d1f;
+        line-height: 1.45;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @media (max-width: 768px) {
+        .logv-modal-card {
+            max-width: 95%;
+            height: 88vh;
+        }
+
+        .logv-header {
+            padding: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .logv-title-right {
+            margin-left: 4px;
+        }
+
+        .logv-actions {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .logv-line {
+            flex-wrap: wrap;
+            gap: 6px 8px;
+        }
+
+        .logv-time {
+            flex: 0 0 auto;
+        }
+
+        .logv-cn {
+            flex-basis: 100%;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    }
+</style>
+
+<div class="logv-modal-overlay" id="logViewerModal">
+    <div class="logv-modal-card">
+        <div class="logv-header">
+            <div class="logv-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#007aff;">
+                    <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                    <path d="M3 7l9 6 9-6"></path>
+                </svg>
+                最近日志中心
+                <div class="logv-title-right">
+                    <div class="logv-capsule logv-capsule-right" id="logViewerLimitCapsule">
+                        <button type="button" class="logv-capsule-item active" data-limit="200">200条</button>
+                        <button type="button" class="logv-capsule-item" data-limit="500">500条</button>
+                        <button type="button" class="logv-capsule-item" data-limit="1000">1000条</button>
+                    </div>
+                </div>
+            </div>
+            <div class="logv-actions">
+                <div class="logv-capsule logv-capsule-left" id="logViewerLevelFilter">
+                    <button type="button" class="logv-capsule-item active" data-level="all">全部</button>
+                    <button type="button" class="logv-capsule-item" data-level="debug">Debug</button>
+                    <button type="button" class="logv-capsule-item" data-level="info">Info</button>
+                    <button type="button" class="logv-capsule-item" data-level="warn">Warn</button>
+                    <button type="button" class="logv-capsule-item" data-level="error">Error</button>
+                </div>
+                <span class="logv-live-dot" id="logViewerLiveDot"></span>
+                <span class="logv-live-text" id="logViewerLiveText">实时更新</span>
+                <button class="logv-btn logv-close" onclick="closeLogViewerModal()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="logv-body" id="logViewerBody">
+            <div class="logv-empty">打开后将自动流式加载日志...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const logViewerModalEl = document.getElementById('logViewerModal');
+    const logViewerBodyEl = document.getElementById('logViewerBody');
+    const logViewerLevelFilterEl = document.getElementById('logViewerLevelFilter');
+    const logViewerLimitCapsuleEl = document.getElementById('logViewerLimitCapsule');
+    const logViewerLiveDotEl = document.getElementById('logViewerLiveDot');
+    const logViewerLiveTextEl = document.getElementById('logViewerLiveText');
+    const logViewerLevelButtons = Array.from(logViewerLevelFilterEl.querySelectorAll('[data-level]'));
+    const logViewerLimitButtons = Array.from(logViewerLimitCapsuleEl.querySelectorAll('[data-limit]'));
+
+    let logViewerStream = null;
+    let logViewerHasData = false;
+    let logViewerAllLogs = [];
+    let logViewerLevelFilter = 'all';
+    let logViewerLiveEnabled = true;
+    let logViewerLimit = '200';
+
+    logViewerModalEl.addEventListener('click', function (e) {
+        if (e.target === logViewerModalEl) closeLogViewerModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeLogViewerModal();
+        }
+    });
+
+    function openLogViewerModal() {
+        logViewerModalEl.classList.add('active');
+
+        const dropdown = document.querySelector('.dropdown-content');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+            setTimeout(() => { dropdown.style.display = ''; }, 100);
+        }
+
+        refreshLogViewerData();
+    }
+
+    function closeLogViewerModal() {
+        stopRecentLogsStream();
+        logViewerModalEl.classList.remove('active');
+    }
+
+    function escHTML(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function levelClass(level) {
+        const v = String(level || '').toLowerCase();
+        if (v.includes('error')) return 'error';
+        if (v.includes('warn')) return 'warn';
+        if (v.includes('debug')) return 'debug';
+        return 'info';
+    }
+
+    function setLogViewerLiveState(enabled) {
+        logViewerLiveEnabled = !!enabled;
+        logViewerLiveDotEl.classList.toggle('off', !logViewerLiveEnabled);
+        logViewerLiveTextEl.textContent = logViewerLiveEnabled ? '实时更新' : '停止更新';
+        logViewerLiveTextEl.classList.toggle('off', !logViewerLiveEnabled);
+    }
+
+    function setCapsuleExpanded(capsuleEl, expanded) {
+        capsuleEl.classList.toggle('expanded', !!expanded);
+    }
+
+    function collapseAllCapsules() {
+        setCapsuleExpanded(logViewerLevelFilterEl, false);
+        setCapsuleExpanded(logViewerLimitCapsuleEl, false);
+    }
+
+    function renderRecentLogs(logs) {
+        if (!Array.isArray(logs) || !logs.length) {
+            logViewerBodyEl.innerHTML = `<div class="logv-empty">暂无日志数据</div>`;
+            logViewerHasData = false;
+            return;
+        }
+
+        const levelFilter = String(logViewerLevelFilter || 'all').toLowerCase();
+        const filteredLogs = levelFilter === 'all'
+            ? logs
+            : logs.filter(item => levelClass(item.level) === levelFilter);
+
+        if (!filteredLogs.length) {
+            logViewerBodyEl.innerHTML = `<div class="logv-empty">当前筛选条件下暂无日志</div>`;
+            logViewerHasData = false;
+            return;
+        }
+
+        logViewerBodyEl.innerHTML = filteredLogs.map(item => {
+            const cls = levelClass(item.level);
+            const levelCN = escHTML(item.level_cn || item.level || '信息');
+            const operation = escHTML(item.operation || '系统日志');
+            const msg = escHTML(item.message_cn || item.message || '--');
+            return `
+                <div class="logv-item">
+                    <div class="logv-line">
+                        <span class="logv-time">${escHTML(item.time || '--')}</span>
+                        <span class="logv-level ${cls}">${levelCN}</span>
+                        <span class="logv-op">${operation}</span>
+                        <span class="logv-cn" title="${msg}">${msg}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        logViewerHasData = true;
+    }
+
+    async function fetchRecentLogsSnapshot() {
+        const limit = logViewerLimit || '200';
+        if (!logViewerHasData) {
+            logViewerBodyEl.innerHTML = `<div class="logv-empty">正在加载日志快照...</div>`;
+        }
+        setLogViewerLiveState(false);
+
+        try {
+            const res = await fetch(`/api/recent-logs?limit=${encodeURIComponent(limit)}`);
+            const data = await res.json();
+
+            if (!data || data.status !== 'success') {
+                const msg = (data && data.message) ? escHTML(data.message) : '日志获取失败';
+                logViewerBodyEl.innerHTML = `<div class="logv-empty" style="color:#d74242;">${msg}</div>`;
+                return;
+            }
+
+            logViewerAllLogs = Array.isArray(data.logs) ? data.logs : [];
+            renderRecentLogs(logViewerAllLogs);
+        } catch (e) {
+            logViewerBodyEl.innerHTML = `<div class="logv-empty" style="color:#d74242;">网络请求失败，请稍后重试</div>`;
+        }
+    }
+
+    function stopRecentLogsStream() {
+        if (logViewerStream) {
+            logViewerStream.close();
+            logViewerStream = null;
+        }
+    }
+
+    function startRecentLogsStream() {
+        stopRecentLogsStream();
+
+        const limit = logViewerLimit || '200';
+        if (!logViewerHasData) {
+            logViewerBodyEl.innerHTML = `<div class="logv-empty">正在连接实时日志流...</div>`;
+        }
+        setLogViewerLiveState(true);
+
+        const es = new EventSource(`/api/recent-logs/stream?limit=${encodeURIComponent(limit)}`);
+        logViewerStream = es;
+
+        es.addEventListener('logs', function (evt) {
+            try {
+                const data = JSON.parse(evt.data || '{}');
+                if (!data || data.status !== 'success') {
+                    const msg = (data && data.message) ? escHTML(data.message) : '日志流读取失败';
+                    logViewerBodyEl.innerHTML = `<div class="logv-empty" style="color:#d74242;">${msg}</div>`;
+                    return;
+                }
+                logViewerAllLogs = Array.isArray(data.logs) ? data.logs : [];
+                renderRecentLogs(logViewerAllLogs);
+            } catch (e) {
+            }
+        });
+
+        es.addEventListener('error', function () {});
+    }
+
+    function refreshLogViewerData() {
+        if (logViewerLiveEnabled) {
+            startRecentLogsStream();
+            return;
+        }
+
+        stopRecentLogsStream();
+        fetchRecentLogsSnapshot();
+    }
+
+    logViewerLiveDotEl.addEventListener('click', function () {
+        if (!logViewerModalEl.classList.contains('active')) {
+            return;
+        }
+
+        setLogViewerLiveState(!logViewerLiveEnabled);
+        logViewerHasData = false;
+        refreshLogViewerData();
+    });
+
+    logViewerLevelButtons.forEach(btn => {
+        btn.addEventListener('click', function () {
+            if (!logViewerLevelFilterEl.classList.contains('expanded')) {
+                setCapsuleExpanded(logViewerLevelFilterEl, true);
+                setCapsuleExpanded(logViewerLimitCapsuleEl, false);
+                return;
+            }
+
+            const level = String(btn.dataset.level || 'all').toLowerCase();
+            logViewerLevelFilter = level;
+
+            logViewerLevelButtons.forEach(x => x.classList.toggle('active', x === btn));
+            renderRecentLogs(logViewerAllLogs);
+            setCapsuleExpanded(logViewerLevelFilterEl, false);
+        });
+    });
+
+    logViewerLimitButtons.forEach(btn => {
+        btn.addEventListener('click', function () {
+            if (!logViewerLimitCapsuleEl.classList.contains('expanded')) {
+                setCapsuleExpanded(logViewerLimitCapsuleEl, true);
+                setCapsuleExpanded(logViewerLevelFilterEl, false);
+                return;
+            }
+
+            const nextLimit = String(btn.dataset.limit || '200');
+            const changed = logViewerLimit !== nextLimit;
+            logViewerLimit = nextLimit;
+
+            logViewerLimitButtons.forEach(x => x.classList.toggle('active', x === btn));
+            setCapsuleExpanded(logViewerLimitCapsuleEl, false);
+
+            if (changed && logViewerModalEl.classList.contains('active')) {
+                logViewerHasData = false;
+                refreshLogViewerData();
+            }
+        });
+    });
+
+    logViewerLevelFilterEl.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-level]')) {
+            setCapsuleExpanded(logViewerLevelFilterEl, !logViewerLevelFilterEl.classList.contains('expanded'));
+            setCapsuleExpanded(logViewerLimitCapsuleEl, false);
+        }
+    });
+
+    logViewerLimitCapsuleEl.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-limit]')) {
+            setCapsuleExpanded(logViewerLimitCapsuleEl, !logViewerLimitCapsuleEl.classList.contains('expanded'));
+            setCapsuleExpanded(logViewerLevelFilterEl, false);
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('#logViewerModal .logv-capsule')) {
+            collapseAllCapsules();
+        }
+    });
+
+    setLogViewerLiveState(true);
+    collapseAllCapsules();
+</script>
+{{end}}

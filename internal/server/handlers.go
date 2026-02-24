@@ -1706,6 +1706,110 @@ func apiGetCertLogs(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, "success", service.GetCertLogs())
 }
 
+// apiGetRecentLogs 获取最近系统日志（含中文解读）
+func apiGetRecentLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	limit := 120
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	logs, err := service.GetRecentLogs(limit)
+	if err != nil {
+		logger.Log.Error("读取最近日志失败", "error", err)
+		sendJSON(w, "error", "读取日志失败，请检查日志文件是否存在")
+		return
+	}
+
+	sendJSON(w, "success", map[string]interface{}{
+		"logs": logs,
+	})
+}
+
+// apiStreamRecentLogs 通过 SSE 持续推送最近日志（含中文解读）
+func apiStreamRecentLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming Unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	limit := 120
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	ctx := r.Context()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	lastFingerprint := ""
+	sendLogs := func(force bool) {
+		logs, err := service.GetRecentLogs(limit)
+		if err != nil {
+			payload, _ := json.Marshal(map[string]interface{}{
+				"status":  "error",
+				"message": "读取日志失败，请检查日志文件是否存在",
+			})
+			fmt.Fprintf(w, "event: logs\ndata: %s\n\n", payload)
+			flusher.Flush()
+			return
+		}
+
+		fingerprint := buildRecentLogFingerprint(logs)
+		if !force && fingerprint == lastFingerprint {
+			return
+		}
+
+		payload, _ := json.Marshal(map[string]interface{}{
+			"status": "success",
+			"logs":   logs,
+		})
+		fmt.Fprintf(w, "event: logs\ndata: %s\n\n", payload)
+		flusher.Flush()
+		lastFingerprint = fingerprint
+	}
+
+	sendLogs(true)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sendLogs(false)
+			fmt.Fprint(w, ": ping\n\n")
+			flusher.Flush()
+		}
+	}
+}
+
+func buildRecentLogFingerprint(logs []service.RecentLogEntry) string {
+	if len(logs) == 0 {
+		return "empty"
+	}
+	head := logs[0]
+	return fmt.Sprintf("%d|%s|%s|%s", len(logs), head.Time, head.Level, head.Raw)
+}
+
 // ------------------- [机场订阅相关 API] -------------------
 
 // apiAirportList 获取订阅源列表
