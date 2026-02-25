@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -101,9 +102,11 @@ func (rt *Runtime) Run() error {
 	pushTicker := time.NewTicker(time.Duration(rt.cfg.WSPushIntervalSec) * time.Second)
 	snapshotTicker := time.NewTicker(time.Duration(rt.cfg.SnapshotIntervalSec) * time.Second)
 	stateSaveTicker := time.NewTicker(60 * time.Second) // 每分钟持久化状态
+	memoryTrimTicker := time.NewTicker(2 * time.Minute) // 定期归还未使用内存给 OS
 	defer pushTicker.Stop()
 	defer snapshotTicker.Stop()
 	defer stateSaveTicker.Stop()
+	defer memoryTrimTicker.Stop()
 
 	// 启动日志（仅输出一条）
 	log.Printf("[Agent] nodectl-agent %s 已启动 (install_id=%s, iface=%s, push=%ds, snapshot=%ds)",
@@ -179,6 +182,10 @@ func (rt *Runtime) Run() error {
 			if err := rt.state.Save(); err != nil {
 				rt.logDedup.LogOrSuppress("state:save", "[Agent] 持久化状态失败: %v", err)
 			}
+
+		case <-memoryTrimTicker.C:
+			// 在低内存模式下主动归还空闲页，降低 RSS 常驻峰值。
+			debug.FreeOSMemory()
 		}
 	}
 }

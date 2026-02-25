@@ -1498,7 +1498,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 Environment=GOMEMLIMIT=5MiB
-Environment=GOGC=20
+Environment=GOGC=10
 ExecStart=/usr/local/bin/nodectl-agent --config /etc/nodectl-agent/config.json
 Restart=always
 RestartSec=5

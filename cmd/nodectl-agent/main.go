@@ -30,6 +30,12 @@ func main() {
 		debug.SetMemoryLimit(5 << 20) // 5 MiB
 	}
 
+	// 设置 GOGC（如果环境变量未覆盖，则使用更激进的 10）
+	// 说明：更小的 GOGC 会更频繁 GC，以换取更低内存占用。
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(10)
+	}
+
 	// 初始化自动更新器 + 崩溃循环检测
 	updater, err := agent.NewUpdater()
 	if err != nil {
