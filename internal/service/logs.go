@@ -484,6 +484,21 @@ func enrichLogMessageWithContext(messageCN, rawMsg string, attrs map[string]stri
 		return fmt.Sprintf("节点 %s；失败协议 %s；原因 %s", nodeName, protocol, reason)
 	}
 
+	// 对于包含"失败"的消息，附加 error 属性以便前端展示具体失败原因
+	errAttr := strings.TrimSpace(attrs["error"])
+	if errAttr != "" && strings.Contains(rawMsg, "失败") {
+		base := strings.TrimSpace(messageCN)
+		if base == "" {
+			base = rawMsg
+		}
+		if !strings.Contains(base, errAttr) {
+			if ip != "" {
+				return fmt.Sprintf("%s；错误: %s；IP: %s", base, errAttr, ip)
+			}
+			return fmt.Sprintf("%s；错误: %s", base, errAttr)
+		}
+	}
+
 	if ip == "" {
 		return messageCN
 	}

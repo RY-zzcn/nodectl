@@ -355,6 +355,53 @@
         border-color: #b3d7ff;
     }
 
+    /* 敏感令牌输入框 + 确认按钮 */
+    .sys-token-group {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .sys-token-group .sys-input {
+        flex: 1;
+    }
+
+    .btn-sys-token-confirm {
+        background: #f0f0f5;
+        border: 1px solid #d1d1d6;
+        color: #999;
+        padding: 0 12px;
+        height: 38px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: not-allowed;
+        transition: all 0.2s;
+        white-space: nowrap;
+        flex-shrink: 0;
+        pointer-events: none;
+    }
+
+    .btn-sys-token-confirm.active {
+        background: #007aff;
+        border-color: #007aff;
+        color: #fff;
+        cursor: pointer;
+        pointer-events: auto;
+        box-shadow: 0 1px 4px rgba(0,122,255,0.25);
+    }
+
+    .btn-sys-token-confirm.active:hover {
+        background: #0066d6;
+    }
+
+    .btn-sys-token-confirm.saved {
+        background: #34c759;
+        border-color: #34c759;
+        color: #fff;
+        pointer-events: none;
+    }
+
     /* 开关组件 */
     .sys-pref-row {
         display: flex;
@@ -1320,9 +1367,14 @@
 
                     <div class="sys-field">
                         <label class="sys-label">Telegram Bot Token</label>
-                        <input type="password" id="sys_tg_bot_token" class="sys-input"
-                            placeholder="例如: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz" oninput="triggerSysAutoSave()">
-                        <div class="sys-desc">通过 BotFather 创建机器人获取的 Token。</div>
+                        <div class="sys-token-group">
+                            <input type="password" id="sys_tg_bot_token" class="sys-input"
+                                placeholder="例如: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz"
+                                oninput="onTokenInputChange('sys_tg_bot_token', 'btn_tg_token_confirm')">
+                            <button type="button" id="btn_tg_token_confirm" class="btn-sys-token-confirm"
+                                onclick="confirmTokenSave('sys_tg_bot_token', 'btn_tg_token_confirm')">确认</button>
+                        </div>
+                        <div class="sys-desc">通过 BotFather 创建机器人获取的 Token。修改后需点击「确认」按钮生效。</div>
                     </div>
 
                     <div class="sys-field">
@@ -1432,8 +1484,13 @@
                             </div>
                             <div class="sys-field">
                                 <label class="sys-label">CF API 令牌 (API Token)</label>
-                                <input type="password" id="sys_cf_api_key" class="sys-input"
-                                    placeholder="输入具备 DNS 编辑权限的 API Token" oninput="triggerSysAutoSave()">
+                                <div class="sys-token-group">
+                                    <input type="password" id="sys_cf_api_key" class="sys-input"
+                                        placeholder="输入具备 DNS 编辑权限的 API Token"
+                                        oninput="onTokenInputChange('sys_cf_api_key', 'btn_cf_key_confirm')">
+                                    <button type="button" id="btn_cf_key_confirm" class="btn-sys-token-confirm"
+                                        onclick="confirmTokenSave('sys_cf_api_key', 'btn_cf_key_confirm')">确认</button>
+                                </div>
                             </div>
                             <div class="sys-field">
                                 <label class="sys-label">证书绑定域名</label>
@@ -2045,6 +2102,8 @@
 
                 // TG Bot 配置
                 document.getElementById('sys_tg_bot_token').value = data.tg_bot_token || '';
+                document.getElementById('sys_tg_bot_token').dataset.original = data.tg_bot_token || '';
+                resetTokenConfirmBtn('btn_tg_token_confirm');
                 document.getElementById('sys_tg_bot_enabled').checked = (data.tg_bot_enabled === 'true');
                 document.getElementById('sys_tg_bot_register_commands').checked = (data.tg_bot_register_commands === 'true');
 
@@ -2071,6 +2130,8 @@
 
                 document.getElementById('sys_cf_email').value = data.cf_email || '';
                 document.getElementById('sys_cf_api_key').value = data.cf_api_key || '';
+                document.getElementById('sys_cf_api_key').dataset.original = data.cf_api_key || '';
+                resetTokenConfirmBtn('btn_cf_key_confirm');
                 document.getElementById('sys_cf_domain').value = data.cf_domain || '';
                 // ✨ 新增：读取自动续期状态 (默认开启)
                 document.getElementById('sys_cf_auto_renew').checked = (data.cf_auto_renew !== 'false');
@@ -2166,6 +2227,73 @@
     }
 
     let sysAutoSaveTimer = null;
+
+    // ===== 敏感令牌输入框：手动确认保存逻辑 =====
+    function resetTokenConfirmBtn(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.classList.remove('active', 'saved');
+        btn.textContent = '确认';
+    }
+
+    function onTokenInputChange(inputId, btnId) {
+        const input = document.getElementById(inputId);
+        const btn = document.getElementById(btnId);
+        if (!input || !btn) return;
+        const current = input.value.trim();
+        const original = input.dataset.original || '';
+        // 只有实际修改了内容才激活按钮
+        if (current !== original && current !== '') {
+            btn.classList.add('active');
+            btn.classList.remove('saved');
+            btn.textContent = '确认';
+        } else {
+            btn.classList.remove('active', 'saved');
+            btn.textContent = '确认';
+        }
+    }
+
+    async function confirmTokenSave(inputId, btnId) {
+        const input = document.getElementById(inputId);
+        const btn = document.getElementById(btnId);
+        if (!input || !btn) return;
+        const val = input.value.trim();
+        if (!val || val === input.dataset.original) return;
+
+        // 确定对应的 key
+        let key = '';
+        if (inputId === 'sys_tg_bot_token') key = 'tg_bot_token';
+        else if (inputId === 'sys_cf_api_key') key = 'cf_api_key';
+        else return;
+
+        btn.classList.remove('active');
+        btn.textContent = '保存中...';
+
+        try {
+            const payload = {};
+            payload[key] = val;
+            const res = await fetch('/api/update-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                input.dataset.original = val;
+                btn.classList.add('saved');
+                btn.textContent = '✓ 已保存';
+                setTimeout(() => { resetTokenConfirmBtn(btnId); }, 2000);
+            } else {
+                btn.classList.add('active');
+                btn.textContent = '失败';
+                setTimeout(() => { btn.textContent = '确认'; }, 1500);
+            }
+        } catch (e) {
+            btn.classList.add('active');
+            btn.textContent = '失败';
+            setTimeout(() => { btn.textContent = '确认'; }, 1500);
+        }
+    }
+
     function triggerSysAutoSave() {
         if (!document.getElementById('systemSettingsModal').classList.contains('active')) {
             return;
@@ -2194,11 +2322,9 @@
                 "sys_log_level": document.getElementById('sys_log_level').value,
                 "sys_force_http": document.getElementById('sys_force_http').checked ? 'true' : 'false',
                 "cf_email": document.getElementById('sys_cf_email').value,
-                "cf_api_key": document.getElementById('sys_cf_api_key').value,
                 "cf_domain": document.getElementById('sys_cf_domain').value,
                 "cf_auto_renew": document.getElementById('sys_cf_auto_renew').checked ? 'true' : 'false', // ✨ 新增
                 "tg_bot_enabled": document.getElementById('sys_tg_bot_enabled').checked ? 'true' : 'false',
-                "tg_bot_token": document.getElementById('sys_tg_bot_token').value.trim(),
                 "tg_bot_whitelist": tgBotWhitelistItems.filter(item => item.id.trim() !== '').map(item => {
                     const id = item.id.trim().replace(/[,=]/g, '');
                     const remark = item.remark.trim().replace(/,/g, '');
