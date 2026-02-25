@@ -220,6 +220,14 @@ func cleanupExpiredLoginAttemptsLocked(now time.Time) {
 	}
 }
 
+func compactUserAgent(ua string) string {
+	ua = strings.TrimSpace(ua)
+	if len(ua) > 160 {
+		return ua[:160] + "..."
+	}
+	return ua
+}
+
 // getClientIP 从请求中提取真实客户端 IP（支持反向代理场景）
 func getClientIP(r *http.Request) string {
 	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
@@ -255,6 +263,8 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 					"reason", "请求缺少 nodectl_token Cookie",
 					"ip", clientIP,
 					"path", reqPath,
+					"method", r.Method,
+					"user_agent", compactUserAgent(r.UserAgent()),
 				)
 			}
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -269,6 +279,7 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 				"error", err,
 				"ip", clientIP,
 				"path", reqPath,
+				"method", r.Method,
 			)
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
@@ -296,6 +307,8 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 				"error", err,
 				"ip", clientIP,
 				"path", reqPath,
+				"method", r.Method,
+				"user_agent", compactUserAgent(r.UserAgent()),
 			)
 
 			http.SetCookie(w, &http.Cookie{

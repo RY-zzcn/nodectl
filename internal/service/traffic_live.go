@@ -183,6 +183,34 @@ func (h *TrafficHub) resolveNodeUUID(installID string) string {
 	return node.UUID
 }
 
+func (h *TrafficHub) resolveNodeNameByInstallID(installID string) string {
+	installID = strings.TrimSpace(installID)
+	if installID == "" {
+		return ""
+	}
+
+	var node database.NodePool
+	if err := database.DB.Select("name").Where("install_id = ?", installID).First(&node).Error; err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(node.Name)
+}
+
+func (h *TrafficHub) resolveNodeNameByIP(ip string) string {
+	ip = strings.TrimSpace(strings.Trim(ip, "[]"))
+	if ip == "" {
+		return ""
+	}
+
+	var node database.NodePool
+	if err := database.DB.Select("name").Where("ipv4 = ? OR ipv6 = ?", ip, ip).First(&node).Error; err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(node.Name)
+}
+
 // ============================================================
 //  Agent 上报处理 (WS Server Handler)
 // ============================================================
@@ -204,7 +232,7 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "connection closed")
 
-	logger.Log.Info("Agent WS 已连接", "ip", clientIP)
+	logger.Log.Info("Agent WS 握手成功，等待身份识别", "ip", clientIP)
 
 	ctx := r.Context()
 
@@ -214,11 +242,15 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
+			nodeName := ""
+			if agentInstallID != "" {
+				nodeName = hub.resolveNodeNameByInstallID(agentInstallID)
+			}
 			// 正常关闭或网络断开
 			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-				logger.Log.Info("Agent WS 正常断开", "ip", clientIP, "install_id", agentInstallID)
+				logger.Log.Info("Agent WS 正常断开", "ip", clientIP, "install_id", agentInstallID, "node_name", nodeName)
 			} else {
-				logger.Log.Warn("Agent WS 读取异常", "error", err, "ip", clientIP, "install_id", agentInstallID)
+				logger.Log.Warn("Agent WS 读取异常", "error", err, "ip", clientIP, "install_id", agentInstallID, "node_name", nodeName)
 			}
 			// 注销 Agent 连接
 			if agentInstallID != "" {
@@ -279,12 +311,26 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 			hub.agentMu.Lock()
 			hub.agentConns[installID] = conn
 			hub.agentMu.Unlock()
+
+			nodeName := hub.resolveNodeNameByInstallID(installID)
+			if nodeName == "" {
+				nodeName = hub.resolveNodeNameByIP(clientIP)
+			}
+			logger.Log.Info("Agent WS 已连接",
+				"ip", clientIP,
+				"install_id", installID,
+				"node_name", nodeName,
+			)
 		}
 
 		// 解析 node_uuid
 		nodeUUID := hub.resolveNodeUUID(installID)
 		if nodeUUID == "" {
-			logger.Log.Warn("Agent WS 未知节点", "install_id", installID, "ip", clientIP)
+			logger.Log.Warn("Agent WS 未知节点",
+				"install_id", installID,
+				"ip", clientIP,
+				"node_name_by_ip", hub.resolveNodeNameByIP(clientIP),
+			)
 			continue
 		}
 
@@ -313,21 +359,27 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 			if msg.AgentVersion != "" {
 				go func(iid, newVer string) {
 					var node database.NodePool
-					if err := database.DB.Select("agent_version").Where("install_id = ?", iid).First(&node).Error; err != nil {
+					if err := database.DB.Select("name", "agent_version").Where("install_id = ?", iid).First(&node).Error; err != nil {
 						return
 					}
 					oldVer := node.AgentVersion
+					nodeName := strings.TrimSpace(node.Name)
+					if nodeName == "" {
+						nodeName = "unknown"
+					}
 					if oldVer != newVer {
 						database.DB.Model(&database.NodePool{}).Where("install_id = ?", iid).Update("agent_version", newVer)
 						if oldVer == "" {
 							logger.Log.Info("Agent 版本已记录",
 								"event", "agent_version_init",
 								"install_id", iid,
+								"node_name", nodeName,
 								"agent_version", newVer)
 						} else {
 							logger.Log.Info("Agent 版本已更新",
 								"event", "agent_auto_updated",
 								"install_id", iid,
+								"node_name", nodeName,
 								"old_version", oldVer,
 								"new_version", newVer)
 						}

@@ -387,6 +387,60 @@ func isMySubscriptionChange(changesRaw string) bool {
 func enrichLogMessageWithContext(messageCN, rawMsg string, attrs map[string]string) string {
 	ip := strings.TrimSpace(attrs["ip"])
 
+	if strings.Contains(rawMsg, "未授权访问拦截") {
+		reason := strings.TrimSpace(attrs["reason"])
+		path := strings.TrimSpace(attrs["path"])
+		method := strings.TrimSpace(attrs["method"])
+		userAgent := strings.TrimSpace(attrs["user_agent"])
+
+		parts := make([]string, 0, 6)
+		parts = append(parts, "未授权访问拦截")
+		if reason != "" {
+			parts = append(parts, "原因: "+reason)
+		}
+		if method != "" {
+			parts = append(parts, "方法: "+method)
+		}
+		if path != "" {
+			parts = append(parts, "路径: "+path)
+		}
+		if userAgent != "" {
+			parts = append(parts, "UA: "+userAgent)
+		}
+		if ip != "" {
+			parts = append(parts, "IP: "+ip)
+		}
+
+		return strings.Join(parts, "；")
+	}
+
+	if strings.Contains(rawMsg, "HTTP 服务告警") {
+		reason := strings.TrimSpace(attrs["reason"])
+		hint := strings.TrimSpace(attrs["security_hint"])
+		method := strings.TrimSpace(attrs["method"])
+		path := strings.TrimSpace(attrs["path"])
+
+		parts := make([]string, 0, 7)
+		parts = append(parts, "HTTP 服务告警")
+		if reason != "" {
+			parts = append(parts, "原因: "+reason)
+		}
+		if method != "" {
+			parts = append(parts, "方法: "+method)
+		}
+		if path != "" {
+			parts = append(parts, "路径: "+path)
+		}
+		if hint != "" {
+			parts = append(parts, "说明: "+hint)
+		}
+		if ip != "" {
+			parts = append(parts, "IP: "+ip)
+		}
+
+		return strings.Join(parts, "；")
+	}
+
 	// 接收到节点协议上报：显示具体协议名称
 	if strings.Contains(rawMsg, "接收到节点协议上报") {
 		nodeName := strings.TrimSpace(attrs["name"])
@@ -519,6 +573,24 @@ func enrichLogMessageWithContext(messageCN, rawMsg string, attrs map[string]stri
 
 	// Agent WS 相关日志追加 IP
 	if strings.HasPrefix(rawMsg, "Agent WS ") {
+		nodeName := strings.TrimSpace(attrs["node_name"])
+		if nodeName != "" {
+			if strings.Contains(messageCN, "节点") {
+				if strings.Contains(messageCN, "IP:") {
+					return messageCN
+				}
+				if ip != "" {
+					return fmt.Sprintf("%s；IP: %s", strings.TrimSpace(messageCN), ip)
+				}
+				return messageCN
+			}
+
+			if ip != "" {
+				return fmt.Sprintf("节点 %s；%s；IP: %s", nodeName, strings.TrimSpace(messageCN), ip)
+			}
+			return fmt.Sprintf("节点 %s；%s", nodeName, strings.TrimSpace(messageCN))
+		}
+
 		if strings.Contains(messageCN, "IP:") {
 			return messageCN
 		}

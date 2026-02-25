@@ -27,17 +27,35 @@ type serverLogWriter struct{}
 // serverLogIPRe 匹配 Go HTTP 内部错误日志中的 IP:Port 格式
 var serverLogIPRe = regexp.MustCompile(`(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+|\[?[0-9a-fA-F:]+\]?:\d+)`)
 
+func classifyHTTPServerWarning(msg string) (reason, securityHint string) {
+	lower := strings.ToLower(msg)
+
+	switch {
+	case strings.Contains(lower, "tls handshake error") && strings.Contains(lower, "client sent an http request to an https server"):
+		return "客户端向 HTTPS 端口发送了 HTTP 明文请求", "常见于端口探测或客户端协议配置错误，不代表已绕过登录鉴权"
+	case strings.Contains(lower, "tls handshake error") && strings.Contains(lower, "first record does not look like a tls handshake"):
+		return "收到非 TLS 握手数据", "常见于扫描器探测或客户端连错端口"
+	case strings.Contains(lower, "tls handshake error"):
+		return "TLS 握手失败", "可能是扫描、证书不受信任或协议不匹配"
+	case strings.Contains(lower, "malformed http request"):
+		return "收到畸形 HTTP 请求", "常见于扫描器或异常客户端"
+	default:
+		return "HTTP 连接异常", "请结合 message 字段排查"
+	}
+}
+
 func (w *serverLogWriter) Write(p []byte) (n int, err error) {
 	msg := strings.TrimSpace(string(p))
 	if msg != "" {
+		reason, hint := classifyHTTPServerWarning(msg)
 		ip := ""
 		if m := serverLogIPRe.FindString(msg); m != "" {
 			ip = m
 		}
 		if ip != "" {
-			logger.Log.Warn("HTTP 服务告警", "message", msg, "ip", ip)
+			logger.Log.Warn("HTTP 服务告警", "message", msg, "reason", reason, "security_hint", hint, "ip", ip)
 		} else {
-			logger.Log.Warn("HTTP 服务告警", "message", msg)
+			logger.Log.Warn("HTTP 服务告警", "message", msg, "reason", reason, "security_hint", hint)
 		}
 	}
 	return len(p), nil
