@@ -2867,8 +2867,22 @@ func apiNodeControlResetLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 下发命令
-	result, err := service.DispatchCommandToNode(node.InstallID, "reset-links", nil, 30*time.Second)
+	// 从数据库中已有链接提取协议列表
+	protocols := make([]string, 0, len(node.Links))
+	for proto := range node.Links {
+		protocols = append(protocols, proto)
+	}
+	if len(protocols) == 0 {
+		sendJSON(w, "error", "该节点没有已知协议信息，无法重置")
+		return
+	}
+
+	// 将协议列表作为 payload 下发给 agent
+	payload := map[string]interface{}{
+		"protocols": protocols,
+	}
+
+	result, err := service.DispatchCommandToNode(node.InstallID, "reset-links", payload, 120*time.Second)
 	if err != nil {
 		logger.Log.Error("重置链接命令失败", "uuid", req.UUID, "error", err)
 		sendJSON(w, "error", fmt.Sprintf("命令执行失败: %v", err))
@@ -2913,8 +2927,23 @@ func apiNodeControlReinstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 从数据库中已有链接提取协议列表
+	protocols := make([]string, 0, len(node.Links))
+	for proto := range node.Links {
+		protocols = append(protocols, proto)
+	}
+	if len(protocols) == 0 {
+		sendJSON(w, "error", "该节点没有已知协议信息，无法重装")
+		return
+	}
+
+	// 将协议列表作为 payload 下发给 agent
+	payload := map[string]interface{}{
+		"protocols": protocols,
+	}
+
 	// 下发命令（重装可能比较慢，给 120 秒超时）
-	result, err := service.DispatchCommandToNode(node.InstallID, "reinstall-singbox", nil, 120*time.Second)
+	result, err := service.DispatchCommandToNode(node.InstallID, "reinstall-singbox", payload, 120*time.Second)
 	if err != nil {
 		logger.Log.Error("重装 sing-box 命令失败", "uuid", req.UUID, "error", err)
 		sendJSON(w, "error", fmt.Sprintf("命令执行失败: %v", err))

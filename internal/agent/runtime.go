@@ -3,11 +3,13 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -225,9 +227,9 @@ func (rt *Runtime) handleCommand(cmd ServerCommand, reply func(CommandResult)) {
 
 	switch cmd.Action {
 	case "reset-links":
-		rt.executeResetLinks(reply)
+		rt.executeResetLinks(cmd, reply)
 	case "reinstall-singbox":
-		rt.executeReinstallSingbox(reply)
+		rt.executeReinstallSingbox(cmd, reply)
 	default:
 		reply(CommandResult{
 			Type:    "result",
@@ -237,15 +239,52 @@ func (rt *Runtime) handleCommand(cmd ServerCommand, reply func(CommandResult)) {
 	}
 }
 
-// executeResetLinks 重置节点链接（重新生成 sing-box 配置并重启服务）
-func (rt *Runtime) executeResetLinks(reply func(CommandResult)) {
+// deriveScriptURL 从 ws_url 推导安装脚本 URL
+func (rt *Runtime) deriveScriptURL() string {
+	// ws_url 形如 wss://domain:port/api/callback/traffic/ws
+	panelURL := rt.cfg.WSURL
+	panelURL = strings.Replace(panelURL, "wss://", "https://", 1)
+	panelURL = strings.Replace(panelURL, "ws://", "http://", 1)
+	if idx := strings.Index(panelURL, "/api/"); idx > 0 {
+		panelURL = panelURL[:idx]
+	}
+	return fmt.Sprintf("%s/api/public/install-script?id=%s", panelURL, rt.cfg.InstallID)
+}
+
+// executeResetLinks 重置节点链接
+// 后端下发 payload 中包含 {"protocols": ["ss", "hy2", ...]}，作为安装脚本的 CLI 参数
+func (rt *Runtime) executeResetLinks(cmd ServerCommand, reply func(CommandResult)) {
 	reply(CommandResult{
 		Type:  "progress",
-		Stage: "正在执行重置链接...",
+		Stage: "正在重新执行安装脚本...",
 	})
 
-	// 调用 sb 管理脚本重新安装/配置
-	out, err := exec.Command("/bin/sh", "-c", "sb reinstall 2>&1").CombinedOutput()
+	// 解析 payload 中的协议列表
+	var payload struct {
+		Protocols []string `json:"protocols"`
+	}
+	if len(cmd.Payload) > 0 {
+		if err := json.Unmarshal(cmd.Payload, &payload); err != nil {
+			log.Printf("[Agent] 解析 payload 失败: %v", err)
+		}
+	}
+	if len(payload.Protocols) == 0 {
+		reply(CommandResult{
+			Type:    "result",
+			Status:  "error",
+			Message: "未收到协议列表，无法重置",
+		})
+		return
+	}
+
+	scriptURL := rt.deriveScriptURL()
+	protoArgs := strings.Join(payload.Protocols, " ")
+
+	// curl 下载脚本 | bash -s -- ss hy2 vless ...
+	shellCmd := fmt.Sprintf(`curl -fsSL "%s" | bash -s -- %s`, scriptURL, protoArgs)
+	log.Printf("[Agent] 执行重置链接: %s", shellCmd)
+
+	out, err := exec.Command("/bin/sh", "-c", shellCmd).CombinedOutput()
 	if err != nil {
 		reply(CommandResult{
 			Type:    "result",
@@ -258,18 +297,41 @@ func (rt *Runtime) executeResetLinks(reply func(CommandResult)) {
 	reply(CommandResult{
 		Type:    "result",
 		Status:  "ok",
-		Message: "链接已重置",
+		Message: fmt.Sprintf("链接已重置\n%s", string(out)),
 	})
 }
 
-// executeReinstallSingbox 重新安装 sing-box
-func (rt *Runtime) executeReinstallSingbox(reply func(CommandResult)) {
+// executeReinstallSingbox 重新安装 sing-box（复用安装脚本，同样从 payload 读取协议）
+func (rt *Runtime) executeReinstallSingbox(cmd ServerCommand, reply func(CommandResult)) {
 	reply(CommandResult{
 		Type:  "progress",
 		Stage: "正在重新安装 sing-box...",
 	})
 
-	out, err := exec.Command("/bin/sh", "-c", "sb reinstall 2>&1").CombinedOutput()
+	var payload struct {
+		Protocols []string `json:"protocols"`
+	}
+	if len(cmd.Payload) > 0 {
+		if err := json.Unmarshal(cmd.Payload, &payload); err != nil {
+			log.Printf("[Agent] 解析 payload 失败: %v", err)
+		}
+	}
+	if len(payload.Protocols) == 0 {
+		reply(CommandResult{
+			Type:    "result",
+			Status:  "error",
+			Message: "未收到协议列表，无法重新安装",
+		})
+		return
+	}
+
+	scriptURL := rt.deriveScriptURL()
+	protoArgs := strings.Join(payload.Protocols, " ")
+
+	shellCmd := fmt.Sprintf(`curl -fsSL "%s" | bash -s -- %s`, scriptURL, protoArgs)
+	log.Printf("[Agent] 执行重装: %s", shellCmd)
+
+	out, err := exec.Command("/bin/sh", "-c", shellCmd).CombinedOutput()
 	if err != nil {
 		reply(CommandResult{
 			Type:    "result",
