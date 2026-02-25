@@ -511,14 +511,16 @@ func QueryTrafficSeries(opts TrafficSeriesOptions) (*TrafficSeriesResult, error)
 		}, nil
 	}
 
-	aggByHour := make(map[time.Time]hourlyAgg, hours+2)
+	// 使用 HourKey 整数（存储时基于本地时间计算）作为 map key，
+	// 避免 SQLite 返回 UTC 时区的 ReportedAt 与本地时间 ts 比较失配导致所有桶为零。
+	aggByHour := make(map[int]hourlyAgg, hours+2)
 	prevUp := baselineUp
 	prevDown := baselineDown
 	hasPrev := hasBaseline
 
 	for _, s := range samples {
-		h := s.ReportedAt.Truncate(time.Hour)
-		agg := aggByHour[h]
+		key := s.HourKey // 已在写入时用本地时间计算，与输出循环 hourKey(ts) 对齐
+		agg := aggByHour[key]
 		agg.Has = true
 
 		upDelta := s.TXBytes
@@ -541,7 +543,7 @@ func QueryTrafficSeries(opts TrafficSeriesOptions) (*TrafficSeriesResult, error)
 			agg.LastUp = s.TXBytes
 			agg.LastDown = s.RXBytes
 		}
-		aggByHour[h] = agg
+		aggByHour[key] = agg
 
 		prevUp = s.TXBytes
 		prevDown = s.RXBytes
@@ -561,7 +563,7 @@ func QueryTrafficSeries(opts TrafficSeriesOptions) (*TrafficSeriesResult, error)
 		bucketHasTotal := false
 
 		for h := ts; h.Before(intervalEnd); h = h.Add(time.Hour) {
-			agg, ok := aggByHour[h]
+			agg, ok := aggByHour[hourKey(h)]
 			if !ok || !agg.Has {
 				continue
 			}

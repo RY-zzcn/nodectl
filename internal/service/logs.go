@@ -386,6 +386,43 @@ func isMySubscriptionChange(changesRaw string) bool {
 
 func enrichLogMessageWithContext(messageCN, rawMsg string, attrs map[string]string) string {
 	ip := strings.TrimSpace(attrs["ip"])
+
+	// 接收到节点协议上报：显示具体协议名称
+	if strings.Contains(rawMsg, "接收到节点协议上报") {
+		nodeName := strings.TrimSpace(attrs["name"])
+		protocol := strings.TrimSpace(attrs["protocol"])
+		if nodeName == "" {
+			nodeName = "unknown"
+		}
+		if protocol != "" {
+			return fmt.Sprintf("节点 %s；上报协议 %s", nodeName, protocol)
+		}
+		return fmt.Sprintf("节点 %s；接收到协议上报", nodeName)
+	}
+
+	// 接收到节点 IP 上报：显示 IPv4/IPv6/双栈信息
+	if strings.Contains(rawMsg, "接收到节点 IP 上报") {
+		nodeName := strings.TrimSpace(attrs["name"])
+		ipv4 := strings.TrimSpace(attrs["ipv4"])
+		ipv6 := strings.TrimSpace(attrs["ipv6"])
+		if nodeName == "" {
+			nodeName = "unknown"
+		}
+		var stackType string
+		switch {
+		case ipv4 != "" && ipv6 != "":
+			stackType = "双栈"
+		case ipv4 != "":
+			stackType = "仅 IPv4"
+		case ipv6 != "":
+			stackType = "仅 IPv6"
+		}
+		if stackType != "" {
+			return fmt.Sprintf("节点 %s；上报 IP（%s）", nodeName, stackType)
+		}
+		return fmt.Sprintf("节点 %s；接收到 IP 上报", nodeName)
+	}
+
 	if strings.Contains(rawMsg, "节点添加成功") || strings.Contains(rawMsg, "节点已删除") {
 		nodeName := strings.TrimSpace(attrs["name"])
 		nodeUUID := strings.TrimSpace(attrs["uuid"])
