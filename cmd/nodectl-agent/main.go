@@ -25,9 +25,9 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmsgprefix)
 	log.SetPrefix("")
 
-	// 设置 GOMEMLIMIT（如果环境变量未覆盖，则使用 16 MiB 软上限）
+	// 设置 GOMEMLIMIT（如果环境变量未覆盖，则使用 5 MiB 软上限）
 	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(16 << 20) // 16 MiB
+		debug.SetMemoryLimit(5 << 20) // 5 MiB
 	}
 
 	// 初始化自动更新器 + 崩溃循环检测
