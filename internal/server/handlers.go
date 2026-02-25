@@ -2962,6 +2962,9 @@ func apiNodeOnlineStatus(w http.ResponseWriter, r *http.Request) {
 				item["rx_rate_bps"] = live.RXRateBps
 				item["tx_rate_bps"] = live.TXRateBps
 				item["last_live_at"] = live.LastLiveAt.Unix()
+				if live.AgentVersion != "" {
+					item["agent_version"] = live.AgentVersion
+				}
 			}
 			statusList = append(statusList, item)
 		}
@@ -2988,6 +2991,9 @@ func apiNodeOnlineStatus(w http.ResponseWriter, r *http.Request) {
 		result["rx_rate_bps"] = live.RXRateBps
 		result["tx_rate_bps"] = live.TXRateBps
 		result["last_live_at"] = live.LastLiveAt.Unix()
+		if live.AgentVersion != "" {
+			result["agent_version"] = live.AgentVersion
+		}
 	}
 	sendJSON(w, "success", result)
 }

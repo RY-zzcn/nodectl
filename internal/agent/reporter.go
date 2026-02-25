@@ -2,11 +2,12 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -20,8 +21,9 @@ type TrafficMessage struct {
 	RXRateBps int64  `json:"rx_rate_bps"`
 	TXRateBps int64  `json:"tx_rate_bps"`
 	// 可选字段：仅在快照消息中包含
-	RXBytes *int64 `json:"rx_bytes,omitempty"`
-	TXBytes *int64 `json:"tx_bytes,omitempty"`
+	RXBytes      *int64 `json:"rx_bytes,omitempty"`
+	TXBytes      *int64 `json:"tx_bytes,omitempty"`
+	AgentVersion string `json:"agent_version,omitempty"` // 仅快照消息携带
 }
 
 // ServerCommand 后端下发的命令结构
@@ -44,6 +46,25 @@ type CommandResult struct {
 // CommandHandler 命令处理函数签名
 type CommandHandler func(cmd ServerCommand, reply func(CommandResult))
 
+// cmdTask 命令任务（用于 worker 队列）
+type cmdTask struct {
+	cmd       ServerCommand
+	replyFunc func(CommandResult)
+}
+
+// msgPeek 轻量消息类型探测结构体（避免 map[string]interface{} 分配）
+type msgPeek struct {
+	Type string `json:"type"`
+}
+
+// bufPool JSON 编码缓冲池（复用 bytes.Buffer，降低 allocs/s）
+var bufPool = sync.Pool{
+	New: func() interface{} { return new(bytes.Buffer) },
+}
+
+// maxPoolBufCap 归还 pool 的 buffer 最大容量，超过则丢弃防止池污染
+const maxPoolBufCap = 4096
+
 // Reporter WebSocket 上报器
 type Reporter struct {
 	mu              sync.Mutex
@@ -55,6 +76,8 @@ type Reporter struct {
 	lastConnectedAt time.Time
 	commandHandler  CommandHandler
 	readCtxCancel   context.CancelFunc
+	// 命令并发限流
+	cmdCh chan cmdTask
 }
 
 // NewReporter 创建上报器实例
@@ -62,6 +85,7 @@ func NewReporter(cfg *Config) *Reporter {
 	return &Reporter{
 		cfg:        cfg,
 		maxBackoff: 60 * time.Second,
+		cmdCh:      make(chan cmdTask, 4), // 有界队列，cap=4
 	}
 }
 
@@ -106,13 +130,40 @@ func (r *Reporter) Connect(ctx context.Context) error {
 	// 启动读协程（接收服务端下发的命令）
 	readCtx, readCancel := context.WithCancel(ctx)
 	r.readCtxCancel = readCancel
+
+	// 启动命令 worker（2 个固定 worker，防止命令突发 goroutine 爆炸）
+	for i := 0; i < 2; i++ {
+		go r.cmdWorker(readCtx)
+	}
+
 	go r.startReadLoop(readCtx, conn)
 
 	log.Printf("[Agent] WebSocket 已连接: %s", r.cfg.WSURL)
 	return nil
 }
 
+// cmdWorker 命令执行 worker，从有界 channel 读取任务
+func (r *Reporter) cmdWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case task, ok := <-r.cmdCh:
+			if !ok {
+				return
+			}
+			r.mu.Lock()
+			handler := r.commandHandler
+			r.mu.Unlock()
+			if handler != nil {
+				handler(task.cmd, task.replyFunc)
+			}
+		}
+	}
+}
+
 // startReadLoop 读取后端下发的消息（命令）
+// 优化：使用轻量 msgPeek 结构体探测 type 字段，避免 map[string]interface{} 堆分配
 func (r *Reporter) startReadLoop(ctx context.Context, conn *websocket.Conn) {
 	for {
 		_, data, err := conn.Read(ctx)
@@ -127,14 +178,13 @@ func (r *Reporter) startReadLoop(ctx context.Context, conn *websocket.Conn) {
 			return
 		}
 
-		// 尝试解析命令
-		var rawMsg map[string]interface{}
-		if err := json.Unmarshal(data, &rawMsg); err != nil {
+		// 轻量探测消息类型（仅解一个字段，零 map 分配）
+		var peek msgPeek
+		if err := json.Unmarshal(data, &peek); err != nil {
 			continue
 		}
 
-		msgType, _ := rawMsg["type"].(string)
-		if msgType != "command" {
+		if peek.Type != "command" {
 			continue
 		}
 
@@ -161,8 +211,16 @@ func (r *Reporter) startReadLoop(ctx context.Context, conn *websocket.Conn) {
 			r.sendResult(ctx, result)
 		}
 
-		// 异步执行命令
-		go handler(cmd, replyFunc)
+		// 通过有界 channel 分发到 worker，队列满时拒绝
+		select {
+		case r.cmdCh <- cmdTask{cmd: cmd, replyFunc: replyFunc}:
+		default:
+			replyFunc(CommandResult{
+				Type:    "result",
+				Status:  "error",
+				Message: "命令队列已满，请稍后重试",
+			})
+		}
 	}
 }
 
@@ -206,17 +264,19 @@ func (r *Reporter) SendRateMessage(ctx context.Context, rxRate, txRate int64) er
 // SendSnapshotMessage 发送快照消息：实时速率 + 累计流量 (每 5 分钟)
 func (r *Reporter) SendSnapshotMessage(ctx context.Context, rxRate, txRate, rxBytes, txBytes int64) error {
 	msg := TrafficMessage{
-		InstallID: r.cfg.InstallID,
-		TS:        time.Now().Unix(),
-		RXRateBps: rxRate,
-		TXRateBps: txRate,
-		RXBytes:   &rxBytes,
-		TXBytes:   &txBytes,
+		InstallID:    r.cfg.InstallID,
+		TS:           time.Now().Unix(),
+		RXRateBps:    rxRate,
+		TXRateBps:    txRate,
+		RXBytes:      &rxBytes,
+		TXBytes:      &txBytes,
+		AgentVersion: AgentVersion, // 仅快照消息携带 agent 版本
 	}
 	return r.sendJSON(ctx, msg)
 }
 
 // sendJSON 内部方法：序列化并发送 JSON 消息
+// 优化：使用 sync.Pool 复用 bytes.Buffer，降低 allocs/s
 func (r *Reporter) sendJSON(ctx context.Context, msg TrafficMessage) error {
 	r.mu.Lock()
 	conn := r.conn
@@ -227,22 +287,43 @@ func (r *Reporter) sendJSON(ctx context.Context, msg TrafficMessage) error {
 		return fmt.Errorf("WebSocket 未连接")
 	}
 
-	data, err := json.Marshal(msg)
+	// 从池中获取 buffer
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+
+	err := json.NewEncoder(buf).Encode(msg)
 	if err != nil {
+		r.putBuf(buf)
 		return fmt.Errorf("序列化消息失败: %w", err)
+	}
+
+	// Encode 会追加 '\n'，去掉末尾换行
+	payload := buf.Bytes()
+	if len(payload) > 0 && payload[len(payload)-1] == '\n' {
+		payload = payload[:len(payload)-1]
 	}
 
 	writeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if err := conn.Write(writeCtx, websocket.MessageText, data); err != nil {
+	if err := conn.Write(writeCtx, websocket.MessageText, payload); err != nil {
+		r.putBuf(buf)
 		r.mu.Lock()
 		r.connected = false
 		r.mu.Unlock()
 		return fmt.Errorf("WebSocket 写入失败: %w", err)
 	}
 
+	r.putBuf(buf)
 	return nil
+}
+
+// putBuf 归还 buffer 到池，超过容量上限则丢弃防止池污染
+func (r *Reporter) putBuf(buf *bytes.Buffer) {
+	if buf.Cap() <= maxPoolBufCap {
+		bufPool.Put(buf)
+	}
+	// 超过上限直接丢弃，让 GC 回收
 }
 
 // Close 关闭 WebSocket 连接
@@ -270,6 +351,7 @@ func (r *Reporter) IsConnected() bool {
 
 // ReconnectWithBackoff 指数退避重连
 // 退避策略：1s → 2s → 4s → ... 上限 60s + 随机抖动
+// 优化：使用 time.NewTimer 替代 time.After，上下文取消时立即释放 timer
 func (r *Reporter) ReconnectWithBackoff(ctx context.Context) error {
 	r.mu.Lock()
 	r.reconnectCount++
@@ -282,15 +364,19 @@ func (r *Reporter) ReconnectWithBackoff(ctx context.Context) error {
 		backoff = r.maxBackoff
 	}
 	// 添加随机抖动 (0-25% 的退避时间)
-	jitter := time.Duration(rand.Int63n(int64(backoff) / 4))
+	jitter := rand.N(backoff / 4)
 	backoff += jitter
 
 	log.Printf("[Agent] 第 %d 次重连，等待 %v ...", count, backoff)
 
+	// 使用 NewTimer 替代 After，确保上下文取消时 timer 被回收
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(backoff):
+	case <-timer.C:
 	}
 
 	return r.Connect(ctx)

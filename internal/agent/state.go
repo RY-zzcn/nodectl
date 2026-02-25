@@ -49,6 +49,7 @@ func (s *State) Load() error {
 }
 
 // Save 将当前状态写入磁盘
+// 使用原子写入（temp → fsync → rename），防止掉电/SIGKILL 导致文件损坏
 func (s *State) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -59,12 +60,34 @@ func (s *State) Save() error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(s, "", "  ")
+	data, err := json.Marshal(s) // 去掉 MarshalIndent，机器读文件不需缩进
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(s.path, data, 0644)
+	// 写入临时文件
+	tmp := s.path + ".tmp"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+
+	// fsync 确保数据落盘
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	f.Close()
+
+	// 原子替换目标文件
+	return os.Rename(tmp, s.path)
 }
 
 // UpdateOnReport 上报成功后更新状态

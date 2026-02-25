@@ -8,6 +8,9 @@ on:
         description: '发布版本号 (必须以 v 开头，例如: v0.3.0)'
         required: true
         default: 'v0.3.0'
+      agent_version:
+        description: 'Agent 版本号 (不填则跟随主版本)'
+        required: false
 
 permissions:
   contents: write
@@ -32,7 +35,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
           cache: true # 开启缓存以加速依赖下载和编译
 
       - name: Build Binary
@@ -69,7 +72,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Build Agent Binary
@@ -79,13 +82,26 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p bin
-          go build -trimpath -ldflags="-s -w -X 'nodectl/internal/version.Version=${{ github.event.inputs.version }}'" -o bin/nodectl-agent-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/nodectl-agent/main.go
+          AGENT_VERSION="${{ github.event.inputs.agent_version || github.event.inputs.version }}"
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          go build -trimpath -ldflags="-s -w \
+            -X 'nodectl/internal/agent.AgentVersion=${AGENT_VERSION}' \
+            -X 'nodectl/internal/agent.GitCommit=${GIT_SHA}' \
+            -X 'nodectl/internal/agent.BuildTime=${BUILD_TIME}'" \
+            -o bin/nodectl-agent-${{ matrix.goos }}-${{ matrix.goarch }}-${AGENT_VERSION} \
+            ./cmd/nodectl-agent/main.go
+
+      - name: Generate Agent SHA256
+        run: |
+          cd bin
+          for f in nodectl-agent-*; do sha256sum "$f" > "${f}.sha256"; done
 
       - name: Upload Agent Artifact
         uses: actions/upload-artifact@v4
         with:
           name: agent-binary-${{ matrix.goarch }}
-          path: bin/nodectl-agent-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: bin/nodectl-agent-*
 
   # ==========================================
   # 阶段 2: 发布到 GitHub Releases

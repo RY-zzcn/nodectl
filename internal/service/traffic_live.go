@@ -52,17 +52,19 @@ type AgentTrafficMsg struct {
 	RXRateBps int64  `json:"rx_rate_bps"`
 	TXRateBps int64  `json:"tx_rate_bps"`
 	// 可选字段：仅快照消息包含
-	RXBytes *int64 `json:"rx_bytes,omitempty"`
-	TXBytes *int64 `json:"tx_bytes,omitempty"`
+	RXBytes      *int64 `json:"rx_bytes,omitempty"`
+	TXBytes      *int64 `json:"tx_bytes,omitempty"`
+	AgentVersion string `json:"agent_version,omitempty"` // 仅快照消息携带
 }
 
 // NodeLiveState 节点实时内存态
 type NodeLiveState struct {
-	InstallID  string    `json:"install_id"`
-	NodeUUID   string    `json:"node_uuid"`
-	RXRateBps  int64     `json:"rx_rate_bps"`
-	TXRateBps  int64     `json:"tx_rate_bps"`
-	LastLiveAt time.Time `json:"last_live_at"`
+	InstallID    string    `json:"install_id"`
+	NodeUUID     string    `json:"node_uuid"`
+	RXRateBps    int64     `json:"rx_rate_bps"`
+	TXRateBps    int64     `json:"tx_rate_bps"`
+	LastLiveAt   time.Time `json:"last_live_at"`
+	AgentVersion string    `json:"agent_version,omitempty"` // Agent 上报的版本号
 }
 
 // FrontendPushMsg 推送给前端的实时消息
@@ -227,15 +229,17 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 尝试判断消息类型：命令结果 or 流量上报
-		var rawMsg map[string]interface{}
-		if err := json.Unmarshal(data, &rawMsg); err != nil {
+		// 使用轻量 peek 结构体替代 map[string]interface{} 判断消息类型（P2-server 优化）
+		var peek struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(data, &peek); err != nil {
 			logger.Log.Warn("Agent WS 消息解析失败", "error", err, "ip", clientIP)
 			continue
 		}
 
-		// 如果包含 type 字段，说明是命令结果回传
-		if msgType, ok := rawMsg["type"].(string); ok && (msgType == "accepted" || msgType == "progress" || msgType == "result") {
+		// 如果包含 type 字段且为命令结果类型，按命令结果处理
+		if peek.Type == "accepted" || peek.Type == "progress" || peek.Type == "result" {
 			var cmdResult AgentCommandResult
 			json.Unmarshal(data, &cmdResult)
 
@@ -297,10 +301,40 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 		state.RXRateBps = msg.RXRateBps
 		state.TXRateBps = msg.TXRateBps
 		state.LastLiveAt = time.Now()
+		// 更新 agent 版本（若快照消息携带）
+		if msg.AgentVersion != "" {
+			state.AgentVersion = msg.AgentVersion
+		}
 		hub.mu.Unlock()
 
-		// 若包含累计字段 → 写入历史库
+		// 若包含累计字段 → 快照消息处理
 		if msg.RXBytes != nil && msg.TXBytes != nil {
+			// 持久化 agent_version 到 NodePool（仅版本变更时更新，避免重复写库）
+			if msg.AgentVersion != "" {
+				go func(iid, newVer string) {
+					var node database.NodePool
+					if err := database.DB.Select("agent_version").Where("install_id = ?", iid).First(&node).Error; err != nil {
+						return
+					}
+					oldVer := node.AgentVersion
+					if oldVer != newVer {
+						database.DB.Model(&database.NodePool{}).Where("install_id = ?", iid).Update("agent_version", newVer)
+						if oldVer == "" {
+							logger.Log.Info("Agent 版本已记录",
+								"event", "agent_version_init",
+								"install_id", iid,
+								"agent_version", newVer)
+						} else {
+							logger.Log.Info("Agent 版本已更新",
+								"event", "agent_auto_updated",
+								"install_id", iid,
+								"old_version", oldVer,
+								"new_version", newVer)
+						}
+					}
+				}(installID, msg.AgentVersion)
+			}
+
 			go func(iid string, rx, tx int64) {
 				if _, err := SaveNodeTrafficReport(iid, rx, tx, time.Now()); err != nil {
 					logger.Log.Error("WS 快照写入失败", "install_id", iid, "error", err)

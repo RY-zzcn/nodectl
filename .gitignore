@@ -1,4 +1,5 @@
 data/
 tmp.exe
 nodectl.exe
-INSTALL_REFACTOR_PLAN.md
+nodectl-agent.exe
+AGENT_MEMORY_OPTIMIZATION_PLAN.md

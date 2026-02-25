@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -22,6 +23,8 @@ type Runtime struct {
 	collector *Collector
 	reporter  *Reporter
 	state     *State
+	updater   *Updater
+	logDedup  *LogDedup
 	cancel    context.CancelFunc
 	// 启动时从 state 加载的基线累计值（运行期间不变，避免双重计数）
 	startupRX int64
@@ -29,12 +32,14 @@ type Runtime struct {
 }
 
 // NewRuntime 创建运行时实例
-func NewRuntime(cfg *Config) *Runtime {
+func NewRuntime(cfg *Config, updater *Updater) *Runtime {
 	return &Runtime{
 		cfg:       cfg,
 		collector: NewCollector(cfg.Interface),
 		reporter:  NewReporter(cfg),
 		state:     NewState(""),
+		updater:   updater,
+		logDedup:  NewLogDedup(),
 	}
 }
 
@@ -47,13 +52,11 @@ func (rt *Runtime) Run() error {
 
 	// 捕获启动基线（跨重启的历史累计值），运行期间不再变化
 	rt.startupRX, rt.startupTX = rt.state.GetAccumulated()
-	log.Printf("[Agent] 历史累计基线 RX=%d TX=%d", rt.startupRX, rt.startupTX)
 
 	// 初始化采集器
 	if err := rt.collector.Init(); err != nil {
 		return err
 	}
-	log.Printf("[Agent] 采集器已初始化，网卡: %s", rt.collector.GetInterface())
 
 	// 注册命令处理器
 	rt.reporter.SetCommandHandler(rt.handleCommand)
@@ -84,6 +87,16 @@ func (rt *Runtime) Run() error {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
+	// 首次 WS 连接成功，标记健康（清除崩溃计数）
+	if rt.updater != nil {
+		rt.updater.MarkHealthy()
+	}
+
+	// 启动自动更新检查循环（后台 goroutine）
+	if rt.updater != nil {
+		go rt.updater.Run(ctx)
+	}
+
 	// 启动主循环
 	pushTicker := time.NewTicker(time.Duration(rt.cfg.WSPushIntervalSec) * time.Second)
 	snapshotTicker := time.NewTicker(time.Duration(rt.cfg.SnapshotIntervalSec) * time.Second)
@@ -92,11 +105,13 @@ func (rt *Runtime) Run() error {
 	defer snapshotTicker.Stop()
 	defer stateSaveTicker.Stop()
 
+	// 启动日志（仅输出一条）
+	log.Printf("[Agent] nodectl-agent %s 已启动 (install_id=%s, iface=%s, push=%ds, snapshot=%ds)",
+		AgentVersion, rt.cfg.InstallID, rt.collector.GetInterface(),
+		rt.cfg.WSPushIntervalSec, rt.cfg.SnapshotIntervalSec)
+
 	// 是否到了快照周期
 	snapshotDue := false
-
-	log.Printf("[Agent] 主循环已启动 (速率推送 %ds, 快照 %ds)",
-		rt.cfg.WSPushIntervalSec, rt.cfg.SnapshotIntervalSec)
 
 	for {
 		select {
@@ -107,7 +122,6 @@ func (rt *Runtime) Run() error {
 		case sig := <-sigCh:
 			switch sig {
 			case syscall.SIGHUP:
-				log.Printf("[Agent] 收到 SIGHUP，重新加载配置...")
 				rt.reloadConfig()
 			case syscall.SIGINT, syscall.SIGTERM:
 				log.Printf("[Agent] 收到 %v 信号，准备退出...", sig)
@@ -120,7 +134,7 @@ func (rt *Runtime) Run() error {
 		case <-pushTicker.C:
 			// 采集一次数据
 			if err := rt.collector.Sample(); err != nil {
-				log.Printf("[Agent] 采集失败: %v", err)
+				rt.logDedup.LogOrSuppress("collector:sample", "[Agent] 采集失败: %v", err)
 				continue
 			}
 
@@ -146,7 +160,7 @@ func (rt *Runtime) Run() error {
 
 				err := rt.reporter.SendSnapshotMessage(ctx, rxRate, txRate, totalRX, totalTX)
 				if err != nil {
-					log.Printf("[Agent] 快照上报失败: %v", err)
+					rt.logDedup.LogOrSuppress("reporter:snapshot", "[Agent] 快照上报失败: %v", err)
 					rt.handleDisconnect(ctx)
 				} else {
 					rt.state.UpdateOnReport(totalRX, totalTX)
@@ -156,14 +170,14 @@ func (rt *Runtime) Run() error {
 				// 发送仅速率消息
 				err := rt.reporter.SendRateMessage(ctx, rxRate, txRate)
 				if err != nil {
-					log.Printf("[Agent] 速率上报失败: %v", err)
+					rt.logDedup.LogOrSuppress("reporter:rate", "[Agent] 速率上报失败: %v", err)
 					rt.handleDisconnect(ctx)
 				}
 			}
 
 		case <-stateSaveTicker.C:
 			if err := rt.state.Save(); err != nil {
-				log.Printf("[Agent] 持久化状态失败: %v", err)
+				rt.logDedup.LogOrSuppress("state:save", "[Agent] 持久化状态失败: %v", err)
 			}
 		}
 	}
@@ -184,7 +198,7 @@ func (rt *Runtime) handleDisconnect(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			log.Printf("[Agent] 重连失败: %v", err)
+			rt.logDedup.LogOrSuppress("reporter:reconnect", "[Agent] 重连失败: %v", err)
 			continue
 		}
 		log.Printf("[Agent] 重连成功")
@@ -193,26 +207,47 @@ func (rt *Runtime) handleDisconnect(ctx context.Context) {
 }
 
 // reloadConfig 重新加载配置文件 (SIGHUP)
+// 注意：仅更新可动态变更的字段，网卡变更需要重启
 func (rt *Runtime) reloadConfig() {
 	newCfg, err := LoadConfig("")
 	if err != nil {
 		log.Printf("[Agent] 重新加载配置失败: %v", err)
 		return
 	}
-	rt.cfg = newCfg
+
+	// 仅应用可安全动态变更的字段
+	rt.cfg.WSPushIntervalSec = newCfg.WSPushIntervalSec
+	rt.cfg.SnapshotIntervalSec = newCfg.SnapshotIntervalSec
+	rt.cfg.ResetDay = newCfg.ResetDay
+	rt.cfg.LogLevel = newCfg.LogLevel
+
+	// 网卡变更需要重启，在此仅记录警告
+	if newCfg.Interface != rt.cfg.Interface {
+		log.Printf("[Agent] 网卡配置变更 (%s -> %s) 需要重启 agent 才能生效", rt.cfg.Interface, newCfg.Interface)
+	}
+
 	log.Printf("[Agent] 配置已重新加载")
 }
 
 // shutdown 优雅退出
+// 顺序：collector（释放 FD）→ state（持久化）→ reporter（关闭 WS）
 func (rt *Runtime) shutdown() {
 	log.Printf("[Agent] 正在优雅退出...")
 
-	// 保存状态
+	// 0. 输出日志去重器的累计信息
+	rt.logDedup.Flush()
+
+	// 1. 释放采集器常驻 FD
+	if err := rt.collector.Close(); err != nil {
+		log.Printf("[Agent] 关闭采集器失败: %v", err)
+	}
+
+	// 2. 持久化状态
 	if err := rt.state.Save(); err != nil {
 		log.Printf("[Agent] 退出前保存状态失败: %v", err)
 	}
 
-	// 关闭 WebSocket 连接
+	// 3. 关闭 WebSocket 连接
 	rt.reporter.Close()
 
 	log.Printf("[Agent] 已退出")
@@ -296,13 +331,14 @@ func (rt *Runtime) executeReinstallSingbox(cmd ServerCommand, reply func(Command
 
 // execStreamingScript 执行 shell 命令并逐行流式回传输出
 // 每行作为一个 progress 消息发送，最后发送 result
+// 使用 sync.WaitGroup 确保 scanner goroutine 读完所有输出后再发送最终结果
 func (rt *Runtime) execStreamingScript(shellCmd string, label string, reply func(CommandResult)) {
 	reply(CommandResult{Type: "progress", Stage: fmt.Sprintf("正在执行%s脚本...", label)})
 	log.Printf("[Agent] 执行%s: %s", label, shellCmd)
 
 	cmd := exec.Command("/bin/sh", "-c", shellCmd)
 
-	// 合并 stdout+stderr 到一个管道
+	// 合并 stdout+stderr 到一个管道（有意为之，便于流式回传完整输出）
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
 	cmd.Stderr = pw
@@ -312,8 +348,11 @@ func (rt *Runtime) execStreamingScript(shellCmd string, label string, reply func
 		return
 	}
 
-	// 逐行读取输出并流式回传
+	// 使用 WaitGroup 等待 scanner goroutine 完成，替代 time.Sleep hack
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		scanner := bufio.NewScanner(pr)
 		scanner.Buffer(make([]byte, 64*1024), 256*1024)
 		for scanner.Scan() {
@@ -326,11 +365,10 @@ func (rt *Runtime) execStreamingScript(shellCmd string, label string, reply func
 	err := cmd.Wait()
 	pw.Close()
 
-	// 给 scanner goroutine 一点时间把最后的行发完
-	time.Sleep(100 * time.Millisecond)
+	// 等待 scanner goroutine 读完所有剩余输出
+	wg.Wait()
 
 	if err != nil {
-		// 即使 exit code 非零，也可能是 set -e 导致的，不一定是真正失败
 		log.Printf("[Agent] %s脚本退出: %v", label, err)
 		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("脚本执行完毕但退出码非零: %v", err)})
 	} else {
