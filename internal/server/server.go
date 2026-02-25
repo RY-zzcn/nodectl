@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,10 +24,21 @@ var restartChan = make(chan bool)
 
 type serverLogWriter struct{}
 
+// serverLogIPRe 匹配 Go HTTP 内部错误日志中的 IP:Port 格式
+var serverLogIPRe = regexp.MustCompile(`(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+|\[?[0-9a-fA-F:]+\]?:\d+)`)
+
 func (w *serverLogWriter) Write(p []byte) (n int, err error) {
 	msg := strings.TrimSpace(string(p))
 	if msg != "" {
-		logger.Log.Warn("HTTP 服务告警", "message", msg)
+		ip := ""
+		if m := serverLogIPRe.FindString(msg); m != "" {
+			ip = m
+		}
+		if ip != "" {
+			logger.Log.Warn("HTTP 服务告警", "message", msg, "ip", ip)
+		} else {
+			logger.Log.Warn("HTTP 服务告警", "message", msg)
+		}
 	}
 	return len(p), nil
 }

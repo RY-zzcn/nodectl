@@ -777,14 +777,16 @@
                 const down = Number(p.down_bytes || 0);
                 const total = Number(p.total_bytes || 0);
                 const x = left + i * groupW + (groupW - barW) / 2;
-                const totalH = Math.max(1, chartH * (total / maxV));
+                const totalH = total > 0 ? Math.max(2, chartH * (total / maxV)) : 0;
                 const upH = total > 0 ? totalH * (up / total) : 0;
                 const downH = totalH - upH;
                 const yDown = top + chartH - totalH;
                 const yUp = yDown + downH;
 
-                out += `<rect x="${x.toFixed(2)}" y="${yDown.toFixed(2)}" width="${barW.toFixed(2)}" height="${downH.toFixed(2)}" fill="#1e88ff" rx="2"/>`;
-                out += `<rect x="${x.toFixed(2)}" y="${yUp.toFixed(2)}" width="${barW.toFixed(2)}" height="${upH.toFixed(2)}" fill="#34c759" rx="2"/>`;
+                if (totalH > 0) {
+                    out += `<rect x="${x.toFixed(2)}" y="${yDown.toFixed(2)}" width="${barW.toFixed(2)}" height="${downH.toFixed(2)}" fill="#1e88ff" rx="2"/>`;
+                    out += `<rect x="${x.toFixed(2)}" y="${yUp.toFixed(2)}" width="${barW.toFixed(2)}" height="${upH.toFixed(2)}" fill="#34c759" rx="2"/>`;
+                }
 
                 if (tickSet.has(i)) {
                     const label = fmtAxisLabel(p.label);
@@ -870,16 +872,9 @@
             renderBar();
             renderLine();
 
-            const latest = state.linePoints[state.linePoints.length - 1];
-            if (!latest) {
-                document.getElementById('ts-trend-ratio').textContent = '0.00';
-                setStatus('', false);
-                return;
-            }
-
-            const up = Number(latest.up_bytes || 0);
-            const down = Number(latest.down_bytes || 0);
-            const ratio = up > 0 ? (down / up) : 0;
+            const rankItems = (state.rank && Array.isArray(state.rank.items)) ? state.rank.items : [];
+            const selectedItem = rankItems.find(x => x.uuid === state.selectedNodeUUID);
+            const ratio = selectedItem ? Number(selectedItem.upload_ratio || 0) : 0;
             document.getElementById('ts-trend-ratio').textContent = ratio.toFixed(2);
             setStatus('', false);
         }

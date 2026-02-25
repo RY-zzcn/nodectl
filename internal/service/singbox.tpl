@@ -1346,46 +1346,237 @@ curl_post_submit() {
 }
 
 # -----------------------
-# [新增] 确保 Cron 环境存在并启动 (兼容跨平台及 Docker 环境)
+# -----------------------
+# 辅助函数：检测当前运行的 crond 是否来自 busybox（精简版）
+# 返回 0 表示是 busybox crond（精简版），返回 1 表示是独立完整版 crond
+# -----------------------
+_is_busybox_crond() {
+    local crond_bin
+    crond_bin=$(command -v crond 2>/dev/null) || return 1
+    # busybox crond 实际上是 busybox 的软链接或内置 applet
+    if readlink -f "$crond_bin" 2>/dev/null | grep -q busybox; then
+        return 0
+    fi
+    # 也可能是直接内嵌的 busybox applet（无软链接但二进制本身包含 busybox）
+    if strings "$crond_bin" 2>/dev/null | grep -q BusyBox; then
+        return 0
+    fi
+    return 1
+}
+
+# -----------------------
+# [增强] 确保 Cron 环境存在并启动 (兼容跨平台及 Docker 环境)
+# 修复：Alpine 精简版 busybox crond 不支持用户级 crontab，导致定时任务静默失效
 # -----------------------
 ensure_cron() {
-    info "正在检查并确保 cron 服务已安装且在运行..."
-    
-    # 智能识别包管理器并进行安装
-    if command -v apt-get >/dev/null 2>&1; then
-        # Debian / Ubuntu 系列
-        apt-get update -q >/dev/null 2>&1 || true
-        apt-get install -y cron >/dev/null 2>&1 || true
-        # 尝试启动 (兼容 Systemd 和 传统 init，如果在纯 Docker 无 init 环境则直接后台运行守护进程)
-        systemctl enable cron --now >/dev/null 2>&1 || service cron start >/dev/null 2>&1 || cron &
-    
-    elif command -v yum >/dev/null 2>&1; then
-        # CentOS / RHEL 系列 (包名通常叫 cronie)
-        yum install -y cronie >/dev/null 2>&1 || true
-        systemctl enable crond --now >/dev/null 2>&1 || service crond start >/dev/null 2>&1 || crond &
-    
-    elif command -v apk >/dev/null 2>&1; then
-        # Alpine Linux 系列 (常用于极简 Docker)
-        # Alpine 默认的 busybox 提供 crontab，但不一定有完整的 crond 服务起着，这里强装 dcron
-        
-        # 强制杀掉所有正在运行的 crond 进程 (包括 busybox 提供的自带 crond)
-        killall crond >/dev/null 2>&1 || true
-        
-        # 卸载可能存在的旧版 dcron 或其他 cron 组件
-        apk del dcron >/dev/null 2>&1 || true
-        
-        # 重新安装全新的 dcron
-        apk add --no-cache dcron >/dev/null 2>&1 || true
-        
-        # Alpine 容器通常没有 systemd，直接运行守护进程
-        crond &
-    
+    info "━━━━━━━━━━━━ Cron 环境检测 ━━━━━━━━━━━━"
+
+    # ── 1. 诊断当前 cron 状态 ──────────────────────────────
+    local cron_cmd=""
+    local cron_running=false
+    local cron_is_busybox=false
+
+    if command -v crond >/dev/null 2>&1; then
+        cron_cmd="crond"
+    elif command -v cron >/dev/null 2>&1; then
+        cron_cmd="cron"
+    fi
+
+    if [ -n "$cron_cmd" ]; then
+        info "检测到 cron 可执行文件: $(command -v $cron_cmd)"
+        if _is_busybox_crond; then
+            cron_is_busybox=true
+            warn "当前 crond 为 BusyBox 精简版 —— 不支持 crontab -e 用户级任务，定时上报将静默失效！"
+        else
+            info "当前 crond 为独立完整版 ✓"
+        fi
     else
-        warn "未知的系统环境，无法自动安装 cron，流量上报可能失效！"
+        warn "未检测到 crond / cron 可执行文件"
+    fi
+
+    # 检测 crond 进程是否正在运行
+    if pgrep -x crond >/dev/null 2>&1 || pgrep -x cron >/dev/null 2>&1; then
+        cron_running=true
+        info "cron 守护进程状态: 运行中 ✓"
+    else
+        warn "cron 守护进程状态: 未运行"
+    fi
+
+    # ── 2. 按系统类型进行安装 / 修复 ──────────────────────────
+    info "──────────────────────────────────────"
+
+    if command -v apt-get >/dev/null 2>&1; then
+        # ── Debian / Ubuntu 系列 ────────────────────────────
+        info "系统类型: Debian/Ubuntu，包管理器: apt-get"
+        if ! command -v cron >/dev/null 2>&1 && ! command -v crond >/dev/null 2>&1; then
+            info "cron 未安装，正在安装 cron..."
+            apt-get update -q 2>&1 | tail -1
+            if apt-get install -y cron 2>&1 | grep -E "已安装|already installed|Unpacking|upgrade"; then
+                info "cron 安装成功 ✓"
+            else
+                warn "cron 安装可能失败，请手动检查"
+            fi
+        else
+            info "cron 已安装，跳过安装步骤 ✓"
+        fi
+        # 尝试启动
+        if systemctl enable cron --now 2>&1 | grep -qv "Failed\|error" || \
+           service cron start 2>&1 | grep -qv "fail"; then
+            info "cron 服务已通过 systemd/init 启动 ✓"
+        else
+            info "非 systemd 环境，尝试直接启动 cron 守护进程..."
+            cron 2>/dev/null &
+            sleep 1
+            if pgrep -x cron >/dev/null 2>&1; then
+                info "cron 守护进程启动成功 ✓"
+            else
+                warn "cron 守护进程启动失败，流量定时上报可能无效"
+            fi
+        fi
+
+    elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+        # ── CentOS / RHEL / Fedora 系列 ─────────────────────
+        local pkg_mgr="yum"
+        command -v dnf >/dev/null 2>&1 && pkg_mgr="dnf"
+        info "系统类型: RHEL/CentOS，包管理器: $pkg_mgr"
+        if ! command -v crond >/dev/null 2>&1; then
+            info "cronie 未安装，正在安装..."
+            if $pkg_mgr install -y cronie 2>&1 | grep -E "已安装|already installed|Installing|Installed"; then
+                info "cronie 安装成功 ✓"
+            else
+                warn "cronie 安装可能失败，请手动检查"
+            fi
+        else
+            info "crond 已安装，跳过安装步骤 ✓"
+        fi
+        if systemctl enable crond --now 2>&1 | grep -qv "Failed\|error" || \
+           service crond start 2>&1 | grep -qv "fail"; then
+            info "crond 服务已启动 ✓"
+        else
+            crond 2>/dev/null &
+            sleep 1
+            pgrep -x crond >/dev/null 2>&1 && info "crond 守护进程启动成功 ✓" || \
+                warn "crond 启动失败，流量定时上报可能无效"
+        fi
+
+    elif command -v apk >/dev/null 2>&1; then
+        # ── Alpine Linux 系列 ────────────────────────────────
+        info "系统类型: Alpine Linux，包管理器: apk"
+        info "Alpine 注意: 内置 BusyBox crond 为精简版，不支持用户级 crontab，需安装完整版 dcron"
+
+        # 判断是否需要替换 busybox crond
+        local need_install=false
+        if $cron_is_busybox; then
+            warn "检测到 BusyBox 精简版 crond，必须替换为完整版 dcron，否则定时任务无法运行！"
+            need_install=true
+        elif ! command -v crond >/dev/null 2>&1; then
+            warn "未检测到 crond，需要安装 dcron"
+            need_install=true
+        else
+            # 进一步验证：测试当前 crond 是否真正支持 /var/spool/cron/crontabs/root
+            if ! ls /var/spool/cron/crontabs/ >/dev/null 2>&1 && ! $cron_running; then
+                warn "crond 已安装但未运行且 crontabs 目录异常，尝试重装 dcron..."
+                need_install=true
+            else
+                info "当前 crond 为完整版且运行正常，跳过安装 ✓"
+            fi
+        fi
+
+        if $need_install; then
+            info "步骤 1/4: 停止所有 crond 进程..."
+            pkill -x crond 2>/dev/null || killall crond 2>/dev/null || true
+            sleep 1
+            if ! pgrep -x crond >/dev/null 2>&1; then
+                info "  已停止所有 crond 进程 ✓"
+            else
+                warn "  部分 crond 进程仍在运行，继续尝试..."
+            fi
+
+            info "步骤 2/4: 卸载旧版 cron 组件（busybox-extras/dcron）..."
+            apk del dcron busybox-extras 2>&1 | grep -E "Purging|OK|ERROR" || true
+            info "  旧版组件清理完成 ✓"
+
+            info "步骤 3/4: 安装完整版 dcron..."
+            if apk add --no-cache dcron 2>&1 | tee /dev/fd/2 | grep -qE "OK|Installing|already installed"; then
+                info "  dcron 安装成功 ✓"
+            else
+                warn "  dcron 安装失败！尝试备用方案: supercronic..."
+                # 备用方案：使用 supercronic（纯静态二进制，无需 crond 守护进程）
+                _install_supercronic_alpine || {
+                    warn "所有 cron 方案均失败，流量定时上报将无法工作"
+                    return 1
+                }
+                return 0
+            fi
+
+            info "步骤 4/4: 启动 dcron 守护进程..."
+            # 确保 crontabs 目录存在
+            mkdir -p /var/spool/cron/crontabs
+            # 使用 dcron 的标准启动方式：-b 表示后台守护，-l 8 表示日志级别
+            crond -b -l 8 2>/dev/null || crond -b 2>/dev/null || crond &
+            sleep 1
+            if pgrep -x crond >/dev/null 2>&1; then
+                info "  dcron 守护进程启动成功 ✓"
+                # 尝试注册到 OpenRC（Alpine 的 init 系统），确保重启后自动恢复
+                if command -v rc-update >/dev/null 2>&1; then
+                    rc-update add dcron default 2>/dev/null && \
+                        info "  已注册到 OpenRC (rc-update add dcron default) ✓" || true
+                fi
+            else
+                warn "  dcron 守护进程启动失败！尝试 supercronic 备用方案..."
+                _install_supercronic_alpine || {
+                    warn "所有 cron 方案均失败，流量定时上报将无法工作"
+                    return 1
+                }
+                return 0
+            fi
+        fi
+
+    else
+        warn "未识别的系统环境（无 apt-get / yum / apk），无法自动安装 cron"
+        warn "流量定时上报功能可能无法正常工作，请手动安装 cron 后重新执行安装脚本"
         return 1
     fi
-    
-    info "cron 服务安装并启动完成。"
+
+    # ── 3. 最终验证 ──────────────────────────────────────────
+    info "──────────────────────────────────────"
+    if pgrep -x crond >/dev/null 2>&1 || pgrep -x cron >/dev/null 2>&1; then
+        info "✅ Cron 服务最终状态: 运行中"
+    else
+        warn "⚠️  Cron 服务最终状态: 未运行，定时上报可能失效"
+    fi
+    info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# -----------------------
+# 备用方案：在 Alpine 中安装 supercronic 作为 cron 替代品
+# supercronic 是纯静态二进制，专为容器设计，无需守护进程，兼容标准 crontab 格式
+# -----------------------
+_install_supercronic_alpine() {
+    info "备用方案: 尝试安装 supercronic (容器友好的 cron 替代品)..."
+    local sc_url=""
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  sc_url="https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64" ;;
+        aarch64) sc_url="https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-arm64" ;;
+        armv7*)  sc_url="https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-arm" ;;
+        *)
+            warn "supercronic 不支持当前架构: $arch"
+            return 1
+            ;;
+    esac
+
+    if curl -fsSL "$sc_url" -o /usr/local/bin/supercronic 2>/dev/null; then
+        chmod +x /usr/local/bin/supercronic
+        info "supercronic 安装成功 ✓ (架构: $arch)"
+        # 标记使用 supercronic 模式，供 setup_traffic_monitor 识别
+        CRON_MODE="supercronic"
+        return 0
+    else
+        warn "supercronic 下载失败（可能网络不可达）"
+        return 1
+    fi
 }
 
 # -----------------------
@@ -1398,7 +1589,10 @@ setup_traffic_monitor() {
         return 0
     fi
 
-    # 1. 确保系统有 cron 环境
+    # 全局标记：cron 运行模式，默认 native，备用 supercronic
+    CRON_MODE="native"
+
+    # 1. 确保系统有 cron 环境（含详细诊断输出）
     ensure_cron || true # 即使安装失败也继续尝试，利用兜底逻辑
 
     TRAFFIC_SCRIPT="/usr/local/bin/singbox_traffic.sh"
@@ -1411,7 +1605,7 @@ setup_traffic_monitor() {
     
     # 动态生成我们的 "伪 Agent" 脚本
     cat > "$TRAFFIC_SCRIPT" <<EOF
-#!/bin/bash
+#!/bin/sh
 REPORT_URL="$TRAFFIC_URL"
 INSTALL_ID="$INSTALL_ID"
 RESET_DAY="$RESET_VAL"
@@ -1431,7 +1625,7 @@ mkdir -p "\$(dirname "\$CACHE_FILE")"
 
 # 加载本地历史缓存
 if [ -f "\$CACHE_FILE" ]; then
-    source "\$CACHE_FILE"
+    . "\$CACHE_FILE"
 else
     PREV_RAW_RX=\$RAW_RX
     PREV_RAW_TX=\$RAW_TX
@@ -1485,14 +1679,44 @@ EOF
 
     chmod +x "$TRAFFIC_SCRIPT"
 
-    # 清洗并挂载到 crontab 中
-    crontab -l 2>/dev/null | grep -v "singbox_traffic.sh" > /tmp/crontab.tmp || true
-    echo "*/5 * * * * bash $TRAFFIC_SCRIPT" >> /tmp/crontab.tmp
-    crontab /tmp/crontab.tmp
-    rm -f /tmp/crontab.tmp
+    # ── 2. 挂载定时任务（区分 native cron 和 supercronic 两种模式）──
+    if [ "${CRON_MODE:-native}" = "supercronic" ]; then
+        # supercronic 模式：写入独立 crontab 文件并以后台进程方式运行
+        local sc_crontab="/etc/singbox_crontab"
+        echo "*/5 * * * * sh $TRAFFIC_SCRIPT" > "$sc_crontab"
+        # 防止重复启动
+        pkill -f "supercronic.*singbox_crontab" 2>/dev/null || true
+        nohup /usr/local/bin/supercronic "$sc_crontab" >/var/log/supercronic_singbox.log 2>&1 &
+        info "定时任务已通过 supercronic 挂载 (PID: $!)"
+
+        # 同样尝试注册开机自启（写入 /etc/local.d/ 是 Alpine 的 local 服务方式）
+        if [ -d /etc/local.d ]; then
+            cat > /etc/local.d/singbox_cron.start <<'AUTOSTART'
+#!/bin/sh
+nohup /usr/local/bin/supercronic /etc/singbox_crontab >/var/log/supercronic_singbox.log 2>&1 &
+AUTOSTART
+            chmod +x /etc/local.d/singbox_cron.start
+            rc-update add local default 2>/dev/null || true
+            info "已注册 supercronic 开机自启 (/etc/local.d/singbox_cron.start) ✓"
+        fi
+    else
+        # native cron 模式：使用 crontab 命令挂载
+        crontab -l 2>/dev/null | grep -v "singbox_traffic.sh" > /tmp/crontab.tmp || true
+        echo "*/5 * * * * sh $TRAFFIC_SCRIPT" >> /tmp/crontab.tmp
+        crontab /tmp/crontab.tmp
+        rm -f /tmp/crontab.tmp
+        info "定时任务已挂载到系统 crontab (每5分钟)"
+
+        # 验证 crontab 写入是否成功
+        if crontab -l 2>/dev/null | grep -q "singbox_traffic.sh"; then
+            info "crontab 写入验证: 成功 ✓"
+        else
+            warn "crontab 写入验证: 未检测到任务条目，定时上报可能失效"
+        fi
+    fi
     
-    # [优化 3] 挂载完成后，立即在后台静默触发一次首报 (让面板瞬间变绿)
-    bash "$TRAFFIC_SCRIPT" >/dev/null 2>&1 &
+    # ── 3. 立即触发首次上报（让面板瞬间变绿）──────────────────
+    sh "$TRAFFIC_SCRIPT" >/dev/null 2>&1 &
     
     info "✅ 流量监控配置完成 (上报间隔: 5 分钟，已触发首次心跳)"
 }

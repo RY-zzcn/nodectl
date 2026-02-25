@@ -357,6 +357,14 @@
         gap: 12px;
     }
 
+    /* Socks5 随机认证 toggle */
+    .gs-socks5-toggle input:checked + span {
+        background-color: #007aff !important;
+    }
+    .gs-socks5-toggle input:checked + span + .gs-toggle-knob {
+        transform: translateX(20px);
+    }
+
     /* ================= 变种配置区 ================= */
     .variant-section {
         border: 1px solid #e5e5ea;
@@ -824,6 +832,19 @@
                                 <label class="gs-label">默认密码 (留空无密码)</label>
                                 <input type="text" id="gs_proxy_socks5_pass" class="gs-input" placeholder="" oninput="triggerGsAutoSave()">
                             </div>
+                            <div class="gs-field" style="width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e5ea;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div>
+                                        <label class="gs-label" style="margin-bottom: 2px;">🔀 每节点随机认证</label>
+                                        <div style="font-size: 11px; color: #86868b; line-height: 1.4;">各节点使用独立凭据，增强安全性</div>
+                                    </div>
+                                    <label class="gs-socks5-toggle" style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; margin-left: 12px;">
+                                        <input type="checkbox" id="gs_proxy_socks5_random_auth" onchange="toggleSocks5RandomAuth(); triggerGsAutoSave();" style="opacity: 0; width: 0; height: 0;">
+                                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 24px; transition: .3s;"></span>
+                                        <span class="gs-toggle-knob" style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1022,6 +1043,8 @@
                 document.getElementById('gs_proxy_port_socks5').value = d.proxy_port_socks5 || '';
                 document.getElementById('gs_proxy_socks5_user').value  = d.proxy_socks5_user || '';
                 document.getElementById('gs_proxy_socks5_pass').value  = d.proxy_socks5_pass || '';
+                document.getElementById('gs_proxy_socks5_random_auth').checked = (d.proxy_socks5_random_auth === 'true');
+                toggleSocks5RandomAuth();
                 // Trojan 族
                 document.getElementById('gs_proxy_port_trojan').value     = d.proxy_port_trojan     || '';
                 document.getElementById('gs_proxy_port_trojan_wst').value = d.proxy_port_trojan_wst || '';
@@ -1079,6 +1102,7 @@
                 "proxy_port_socks5": document.getElementById('gs_proxy_port_socks5').value,
                 "proxy_socks5_user": document.getElementById('gs_proxy_socks5_user').value,
                 "proxy_socks5_pass": document.getElementById('gs_proxy_socks5_pass').value,
+                "proxy_socks5_random_auth": document.getElementById('gs_proxy_socks5_random_auth').checked ? 'true' : 'false',
                 // Trojan 族
                 "proxy_port_trojan":     document.getElementById('gs_proxy_port_trojan').value,
                 "proxy_port_trojan_wst": document.getElementById('gs_proxy_port_trojan_wst').value,
@@ -1106,6 +1130,27 @@
                 indicator.innerHTML = '<span style="color:#ff3b30;">保存失败</span>';
             }
         }, 600);
+    }
+
+    function toggleSocks5RandomAuth() {
+        const checked = document.getElementById('gs_proxy_socks5_random_auth').checked;
+        const userInput = document.getElementById('gs_proxy_socks5_user');
+        const passInput = document.getElementById('gs_proxy_socks5_pass');
+        if (checked) {
+            userInput.disabled = true;
+            passInput.disabled = true;
+            userInput.style.opacity = '0.5';
+            passInput.style.opacity = '0.5';
+            userInput.placeholder = '已启用随机认证';
+            passInput.placeholder = '已启用随机认证';
+        } else {
+            userInput.disabled = false;
+            passInput.disabled = false;
+            userInput.style.opacity = '1';
+            passInput.style.opacity = '1';
+            userInput.placeholder = '';
+            passInput.placeholder = '';
+        }
     }
 </script>
 {{end}}

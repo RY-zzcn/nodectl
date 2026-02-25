@@ -39,6 +39,7 @@ var (
 		"proxy_port_socks5":                  "Socks5 端口",
 		"proxy_socks5_user":                  "Socks5 用户名",
 		"proxy_socks5_pass":                  "Socks5 密码",
+		"proxy_socks5_random_auth":           "Socks5 随机认证",
 		"proxy_ss_method":                    "SS 加密方式",
 		"pref_use_emoji_flag":                "国旗 Emoji 显示",
 		"pref_ip_strategy":                   "默认 IP 策略",
@@ -320,6 +321,8 @@ func summarizeLogOperation(msg string, attrs map[string]string) string {
 	}
 
 	switch {
+	case strings.Contains(msg, "HTTP 服务告警"):
+		return "系统日志"
 	case strings.Contains(msg, "链接转换"):
 		return "链接转换"
 	case strings.Contains(msg, "成功下发 Clash 订阅模板") || strings.Contains(msg, "成功下发 V2Ray Base64 订阅") || strings.Contains(msg, "成功下发 Raw"):
@@ -473,7 +476,13 @@ func shouldAppendIPForSecurityLog(rawMsg string) bool {
 
 	return strings.Contains(rawMsg, "未授权访问拦截") ||
 		strings.Contains(rawMsg, "管理员登录成功") ||
-		strings.Contains(rawMsg, "登录拦截")
+		strings.Contains(rawMsg, "登录拦截") ||
+		strings.Contains(rawMsg, "HTTP 服务告警") ||
+		strings.Contains(rawMsg, "Token 校验失败") ||
+		strings.Contains(rawMsg, "Token 校验警告") ||
+		strings.Contains(rawMsg, "鉴权系统异常") ||
+		strings.Contains(rawMsg, "安装脚本请求被拦截") ||
+		strings.Contains(rawMsg, "非法请求方法")
 }
 
 func nodeGroupToCN(v string) string {

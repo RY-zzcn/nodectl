@@ -122,6 +122,36 @@ func ReorderNodes(routingType int, uuids []string) error {
 	return nil
 }
 
+// generateRandomString 生成指定长度的随机字母数字字符串
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		logger.Log.Warn("生成随机字符串失败，使用回退值", "error", err)
+		return "fallback"
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b)
+}
+
+// generateSocks5User 根据配置决定返回默认用户名还是随机用户名
+func generateSocks5User(configMap map[string]string) string {
+	if strings.EqualFold(strings.TrimSpace(configMap["proxy_socks5_random_auth"]), "true") {
+		return "s5_" + generateRandomString(8)
+	}
+	return configMap["proxy_socks5_user"]
+}
+
+// generateSocks5Pass 根据配置决定返回默认密码还是随机密码
+func generateSocks5Pass(configMap map[string]string) string {
+	if strings.EqualFold(strings.TrimSpace(configMap["proxy_socks5_random_auth"]), "true") {
+		return generateRandomString(16)
+	}
+	return configMap["proxy_socks5_pass"]
+}
+
 // RenderInstallScript 渲染安装脚本 (只填充静态端口配置)
 func RenderInstallScript(node database.NodePool) (string, error) {
 	var configs []database.SysConfig
@@ -226,8 +256,8 @@ func RenderInstallScript(node database.NodePool) (string, error) {
 		"RealitySNI":  vlessTLSSNI,
 		"SSMethod":    configMap["proxy_ss_method"],
 		"PortSocks5":  configMap["proxy_port_socks5"],
-		"Socks5User":  configMap["proxy_socks5_user"],
-		"Socks5Pass":  configMap["proxy_socks5_pass"],
+		"Socks5User":  generateSocks5User(configMap),
+		"Socks5Pass":  generateSocks5Pass(configMap),
 		// 新增协议端口
 		"PortTrojan": portTrojan,
 		// 可配置 SNI

@@ -131,6 +131,7 @@ func initProxySettings() {
 		{Key: "proxy_port_socks5", Value: "20005", Description: "Socks5 默认监听端口"},
 		{Key: "proxy_socks5_user", Value: "admin", Description: "Socks5 默认用户名"},
 		{Key: "proxy_socks5_pass", Value: "123456", Description: "Socks5 默认密码"},
+		{Key: "proxy_socks5_random_auth", Value: "true", Description: "Socks5 每次下发安装脚本时使用随机账号密码"},
 		// 新增协议配置
 		{Key: "proxy_port_trojan", Value: "20006", Description: "Trojan 默认监听端口"},
 		// 可配置 SNI（原先硬编码 www.bing.com）
