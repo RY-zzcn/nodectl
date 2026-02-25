@@ -595,6 +595,14 @@
             return gb.toFixed(2) + ' GB';
         }
 
+        // "2026-02-25 11:20" → "02-25 11:20"
+        function fmtUpdateAt(raw) {
+            if (!raw || raw === '--') return '--';
+            const s = String(raw);
+            // 格式 YYYY-MM-DD HH:MM，取 index 5~15
+            return s.length >= 16 ? s.slice(5, 16) : s;
+        }
+
         function setStatus(msg, isErr) {
             const el = statusEl();
             if (!el) return;
@@ -691,11 +699,12 @@
                             </div>
                         </div>
                         <div class="ts-rank-meta">
-                            <div style="display:flex; gap:6px; align-items:center; font-size:10px;">
+                            <div style="display:flex; gap:6px; align-items:center;">
                                 <span style="color:#34c759;">↑ ${fmtGb(up)}</span>
                                 <span style="color:#1e88ff;">↓ ${fmtGb(down)}</span>
                                 <span style="color:#b16bff;">${esc(Number(item.upload_ratio || 0).toFixed(2))}</span>
                             </div>
+                            <span style="color:#b0b0bb; font-size:10px; white-space:nowrap; font-variant-numeric:tabular-nums;">${esc(fmtUpdateAt(item.traffic_update_at))}</span>
                         </div>
                     </div>
                 `;

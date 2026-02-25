@@ -2513,6 +2513,116 @@ action_uninstall() {
     info "卸载完成"
 }
 
+# 查看定时流量上报任务状态
+action_traffic_status() {
+    local TRAFFIC_SCRIPT="/usr/local/bin/singbox_traffic.sh"
+    local TRAFFIC_CACHE="/etc/sing-box/.traffic_cache"
+    local SC_CRONTAB="/etc/singbox_crontab"
+
+    echo ""
+    echo "━━━━━━━━━━━━ 定时流量上报状态 ━━━━━━━━━━━━"
+
+    # 上报脚本
+    if [ -f "$TRAFFIC_SCRIPT" ]; then
+        echo "  上报脚本: 存在 ✓"
+    else
+        echo "  上报脚本: 不存在 ✗ (请重新安装)"
+    fi
+
+    # Cron 模式检测
+    if [ -f "$SC_CRONTAB" ]; then
+        echo "  Cron 模式: supercronic"
+        if pgrep -f "supercronic.*singbox_crontab" >/dev/null 2>&1; then
+            SC_PID=$(pgrep -f "supercronic.*singbox_crontab" | head -n1)
+            echo "  supercronic 进程: 运行中 (PID: $SC_PID) ✓"
+        else
+            echo "  supercronic 进程: 未运行 ✗"
+        fi
+    else
+        echo "  Cron 模式: 系统 cron"
+        if crontab -l 2>/dev/null | grep -q "singbox_traffic.sh"; then
+            echo "  crontab 任务: 已注册 ✓"
+        else
+            echo "  crontab 任务: 未注册 ✗"
+        fi
+        if pgrep -x crond >/dev/null 2>&1 || pgrep -x cron >/dev/null 2>&1; then
+            echo "  crond 进程: 运行中 ✓"
+        else
+            echo "  crond 进程: 未运行 ✗"
+        fi
+    fi
+
+    # 上报缓存
+    echo ""
+    if [ -f "$TRAFFIC_CACHE" ]; then
+        local ACC_TX=0 ACC_RX=0
+        ACC_TX=$(grep '^ACCUMULATED_TX=' "$TRAFFIC_CACHE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || echo 0)
+        ACC_RX=$(grep '^ACCUMULATED_RX=' "$TRAFFIC_CACHE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || echo 0)
+        ACC_TX=${ACC_TX:-0}; ACC_RX=${ACC_RX:-0}
+        local TX_MB=$(awk "BEGIN{printf \"%.2f\", ${ACC_TX}/1048576}")
+        local RX_MB=$(awk "BEGIN{printf \"%.2f\", ${ACC_RX}/1048576}")
+        local CACHE_TIME
+        CACHE_TIME=$(stat -c '%y' "$TRAFFIC_CACHE" 2>/dev/null | cut -c1-16 || \
+                     stat -f '%Sm' -t '%Y-%m-%d %H:%M' "$TRAFFIC_CACHE" 2>/dev/null || echo "unknown")
+        echo "  缓存数据:"
+        echo "    起此期累计上传: ${TX_MB} MB"
+        echo "    起此期累计下载: ${RX_MB} MB"
+        echo "    缓存更新时间: $CACHE_TIME"
+    else
+        echo "  上报缓存: 未找到 (可能尚未首次上报)"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# 重启定时流量上报任务
+action_traffic_restart() {
+    local TRAFFIC_SCRIPT="/usr/local/bin/singbox_traffic.sh"
+    local SC_CRONTAB="/etc/singbox_crontab"
+
+    if [ ! -f "$TRAFFIC_SCRIPT" ]; then
+        err "上报脚本不存在: $TRAFFIC_SCRIPT，请重新安装"
+        return 1
+    fi
+
+    if [ -f "$SC_CRONTAB" ]; then
+        # supercronic 模式
+        info "正在重启 supercronic 流量上报任务..."
+        pkill -f "supercronic.*singbox_crontab" 2>/dev/null || true
+        sleep 1
+        nohup /usr/local/bin/supercronic "$SC_CRONTAB" >/var/log/supercronic_singbox.log 2>&1 &
+        sleep 1
+        if pgrep -f "supercronic.*singbox_crontab" >/dev/null 2>&1; then
+            info "✅ supercronic 已重启 (PID: $(pgrep -f 'supercronic.*singbox_crontab' | head -n1))"
+        else
+            err "supercronic 重启失败，请检查 /var/log/supercronic_singbox.log"
+        fi
+    else
+        # 系统 cron 模式：重启 crond
+        info "正在重启系统 cron 服务..."
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl restart cron 2>/dev/null || systemctl restart crond 2>/dev/null || true
+        elif command -v service >/dev/null 2>&1; then
+            service cron restart 2>/dev/null || service crond restart 2>/dev/null || true
+        elif command -v rc-service >/dev/null 2>&1; then
+            rc-service dcron restart 2>/dev/null || rc-service crond restart 2>/dev/null || true
+        else
+            pkill -x crond 2>/dev/null || true
+            sleep 1
+            crond -b -l 8 2>/dev/null || crond 2>/dev/null &
+        fi
+        sleep 1
+        if pgrep -x crond >/dev/null 2>&1 || pgrep -x cron >/dev/null 2>&1; then
+            info "✅ cron 服务已重启"
+        else
+            warn "⚠ crond 进程未检测到，上报可能失效"
+        fi
+    fi
+
+    info "立即触发一次上报..."
+    sh "$TRAFFIC_SCRIPT" >/dev/null 2>&1 &
+    info "✅ 已触发首次上报，纥5秒后可在面板查看最新流量数据"
+}
+
 # 动态生成菜单
 show_menu() {
     read_config 2>/dev/null || true
@@ -2640,6 +2750,14 @@ MENU
     echo "$((option))) 更新 sing-box"
     option=$((option + 1))
 
+    MENU_MAP[$option]="traffic_status"
+    echo "$((option))) 查看定时上报任务状态"
+    option=$((option + 1))
+
+    MENU_MAP[$option]="traffic_restart"
+    echo "$((option))) 重启定时流量上报任务"
+    option=$((option + 1))
+
     MENU_MAP[$option]="uninstall"
     echo "$((option))) 卸载 sing-box"
     
@@ -2689,6 +2807,8 @@ while true; do
                 restart) service_restart && info "已重启" ;;
                 status) service_status ;;
                 update) action_update ;;
+                traffic_status) action_traffic_status ;;
+                traffic_restart) action_traffic_restart ;;
                 uninstall) action_uninstall; exit 0 ;;
                 *) warn "无效选项: $opt" ;;
             esac
