@@ -1046,12 +1046,22 @@ func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 1. 显式删除关联的流量统计数据（不依赖外键级联）
+	if err := database.DB.Where("node_uuid = ?", req.UUID).Delete(&database.NodeTrafficStat{}).Error; err != nil {
+		logger.Log.Error("删除节点流量数据失败", "error", err, "uuid", req.UUID)
+		// 不阻断，继续删除节点本身
+	}
+
+	// 2. 删除节点记录
 	result := database.DB.Where("uuid = ?", req.UUID).Delete(&database.NodePool{})
 	if result.Error != nil {
 		logger.Log.Error("删除节点失败", "error", result.Error, "uuid", req.UUID, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "数据库删除失败")
 		return
 	}
+
+	// 3. 清理内存中的实时状态（Agent 连接、流量缓存、前端订阅）
+	service.CleanupNodeState(targetNode.InstallID, targetNode.UUID)
 
 	logger.Log.Info("节点已删除", "uuid", req.UUID, "name", targetNode.Name, "ip", clientIP, "path", reqPath)
 	sendJSON(w, "success", "节点已删除")

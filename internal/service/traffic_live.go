@@ -543,6 +543,37 @@ func IsNodeOnline(installID string) bool {
 	return ok
 }
 
+// CleanupNodeState 删除节点时清理内存中的所有关联状态
+func CleanupNodeState(installID string, nodeUUID string) {
+	hub := GetTrafficHub()
+
+	// 清理实时流量状态 + ID缓存
+	hub.mu.Lock()
+	delete(hub.nodes, installID)
+	delete(hub.idCache, installID)
+	hub.mu.Unlock()
+
+	// 关闭并清理 Agent WS 连接
+	hub.agentMu.Lock()
+	if conn, ok := hub.agentConns[installID]; ok && conn != nil {
+		conn.Close(websocket.StatusGoingAway, "节点已删除")
+		delete(hub.agentConns, installID)
+	}
+	hub.agentMu.Unlock()
+
+	// 关闭该节点的所有前端订阅者
+	hub.subMu.Lock()
+	if subs, ok := hub.subscribers[nodeUUID]; ok {
+		for ch := range subs {
+			close(ch)
+		}
+		delete(hub.subscribers, nodeUUID)
+	}
+	hub.subMu.Unlock()
+
+	logger.Log.Info("已清理节点内存状态", "install_id", installID, "node_uuid", nodeUUID)
+}
+
 // ============================================================
 //  命令日志 & SSE 流式推送
 // ============================================================
