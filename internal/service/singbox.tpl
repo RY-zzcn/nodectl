@@ -1361,19 +1361,7 @@ setup_agent() {
 
     info "━━━━━━━━━━━━ nodectl-agent 安装 ━━━━━━━━━━━━"
 
-    # ── 1. 清理旧 cron 流量上报 ──────────────────────────────
-    info "清理旧 cron 流量上报任务..."
-    crontab -l 2>/dev/null | grep -v "singbox_traffic" > /tmp/crontab_clean.tmp 2>/dev/null && \
-        crontab /tmp/crontab_clean.tmp 2>/dev/null || true
-    rm -f /tmp/crontab_clean.tmp
-    rm -f /usr/local/bin/singbox_traffic.sh
-    # 清理 supercronic 残留
-    pkill -f "supercronic.*singbox_crontab" 2>/dev/null || true
-    rm -f /etc/singbox_crontab
-    rm -f /etc/local.d/singbox_cron.start
-    info "旧 cron 流量任务已清理 ✓"
-
-    # ── 2. 检测架构并下载 agent ──────────────────────────────
+    # ── 1. 检测架构并下载 agent ──────────────────────────────
     local arch
     arch=$(uname -m)
     local ARCH_NAME=""
@@ -1476,8 +1464,8 @@ SYSTEMD_SVC
 
     # ── 6. 验证 ──────────────────────────────────────────────
     sleep 2
-    if pgrep -x nodectl-agent >/dev/null 2>&1; then
-        info "✅ nodectl-agent 运行中 (PID: $(pgrep -x nodectl-agent))"
+    if pidof nodectl-agent >/dev/null 2>&1; then
+        info "✅ nodectl-agent 运行中 (PID: $(pidof nodectl-agent))"
     else
         warn "⚠️ nodectl-agent 进程未检测到，请检查日志"
         if [ "$OS" != "alpine" ]; then
@@ -2288,9 +2276,9 @@ action_traffic_status() {
     echo "━━━━━━━━━━━━ nodectl-agent 状态 ━━━━━━━━━━━━"
 
     # Agent 进程
-    if pgrep -x nodectl-agent >/dev/null 2>&1; then
+    if pidof nodectl-agent >/dev/null 2>&1; then
         local AGENT_PID
-        AGENT_PID=$(pgrep -x nodectl-agent | head -n1)
+        AGENT_PID=$(pidof nodectl-agent | awk '{print $1}')
         echo "  Agent 进程: 运行中 (PID: $AGENT_PID) ✓"
     else
         echo "  Agent 进程: 未运行 ✗"
@@ -2370,19 +2358,19 @@ action_traffic_restart() {
     elif command -v rc-service >/dev/null 2>&1; then
         rc-service nodectl-agent restart
         sleep 1
-        if pgrep -x nodectl-agent >/dev/null 2>&1; then
+        if pidof nodectl-agent >/dev/null 2>&1; then
             info "✅ nodectl-agent 已重启"
         else
             err "nodectl-agent 重启失败"
             tail -10 /var/log/nodectl-agent.log 2>/dev/null
         fi
     else
-        pkill -x nodectl-agent 2>/dev/null || true
+        killall nodectl-agent 2>/dev/null || true
         sleep 1
         /usr/local/bin/nodectl-agent --config /etc/nodectl-agent/config.json &
         sleep 1
-        if pgrep -x nodectl-agent >/dev/null 2>&1; then
-            info "✅ nodectl-agent 已重启 (PID: $(pgrep -x nodectl-agent | head -n1))"
+        if pidof nodectl-agent >/dev/null 2>&1; then
+            info "✅ nodectl-agent 已重启 (PID: $(pidof nodectl-agent | awk '{print $1}'))"
         else
             err "nodectl-agent 重启失败"
         fi
