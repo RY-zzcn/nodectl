@@ -115,6 +115,72 @@
         border: 1px solid #f0f1f6;
     }
 
+    .ts-chart-wrap {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+    }
+
+    .ts-chart-wrap .ts-svg {
+        flex: 1;
+    }
+
+    .ts-tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: rgba(30, 30, 34, 0.92);
+        color: #fff;
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 7px 11px;
+        border-radius: 8px;
+        white-space: nowrap;
+        z-index: 20;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+        line-height: 1.65;
+        font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+
+    .ts-tooltip.visible {
+        opacity: 1;
+    }
+
+    .ts-tooltip .tt-label {
+        color: #b0b0ba;
+        margin-bottom: 2px;
+    }
+
+    .ts-tooltip .tt-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .ts-tooltip .tt-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    /* 折线图描点悬停放大动画 */
+    .ts-svg .ts-line-dot {
+        transition: r 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease;
+        cursor: pointer;
+    }
+
+    .ts-svg .ts-line-dot:hover {
+        filter: drop-shadow(0 0 4px rgba(177,107,255,0.5));
+    }
+
+    /* 柱状图悬停高亮 */
+    .ts-svg .ts-bar-hit {
+        cursor: pointer;
+    }
+
     .ts-legend {
         margin-top: 8px;
         display: flex;
@@ -417,7 +483,10 @@
                         <div class="ts-selected-node" id="ts-selected-node"><span class="dot"></span><span>--</span></div>
                     </div>
                 </div>
-                <svg class="ts-svg" id="ts-bar-svg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet"></svg>
+                <div class="ts-chart-wrap" id="ts-bar-wrap">
+                    <svg class="ts-svg" id="ts-bar-svg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet"></svg>
+                    <div class="ts-tooltip" id="ts-bar-tooltip"></div>
+                </div>
                 <div class="ts-legend">
                     <span><i class="ts-dot" style="background:#34c759"></i>上传</span>
                     <span><i class="ts-dot" style="background:#1e88ff"></i>下载</span>
@@ -435,7 +504,10 @@
                     </div>
                     <div class="ts-head-right" style="font-size:12px; color:#8d8d98; font-weight:700;">⚗ <span id="ts-trend-ratio">0.00</span></div>
                 </div>
-                <svg class="ts-svg" id="ts-line-svg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet"></svg>
+                <div class="ts-chart-wrap" id="ts-line-wrap">
+                    <svg class="ts-svg" id="ts-line-svg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet"></svg>
+                    <div class="ts-tooltip" id="ts-line-tooltip"></div>
+                </div>
                 <div class="ts-legend">
                     <span><i class="ts-dot" style="background:#34c759"></i>上传</span>
                     <span><i class="ts-dot" style="background:#1e88ff"></i>下载</span>
@@ -901,6 +973,7 @@
             out += `<circle cx="${left}" cy="${h - bottom}" r="3.2" fill="#34c759" stroke="#fff" stroke-width="1"/>`;
             out += `<circle cx="${w - right}" cy="${h - bottom}" r="3.2" fill="#ff6b6b" stroke="#fff" stroke-width="1"/>`;
 
+            let hitAreas = '';
             points.forEach((p, i) => {
                 const up = Number(p.up_bytes || 0);
                 const down = Number(p.down_bytes || 0);
@@ -921,8 +994,38 @@
                     const label = fmtAxisLabel(p.label);
                     out += `<text x="${(left + i * groupW + groupW / 2).toFixed(2)}" y="${h - 6}" text-anchor="middle" fill="#70707c" font-size="11.5" font-weight="600" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">${esc(label)}</text>`;
                 }
+
+                // 透明hit区域覆盖整个柱组宽度
+                const hitX = left + i * groupW;
+                hitAreas += `<rect class="ts-bar-hit" x="${hitX.toFixed(2)}" y="${top}" width="${groupW.toFixed(2)}" height="${chartH}" fill="transparent" data-idx="${i}"/>`;
             });
+            out += hitAreas;
             svg.innerHTML = out;
+
+            // 绑定柱状图 tooltip 事件
+            const wrap = document.getElementById('ts-bar-wrap');
+            const tip = document.getElementById('ts-bar-tooltip');
+            if (!wrap || !tip) return;
+            svg.querySelectorAll('.ts-bar-hit').forEach(hitEl => {
+                hitEl.addEventListener('mouseenter', function (e) {
+                    const idx = parseInt(this.getAttribute('data-idx'));
+                    const p = points[idx];
+                    if (!p) return;
+                    const up = Number(p.up_bytes || 0);
+                    const down = Number(p.down_bytes || 0);
+                    const total = Number(p.total_bytes || 0);
+                    const label = p.label || '';
+                    tip.innerHTML = `<div class="tt-label">${esc(label)}</div><div class="tt-row"><span class="tt-dot" style="background:#34c759"></span>上传: ${esc(fmtBytes(up))}</div><div class="tt-row"><span class="tt-dot" style="background:#1e88ff"></span>下载: ${esc(fmtBytes(down))}</div><div class="tt-row" style="border-top:1px solid rgba(255,255,255,0.12);padding-top:3px;margin-top:2px;"><span class="tt-dot" style="background:#aaa"></span>总计: ${esc(fmtBytes(total))}</div>`;
+                    tip.classList.add('visible');
+                    positionTooltip(tip, wrap, e);
+                });
+                hitEl.addEventListener('mousemove', function (e) {
+                    positionTooltip(tip, wrap, e);
+                });
+                hitEl.addEventListener('mouseleave', function () {
+                    tip.classList.remove('visible');
+                });
+            });
         }
 
         function renderLine() {
@@ -949,7 +1052,8 @@
             let upPath = '';
             let downPath = '';
             let totalPath = '';
-            let dots = '';
+            let axisLabels = '';
+            let dotsSvg = '';
 
             points.forEach((p, i) => {
                 const up = Number(p.up_bytes || 0);
@@ -965,8 +1069,12 @@
 
                 if (tickSet.has(i)) {
                     const label = fmtAxisLabel(p.label);
-                    dots += `<text x="${ux}" y="${h - 6}" text-anchor="middle" fill="#70707c" font-size="11.5" font-weight="600" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">${esc(label)}</text>`;
+                    axisLabels += `<text x="${ux}" y="${h - 6}" text-anchor="middle" fill="#70707c" font-size="11.5" font-weight="600" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">${esc(label)}</text>`;
                 }
+
+                // 可见描点 + 透明交互热区
+                dotsSvg += `<circle cx="${tx.toFixed(2)}" cy="${ty.toFixed(2)}" r="3" fill="#b16bff" stroke="#fff" stroke-width="1.5" class="ts-line-dot" data-idx="${i}"/>`;
+                dotsSvg += `<circle cx="${tx.toFixed(2)}" cy="${ty.toFixed(2)}" r="14" fill="transparent" class="ts-line-dot" data-idx="${i}" style="stroke:none;"/>`;
             });
 
             const [fx] = xy(0, Number(points[0].total_bytes || 0));
@@ -990,8 +1098,57 @@
                 <path d="${upPath}" fill="none" stroke="#34c759" stroke-width="1.8"/>
                 <path d="${downPath}" fill="none" stroke="#1e88ff" stroke-width="1.8"/>
                 <path d="${totalPath}" fill="none" stroke="#b16bff" stroke-width="1.8" stroke-dasharray="4 3"/>
-                ${dots}
+                ${axisLabels}
+                ${dotsSvg}
             `;
+
+            // 绑定折线图 tooltip + 放大动画事件
+            const wrap = document.getElementById('ts-line-wrap');
+            const tip = document.getElementById('ts-line-tooltip');
+            if (!wrap || !tip) return;
+
+            let activeDotEl = null;
+            svg.querySelectorAll('.ts-line-dot').forEach(dotEl => {
+                dotEl.addEventListener('mouseenter', function (e) {
+                    const idx = parseInt(this.getAttribute('data-idx'));
+                    const p = points[idx];
+                    if (!p) return;
+
+                    // 放大同索引的可见描点（第一个同 data-idx 的 circle）
+                    if (activeDotEl) { activeDotEl.setAttribute('r', '3'); activeDotEl.setAttribute('stroke-width', '1.5'); }
+                    const visibleDot = svg.querySelector(`.ts-line-dot[data-idx="${idx}"][fill="#b16bff"]`);
+                    if (visibleDot) { visibleDot.setAttribute('r', '6'); visibleDot.setAttribute('stroke-width', '2.5'); activeDotEl = visibleDot; }
+
+                    const up = Number(p.up_bytes || 0);
+                    const down = Number(p.down_bytes || 0);
+                    const total = Number(p.total_bytes || 0);
+                    const label = p.label || '';
+                    tip.innerHTML = `<div class="tt-label">${esc(label)}</div><div class="tt-row"><span class="tt-dot" style="background:#34c759"></span>上传: ${esc(fmtBytes(up))}</div><div class="tt-row"><span class="tt-dot" style="background:#1e88ff"></span>下载: ${esc(fmtBytes(down))}</div><div class="tt-row" style="border-top:1px solid rgba(255,255,255,0.12);padding-top:3px;margin-top:2px;"><span class="tt-dot" style="background:#b16bff"></span>总计: ${esc(fmtBytes(total))}</div>`;
+                    tip.classList.add('visible');
+                    positionTooltip(tip, wrap, e);
+                });
+                dotEl.addEventListener('mousemove', function (e) {
+                    positionTooltip(tip, wrap, e);
+                });
+                dotEl.addEventListener('mouseleave', function () {
+                    if (activeDotEl) { activeDotEl.setAttribute('r', '3'); activeDotEl.setAttribute('stroke-width', '1.5'); activeDotEl = null; }
+                    tip.classList.remove('visible');
+                });
+            });
+        }
+
+        function positionTooltip(tip, wrap, e) {
+            const rect = wrap.getBoundingClientRect();
+            let x = e.clientX - rect.left + 12;
+            let y = e.clientY - rect.top - 10;
+            // 防止右侧溢出
+            const tipW = tip.offsetWidth || 140;
+            const tipH = tip.offsetHeight || 80;
+            if (x + tipW > rect.width - 4) x = e.clientX - rect.left - tipW - 8;
+            if (y + tipH > rect.height - 4) y = rect.height - tipH - 4;
+            if (y < 4) y = 4;
+            tip.style.left = x + 'px';
+            tip.style.top = y + 'px';
         }
 
         async function loadSeriesAndRender() {

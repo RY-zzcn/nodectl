@@ -502,6 +502,14 @@ func enrichLogMessageWithContext(messageCN, rawMsg string, attrs map[string]stri
 		return fmt.Sprintf("%s；请求IP: %s", strings.TrimSpace(messageCN), ip)
 	}
 
+	// Agent WS 相关日志追加 IP
+	if strings.HasPrefix(rawMsg, "Agent WS ") {
+		if strings.Contains(messageCN, "IP:") {
+			return messageCN
+		}
+		return fmt.Sprintf("%s；IP: %s", strings.TrimSpace(messageCN), ip)
+	}
+
 	return messageCN
 }
 
