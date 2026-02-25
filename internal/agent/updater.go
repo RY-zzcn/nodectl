@@ -395,6 +395,9 @@ func (u *Updater) findLatestAgentRelease(ctx context.Context) (version, binaryUR
 
 	for i := range release.Assets {
 		asset := &release.Assets[i]
+		if strings.HasSuffix(asset.Name, ".sha256") {
+			continue
+		}
 		matches := pattern.FindStringSubmatch(asset.Name)
 		if matches != nil && len(matches) >= 2 {
 			matchedAsset = asset

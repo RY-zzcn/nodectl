@@ -1398,8 +1398,35 @@ setup_agent() {
             ;;
     esac
 
-    local agent_url
-    agent_url=$(echo "$AGENT_DOWNLOAD_URL" | sed "s/__ARCH__/$ARCH_NAME/g")
+    local agent_url=""
+    local gh_api="https://api.github.com/repos/hobin66/nodectl/releases/latest"
+
+    # 新版发布资产命名为: nodectl-agent-linux-<arch>-vX.Y.Z
+    # 优先通过 GitHub API 动态解析 latest 资产，避免固定 URL 因版本号失效
+    if release_json=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: nodectl-install-script" "$gh_api"); then
+        if command -v jq >/dev/null 2>&1; then
+            agent_url=$(echo "$release_json" | jq -r --arg arch "$ARCH_NAME" '
+                .assets[]
+                | select(.name | test("^nodectl-agent-linux-" + $arch + "-v"))
+                | select(.name | endswith(".sha256") | not)
+                | .browser_download_url
+            ' | head -n 1)
+        else
+            # 无 jq 的兜底解析
+            agent_url=$(echo "$release_json" \
+                | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]+"' \
+                | sed -E 's/^"browser_download_url"[[:space:]]*:[[:space:]]*"(.*)"$/\1/' \
+                | grep "nodectl-agent-linux-${ARCH_NAME}-v" \
+                | grep -vE '\\.sha256$' \
+                | head -n 1)
+        fi
+    fi
+
+    # 向后兼容：若 API 解析失败，尝试旧版占位 URL
+    if [ -z "$agent_url" ] || [ "$agent_url" = "null" ]; then
+        warn "GitHub API 解析 agent 资产失败，回退旧下载 URL 逻辑"
+        agent_url=$(echo "$AGENT_DOWNLOAD_URL" | sed "s/__ARCH__/$ARCH_NAME/g")
+    fi
 
     local AGENT_BIN="/usr/local/bin/nodectl-agent"
 
