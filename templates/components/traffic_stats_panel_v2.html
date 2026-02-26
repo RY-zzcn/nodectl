@@ -560,7 +560,9 @@
             // 实时速率（来自 WS 推送）: install_id -> { uuid, rx_rate_bps, tx_rate_bps, last_live_at }
             liveRates: {},
             offlineGraceSec: 20,
-            liveWs: null
+            liveWs: null,
+            liveReady: false,
+            wsConnectedAt: 0
         };
 
         const nodeSelect = () => document.getElementById('ts-node-select');
@@ -723,6 +725,12 @@
 
         // 判断节点是否离线
         function isNodeOffline(nodeUUID) {
+            // WS 刚连上时先进入预热期，避免首屏/切换节点出现“离线→立马上线”闪烁
+            if (!state.liveReady) {
+                const warmupElapsed = Date.now() / 1000 - (state.wsConnectedAt || 0);
+                if (warmupElapsed <= state.offlineGraceSec) return false;
+            }
+
             const live = state.liveRates[nodeUUID];
             if (!live || !live.last_live_at) return true;
             const elapsed = Date.now() / 1000 - live.last_live_at;
@@ -738,17 +746,25 @@
             const wsUrl = proto + '//' + location.host + '/api/traffic/live';
             const ws = new WebSocket(wsUrl);
             state.liveWs = ws;
+            state.liveReady = false;
+
+            ws.onopen = function() {
+                state.wsConnectedAt = Date.now() / 1000;
+            };
 
             ws.onmessage = function(evt) {
                 try {
                     const msg = JSON.parse(evt.data);
                     if (msg.node_uuid) {
+                        // 使用“本地接收时间”作为在线判定基准，避免手机端时钟漂移导致误判离线
+                        const nowSec = Date.now() / 1000;
                         state.liveRates[msg.node_uuid] = {
                             uuid: msg.node_uuid,
                             rx_rate_bps: msg.rx_rate_bps || 0,
                             tx_rate_bps: msg.tx_rate_bps || 0,
-                            last_live_at: msg.last_live_at || (Date.now() / 1000)
+                            last_live_at: nowSec
                         };
+                        state.liveReady = true;
                         // 仅更新该节点的速率文字和离线状态，不整体重渲染
                         updateRankItemLive(msg.node_uuid);
                     }
@@ -1211,6 +1227,16 @@
                 renderLine();
                 syncRankListHeight();
             });
+
+            // 定时刷新离线标记，避免仅在收到 WS 消息时才更新状态
+            setInterval(function () {
+                const list = document.getElementById('ts-rank-list');
+                if (!list) return;
+                list.querySelectorAll('.ts-rank-item').forEach(function (el) {
+                    const uuid = String(el.getAttribute('data-uuid') || '');
+                    if (uuid) updateRankItemLive(uuid);
+                });
+            }, 2000);
         }
 
         window.trafficStatsRefresh = async function () {
@@ -1248,4 +1274,4 @@
         });
     })();
 </script>
-+{{end}}
+{{end}}
