@@ -128,6 +128,7 @@ type tgNotifyTarget struct {
 	UserID     int64
 	AllowNode  bool
 	AllowLogin bool
+	AllowSpeed bool
 }
 
 func parseTGNotifyTargets(raw string) []tgNotifyTarget {
@@ -152,7 +153,7 @@ func parseTGNotifyTargets(raw string) []tgNotifyTarget {
 			continue
 		}
 
-		target := tgNotifyTarget{UserID: id, AllowNode: true, AllowLogin: true}
+		target := tgNotifyTarget{UserID: id, AllowNode: true, AllowLogin: true, AllowSpeed: true}
 
 		if len(entry) == 2 {
 			rest := strings.TrimSpace(entry[1])
@@ -175,6 +176,8 @@ func parseTGNotifyTargets(raw string) []tgNotifyTarget {
 						target.AllowNode = allow
 					case "login", "login_notify":
 						target.AllowLogin = allow
+					case "speedtest", "speed_test", "batch_speedtest", "speed_notify":
+						target.AllowSpeed = allow
 					}
 				}
 			}
@@ -367,6 +370,73 @@ func SendAdminLoginNotification(username, loginIP string, loginTime time.Time, s
 		msg := tgbotapi.NewMessage(uid, msgText)
 		if _, err := bot.Send(msg); err != nil {
 			logger.Log.Warn("发送 TG 登录通知失败", "user_id", uid, "username", username, "ip", loginIP, "error", err)
+			continue
+		}
+		sentAny = true
+	}
+
+	return sentAny
+}
+
+// SendBatchSpeedTestNotification 发送整组测速任务结束通知（完成/中止）
+func SendBatchSpeedTestNotification(subName, taskKey, status string, totalCount, resultCount, errorCount int, startedAt time.Time, finishedAt time.Time) bool {
+	keys := []string{"tg_bot_enabled", "tg_bot_token", "tg_bot_whitelist", "tg_speedtest_notify_enabled"}
+	var cfgList []database.SysConfig
+	if err := database.DB.Where("key IN ?", keys).Find(&cfgList).Error; err != nil {
+		logger.Log.Warn("读取 TG 测速通知配置失败", "error", err)
+		return false
+	}
+
+	cfg := map[string]string{}
+	for _, c := range cfgList {
+		cfg[c.Key] = strings.TrimSpace(c.Value)
+	}
+
+	if cfg["tg_bot_enabled"] != "true" || cfg["tg_speedtest_notify_enabled"] != "true" {
+		return false
+	}
+
+	token := cfg["tg_bot_token"]
+	if token == "" {
+		return false
+	}
+
+	targets := parseTGNotifyTargets(cfg["tg_bot_whitelist"])
+	users := make([]int64, 0, len(targets))
+	for _, t := range targets {
+		if t.AllowSpeed {
+			users = append(users, t.UserID)
+		}
+	}
+	if len(users) == 0 {
+		return false
+	}
+
+	bot, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		logger.Log.Warn("初始化 TG Bot 失败，无法发送测速通知", "error", err)
+		return false
+	}
+
+	if strings.TrimSpace(subName) == "" {
+		subName = "未命名订阅"
+	}
+	if strings.TrimSpace(taskKey) == "" {
+		taskKey = startedAt.Format("200601021504")
+	}
+
+	title := "✅ 整组测速任务完成"
+	if strings.EqualFold(status, "stopped") {
+		title = "⏹️ 整组测速任务已中止"
+	}
+
+	msgText := fmt.Sprintf("%s\n订阅：%s\n任务：%s\n开始：%s\n结束：%s\n总节点：%d\n已完成：%d\n错误：%d", title, subName, taskKey, startedAt.Format("2006-01-02 15:04:05"), finishedAt.Format("2006-01-02 15:04:05"), totalCount, resultCount, errorCount)
+
+	sentAny := false
+	for _, uid := range users {
+		msg := tgbotapi.NewMessage(uid, msgText)
+		if _, err := bot.Send(msg); err != nil {
+			logger.Log.Warn("发送 TG 测速通知失败", "user_id", uid, "task_key", taskKey, "error", err)
 			continue
 		}
 		sentAny = true

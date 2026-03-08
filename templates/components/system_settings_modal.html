@@ -726,6 +726,34 @@
         background: #f0f0f5;
     }
 
+    .sys-tg-group {
+        border: 1px solid #e5eaf3;
+        border-radius: 10px;
+        background: #fafcff;
+        padding: 10px;
+        margin-bottom: 14px;
+    }
+
+    .sys-tg-group-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #4b5563;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sys-tg-group .sys-pref-row,
+    .sys-tg-group .sys-field {
+        margin-bottom: 8px;
+    }
+
+    .sys-tg-group .sys-pref-row:last-child,
+    .sys-tg-group .sys-field:last-child {
+        margin-bottom: 0;
+    }
+
     .sys-pref-info {
         display: flex;
         flex-direction: column;
@@ -1832,70 +1860,98 @@
 
                 <div class="sys-form-section" id="sys-form-tgbot" style="display:none;">
                     <!-- Togglers -->
-                    <div class="sys-pref-row" style="align-items: center; margin-bottom: 20px;">
-                        <div class="sys-pref-info">
-                            <span class="sys-pref-title" style="display:flex;align-items:center;gap:4px;">
-                                🚀 启用 Telegram Bot
-                                <div class="sys-info-tooltip-wrap" tabindex="0">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                    </svg>
-                                    <div class="sys-tooltip-content">
-                                        开启后，管理面板将运行一个 TG 机器人。关闭后则停止机器人。
+                    <div class="sys-tg-group" style="margin-bottom:20px;">
+                        <div class="sys-tg-group-title">🤖 TG Bot 控制</div>
+                        <div class="sys-pref-row" style="align-items: center;">
+                            <div class="sys-pref-info">
+                                <span class="sys-pref-title" style="display:flex;align-items:center;gap:4px;">
+                                    🚀 启用 Telegram Bot
+                                    <div class="sys-info-tooltip-wrap" tabindex="0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                        </svg>
+                                        <div class="sys-tooltip-content">
+                                            开启后，管理面板将运行一个 TG 机器人。关闭后则停止机器人。
+                                        </div>
                                     </div>
-                                </div>
-                            </span>
-                        </div>
-                        <label class="sys-toggle-switch">
-                            <input type="checkbox" id="sys_tg_bot_enabled" onchange="triggerSysAutoSave()">
-                            <span class="sys-toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="sys-pref-row" style="align-items: center; margin-bottom: 20px;">
-                        <div class="sys-pref-info">
-                            <span class="sys-pref-title" style="display:flex;align-items:center;gap:4px;">
-                                🧹 清理菜单并注册面板
-                                <div class="sys-info-tooltip-wrap" tabindex="0">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                    </svg>
-                                    <div class="sys-tooltip-content">
-                                        开启后，更新为 Nodectl 管理面板的订阅菜单。
-                                    </div>
-                                </div>
-                            </span>
-                        </div>
-                        <label class="sys-toggle-switch">
-                            <input type="checkbox" id="sys_tg_bot_register_commands" onchange="triggerSysAutoSave()">
-                            <span class="sys-toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="sys-field">
-                        <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
-                            登录通知（TG）
-                            <div class="sys-info-tooltip-wrap" tabindex="0">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                </svg>
-                                <div class="sys-tooltip-content">
-                                    登录事件通知策略。需先启用 TG Bot 并配置有效 Token 与白名单用户。
-                                </div>
+                                </span>
                             </div>
-                        </label>
-                        <select id="sys_tg_login_notify_mode" class="sys-select" onchange="triggerSysAutoSave()">
-                            <option value="off">不启用</option>
-                            <option value="success_only">仅成功通知</option>
-                            <option value="failure_only">仅失败通知</option>
-                            <option value="all">成功失败都通知</option>
-                        </select>
+                            <label class="sys-toggle-switch">
+                                <input type="checkbox" id="sys_tg_bot_enabled" onchange="updateTgBotSettingsVisibility(); triggerSysAutoSave()">
+                                <span class="sys-toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div id="sysTgCommandPanelRow" class="sys-pref-row" style="align-items: center; margin-bottom: 0; display:none;">
+                            <div class="sys-pref-info">
+                                <span class="sys-pref-title" style="display:flex;align-items:center;gap:4px;">
+                                    🧹 清理菜单并注册面板
+                                    <div class="sys-info-tooltip-wrap" tabindex="0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                        </svg>
+                                        <div class="sys-tooltip-content">
+                                            开启后，更新为 Nodectl 管理面板的订阅菜单。
+                                        </div>
+                                    </div>
+                                </span>
+                            </div>
+                            <label class="sys-toggle-switch">
+                                <input type="checkbox" id="sys_tg_bot_register_commands" onchange="triggerSysAutoSave()">
+                                <span class="sys-toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="sys-tg-group">
+                        <div class="sys-tg-group-title">🔔 TG 通知策略</div>
+                        <div class="sys-pref-row" style="align-items: center;">
+                            <div class="sys-pref-info">
+                                <span class="sys-pref-title" style="display:flex;align-items:center;gap:4px;">
+                                    整组测速完成通知
+                                    <div class="sys-info-tooltip-wrap" tabindex="0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                        </svg>
+                                        <div class="sys-tooltip-content">
+                                            开启后，整组测速任务结束（完成/中止）时发送摘要通知。
+                                        </div>
+                                    </div>
+                                </span>
+                            </div>
+                            <label class="sys-toggle-switch">
+                                <input type="checkbox" id="sys_tg_speedtest_notify_enabled" onchange="triggerSysAutoSave()">
+                                <span class="sys-toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="sys-field">
+                            <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
+                                登录通知
+                                <div class="sys-info-tooltip-wrap" tabindex="0">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                    <div class="sys-tooltip-content">
+                                        登录事件通知策略。需先启用 TG Bot 并配置有效 Token 与白名单用户。
+                                    </div>
+                                </div>
+                            </label>
+                            <select id="sys_tg_login_notify_mode" class="sys-select" onchange="triggerSysAutoSave()">
+                                <option value="off">不启用</option>
+                                <option value="success_only">仅成功通知</option>
+                                <option value="failure_only">仅失败通知</option>
+                                <option value="all">成功失败都通知</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Inputs -->
@@ -2486,31 +2542,6 @@
                             <span class="sys-toggle-slider"></span>
                         </label>
                     </div>
-                    <div class="sys-field">
-                        <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
-                            节点测速模式
-                            <div class="sys-info-tooltip-wrap" tabindex="0">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                </svg>
-                                <div class="sys-tooltip-content">
-                                    <div style="margin-bottom:6px; color:#cce4ff;">决定点击测速闪电图标时的执行内容：</div>
-                                    <div><b>仅 Ping:</b> 发送 HTTP 请求测试延迟，耗时极短</div>
-                                    <div><b>Ping + 带宽:</b> 先测延迟，延迟通了再测实际下载速度</div>
-                                    <div><b>全面测试:</b> 完整测试 Ping、TCP 延迟以及真实带宽</div>
-                                </div>
-                            </div>
-                        </label>
-                        <select id="sys_pref_speed_test_mode" class="sys-select" onchange="triggerSysAutoSave()">
-                            <option value="ping_only">仅 Ping 延迟</option>
-                            <option value="ping_speed">Ping + 真实带宽 (推荐)</option>
-                            <option value="all">全面测试 (Ping + TCP + 带宽)</option>
-                        </select>
-                    </div>
-
                     <!-- Inputs -->
                     <div class="sys-field">
                         <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
@@ -3058,6 +3089,13 @@
         return defaultValue;
     }
 
+    function updateTgBotSettingsVisibility() {
+        const enabledEl = document.getElementById('sys_tg_bot_enabled');
+        const commandRow = document.getElementById('sysTgCommandPanelRow');
+        if (!enabledEl || !commandRow) return;
+        commandRow.style.display = enabledEl.checked ? 'flex' : 'none';
+    }
+
     // 功能：拉取所有后端设置，并渲染到表单和证书状态 UI 中
     async function loadAllSystemSettings() {
         try {
@@ -3074,7 +3112,6 @@
                 document.getElementById('sys_pref_force_protocol_prefix').checked = (data.pref_force_protocol_prefix === 'true');
                 document.getElementById('sys_pref_ip_strategy').value = data.pref_ip_strategy || 'ipv4_prefer';
                 document.getElementById('sys_airport_filter_invalid').checked = (data.airport_filter_invalid === 'true');
-                document.getElementById('sys_pref_speed_test_mode').value = data.pref_speed_test_mode || 'ping_speed';
                 document.getElementById('sys_pref_speed_test_file_size').value = data.pref_speed_test_file_size || '50';
                 document.getElementById('sys_pref_traffic_stats_retention_days').value = data.pref_traffic_stats_retention_days || '30';
                 document.getElementById('sys_auth_cookie_ttl_mode').value = data.auth_cookie_ttl_mode || '1d';
@@ -3098,20 +3135,22 @@
                 resetTokenConfirmBtn('btn_tg_token_confirm');
                 document.getElementById('sys_tg_bot_enabled').checked = (data.tg_bot_enabled === 'true');
                 document.getElementById('sys_tg_bot_register_commands').checked = (data.tg_bot_register_commands === 'true');
+                document.getElementById('sys_tg_speedtest_notify_enabled').checked = parseSysBool(data.tg_speedtest_notify_enabled, false);
                 const loginNotifyMode = data.tg_login_notify_mode || (parseSysBool(data.tg_login_notify_enabled, false) ? 'all' : 'off');
                 document.getElementById('sys_tg_login_notify_mode').value = ['off', 'success_only', 'failure_only', 'all'].includes(loginNotifyMode) ? loginNotifyMode : 'off';
+                updateTgBotSettingsVisibility();
 
                 // 解析白名单并渲染
                 const wListStr = data.tg_bot_whitelist || '';
                 tgBotWhitelistItems = wListStr.split(',').filter(Boolean).map(s => {
                     const idx = s.indexOf('=');
-                    if (idx === -1) return { id: s.trim(), remark: '', notify_node: true, notify_login: true, notify_open: false };
+                    if (idx === -1) return { id: s.trim(), remark: '', notify_node: true, notify_login: true, notify_speedtest: true, notify_open: false };
 
                     const id = s.substring(0, idx).trim();
                     const rest = s.substring(idx + 1).trim();
                     const parts = rest.split('|');
                     const remark = (parts[0] || '').trim();
-                    const item = { id, remark, notify_node: true, notify_login: true, notify_open: false };
+                    const item = { id, remark, notify_node: true, notify_login: true, notify_speedtest: true, notify_open: false };
 
                     for (let i = 1; i < parts.length; i++) {
                         const seg = (parts[i] || '').trim();
@@ -3123,6 +3162,7 @@
                         const allow = (val === '1' || val === 'true');
                         if (key === 'node' || key === 'node_status') item.notify_node = allow;
                         if (key === 'login' || key === 'login_notify') item.notify_login = allow;
+                        if (key === 'speedtest' || key === 'speed_test' || key === 'batch_speedtest') item.notify_speedtest = allow;
                     }
 
                     return item;
@@ -3591,7 +3631,6 @@
                 "pref_ip_strategy": document.getElementById('sys_pref_ip_strategy').value,
                 "pref_default_install_protocols": collectSysDefaultInstallProtocols(),
                 "airport_filter_invalid": document.getElementById('sys_airport_filter_invalid').checked ? "true" : "false", // ✨ 新增：提交剔除无效节点开关
-                "pref_speed_test_mode": document.getElementById('sys_pref_speed_test_mode').value,
                 "pref_speed_test_file_size": document.getElementById('sys_pref_speed_test_file_size').value,
                 "pref_traffic_stats_retention_days": document.getElementById('sys_pref_traffic_stats_retention_days').value,
                 "auth_cookie_ttl_mode": document.getElementById('sys_auth_cookie_ttl_mode').value,
@@ -3612,10 +3651,12 @@
                     const remark = item.remark.trim().replace(/[|,=]/g, '');
                     const node = item.notify_node ? '1' : '0';
                     const login = item.notify_login ? '1' : '0';
-                    return id + '=' + remark + '|node=' + node + '|login=' + login;
+                    const speedtest = item.notify_speedtest ? '1' : '0';
+                    return id + '=' + remark + '|node=' + node + '|login=' + login + '|speedtest=' + speedtest;
                 }).join(','),
                 "tg_bot_register_commands": document.getElementById('sys_tg_bot_register_commands').checked ? 'true' : 'false',
                 "tg_login_notify_mode": document.getElementById('sys_tg_login_notify_mode').value,
+                "tg_speedtest_notify_enabled": document.getElementById('sys_tg_speedtest_notify_enabled').checked ? 'true' : 'false',
                 "geo_auto_update": document.getElementById('sys_geo_auto_update').checked ? 'true' : 'false',
                 "mihomo_auto_update": document.getElementById('sys_mihomo_auto_update').checked ? 'true' : 'false'
             };
@@ -4092,6 +4133,7 @@
 			remark: item.remark || '',
 			notify_node: item.notify_node !== false,
 			notify_login: item.notify_login !== false,
+                notify_speedtest: item.notify_speedtest !== false,
             notify_open: item.notify_open === true,
 		}));
 
@@ -4121,6 +4163,10 @@
                         <label class="sys-list-notify-item">
                             <input type="checkbox" ${item.notify_login ? 'checked' : ''} onchange="tgBotWhitelistItems[${index}].notify_login = this.checked; triggerSysAutoSave();">
                             登录通知
+                        </label>
+                        <label class="sys-list-notify-item">
+                            <input type="checkbox" ${item.notify_speedtest ? 'checked' : ''} onchange="tgBotWhitelistItems[${index}].notify_speedtest = this.checked; triggerSysAutoSave();">
+                            整组测速通知
                         </label>
                     </div>
                 </div>
@@ -4182,7 +4228,7 @@
     }
 
     function addTgWhitelistItem() {
-        tgBotWhitelistItems.push({ id: '', remark: '', notify_node: true, notify_login: true, notify_open: false });
+        tgBotWhitelistItems.push({ id: '', remark: '', notify_node: true, notify_login: true, notify_speedtest: true, notify_open: false });
         renderTgWhitelist();
 
         setTimeout(() => {

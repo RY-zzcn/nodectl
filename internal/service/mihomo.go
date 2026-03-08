@@ -356,16 +356,20 @@ type SpeedTestResult struct {
 	Text   string `json:"text"` // 界面显示的文字，如 "45ms", "5.2 MB/s"
 }
 
-// RunBatchTest 流水线逐个启动核心并进行测速 (实现 100% 故障隔离)
-func (s *MihomoService) RunBatchTest(ctx context.Context, nodes []database.AirportNode, resultChan chan<- SpeedTestResult) {
+func NormalizeSpeedTestMode(mode string) string {
+	switch strings.TrimSpace(strings.ToLower(mode)) {
+	case "ping_only", "all", "ping_speed":
+		return strings.TrimSpace(strings.ToLower(mode))
+	default:
+		return "ping_speed"
+	}
+}
+
+// RunBatchTestWithMode 流水线逐个启动核心并进行测速 (支持按请求指定模式)
+func (s *MihomoService) RunBatchTestWithMode(ctx context.Context, nodes []database.AirportNode, resultChan chan<- SpeedTestResult, mode string) {
 	defer close(resultChan) // 退出时自动关闭通道，前端 SSE 连接结束
 
-	var modeConfig database.SysConfig
-	database.DB.Where("key = ?", "pref_speed_test_mode").First(&modeConfig)
-	testMode := modeConfig.Value
-	if testMode == "" {
-		testMode = "ping_speed"
-	}
+	testMode := NormalizeSpeedTestMode(mode)
 
 	// 开始流水线排队测试
 	for _, n := range nodes {

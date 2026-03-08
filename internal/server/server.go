@@ -260,6 +260,12 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/airport/nodes", withAuthAndSecure(apiAirportNodes))              // 获取订阅下节点
 	mux.HandleFunc("/api/airport/node/routing", withAuthAndSecure(apiAirportNodeRouting)) // 修改节点状态
 	mux.HandleFunc("/api/airport/test-nodes", withAuthAndSecure(apiTestAirportNodes))     // 新增测速接口
+	mux.HandleFunc("/api/airport/test/start", withAuthAndSecure(apiStartAirportSpeedTest))
+	mux.HandleFunc("/api/airport/test/stop", withAuthAndSecure(apiStopAirportSpeedTest))
+	mux.HandleFunc("/api/airport/test/running", withAuthAndSecure(apiAirportSpeedRunning))
+	mux.HandleFunc("/api/airport/test/history", withAuthAndSecure(apiAirportSpeedHistory))
+	mux.HandleFunc("/api/airport/test/history/results", withAuthAndSecure(apiAirportSpeedHistoryResults))
+	mux.HandleFunc("/api/airport/test/history/delete", withAuthAndSecure(apiAirportSpeedHistoryDelete))
 
 	// 启动 Telegram Bot 后台服务 (不阻塞 Web 线程)
 	go service.StartTelegramBot()

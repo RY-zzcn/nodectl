@@ -66,7 +66,6 @@ func initBasicSettings() {
 		{Key: "cf_domain", Value: "", Description: "证书绑定的主域名"},
 		{Key: "cf_auto_renew", Value: "true", Description: "是否开启证书自动续期"},
 		{Key: "airport_filter_invalid", Value: "false", Description: "是否剔除机场订阅中的无效节点"},
-		{Key: "pref_speed_test_mode", Value: "ping_speed", Description: "节点测速模式"},
 		{Key: "pref_speed_test_file_size", Value: "50", Description: "节点测速文件大小(MB)"},
 		{Key: "pref_traffic_stats_retention_days", Value: "30", Description: "流量统计记录最长保留天数"},
 		{Key: "auth_cookie_ttl_mode", Value: "1d", Description: "后台登录 Cookie 有效期选项(1d/3d/7d/never)"},
@@ -79,6 +78,7 @@ func initBasicSettings() {
 		{Key: "tg_bot_whitelist", Value: "", Description: "允许使用 Bot 的 TG User ID (逗号分隔)"},
 		{Key: "tg_bot_register_commands", Value: "false", Description: "是否清理历史菜单并注册 /sub 指令"},
 		{Key: "tg_login_notify_mode", Value: "off", Description: "后台登录 TG 通知模式(off/success_only/failure_only/all)"},
+		{Key: "tg_speedtest_notify_enabled", Value: "false", Description: "整组测速完成后是否发送 TG 通知"},
 		{Key: "sys_log_level", Value: "info", Description: "系统日志等级 (debug/info/warn/error)"},
 		// Agent 相关配置
 		{Key: "agent_ws_push_interval_sec", Value: "2", Description: "Agent 实时速率推送间隔 (秒)"},
@@ -92,6 +92,7 @@ func initBasicSettings() {
 			logger.Log.Error("初始化设置项配置失败", "key", config.Key, "err", err.Error())
 		}
 	}
+
 }
 
 func initAuthSettings() {

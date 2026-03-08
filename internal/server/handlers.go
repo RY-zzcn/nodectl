@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"nodectl/internal/database"
@@ -31,6 +32,25 @@ import (
 
 // AppStartTime 记录后端程序启动的确切时间
 var AppStartTime = time.Now()
+
+type airportSpeedJob struct {
+	HistoryID string
+	TaskKey   string
+	SubID     string
+	Mode      string
+	Cancel    context.CancelFunc
+	Total     int
+	mu        sync.RWMutex
+	Results   map[string]map[string]service.SpeedTestResult
+	Done      int
+	Errors    int
+}
+
+var (
+	airportSpeedJobsMu    sync.Mutex
+	airportSpeedJobsBySub = make(map[string]*airportSpeedJob)
+	airportSpeedJobsByID  = make(map[string]*airportSpeedJob)
+)
 
 // ------------------- [通用辅助函数] -------------------
 
@@ -1400,9 +1420,9 @@ func apiGetSettings(w http.ResponseWriter, r *http.Request) {
 		"panel_url", "sub_token", "proxy_port_ss", "proxy_port_hy2", "proxy_port_tuic",
 		"proxy_port_reality", "proxy_ss_method",
 		"proxy_port_socks5", "proxy_socks5_user", "proxy_socks5_pass", "proxy_socks5_random_auth", "pref_use_emoji_flag", "pref_force_protocol_prefix", "sub_custom_name", "pref_ip_strategy", "pref_default_install_protocols",
-		"sys_force_http", "sys_log_level", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid", "pref_speed_test_mode", "pref_speed_test_file_size", "pref_traffic_stats_retention_days",
+		"sys_force_http", "sys_log_level", "cf_email", "cf_api_key", "cf_domain", "cf_auto_renew", "airport_filter_invalid", "pref_speed_test_file_size", "pref_traffic_stats_retention_days",
 		"auth_cookie_ttl_mode", "login_ip_retry_window_sec", "login_ip_max_retries", "login_ip_block_ttl_sec",
-		"tg_bot_enabled", "tg_bot_token", "tg_bot_whitelist", "tg_bot_register_commands", "tg_login_notify_mode", "clash_proxies_update_interval", "clash_rules_update_interval", "clash_public_rules_update_interval",
+		"tg_bot_enabled", "tg_bot_token", "tg_bot_whitelist", "tg_bot_register_commands", "tg_login_notify_mode", "tg_speedtest_notify_enabled", "clash_proxies_update_interval", "clash_rules_update_interval", "clash_public_rules_update_interval",
 		"geo_auto_update", "mihomo_auto_update",
 		// 新增协议与内核优化配置
 		"proxy_port_trojan", "proxy_hy2_sni", "proxy_tuic_sni", "proxy_enable_bbr",
@@ -1460,9 +1480,9 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"proxy_ss_method": true, "proxy_port_socks5": true, "proxy_socks5_user": true, "proxy_socks5_pass": true, "proxy_socks5_random_auth": true, "pref_use_emoji_flag": true, "pref_force_protocol_prefix": true,
 		"sub_custom_name": true, "pref_ip_strategy": true, "pref_default_install_protocols": true,
 		"sys_force_http": true, "sys_log_level": true, "cf_email": true, "cf_api_key": true, "cf_domain": true, "cf_auto_renew": true,
-		"airport_filter_invalid": true, "pref_speed_test_mode": true, "pref_speed_test_file_size": true, "pref_traffic_stats_retention_days": true,
+		"airport_filter_invalid": true, "pref_speed_test_file_size": true, "pref_traffic_stats_retention_days": true,
 		"auth_cookie_ttl_mode": true, "login_ip_retry_window_sec": true, "login_ip_max_retries": true, "login_ip_block_ttl_sec": true,
-		"tg_bot_enabled": true, "tg_bot_token": true, "tg_bot_whitelist": true, "tg_bot_register_commands": true, "tg_login_notify_mode": true,
+		"tg_bot_enabled": true, "tg_bot_token": true, "tg_bot_whitelist": true, "tg_bot_register_commands": true, "tg_login_notify_mode": true, "tg_speedtest_notify_enabled": true,
 		"clash_proxies_update_interval": true, "clash_rules_update_interval": true, "clash_public_rules_update_interval": true,
 		"geo_auto_update": true, "mihomo_auto_update": true,
 		// 新增协议与内核优化配置
@@ -2864,6 +2884,7 @@ func apiTestAirportNodes(w http.ResponseWriter, r *http.Request) {
 
 	subID := r.URL.Query().Get("sub_id")
 	nodeID := r.URL.Query().Get("node_id")
+	mode := service.NormalizeSpeedTestMode(r.URL.Query().Get("mode"))
 	subName := "全部订阅"
 
 	var nodes []database.AirportNode
@@ -2911,6 +2932,7 @@ func apiTestAirportNodes(w http.ResponseWriter, r *http.Request) {
 		"sub_id", subID,
 		"sub_name", subName,
 		"node_id", nodeID,
+		"mode", mode,
 		"node_count", len(nodes),
 		"changes", fmt.Sprintf("订阅名称 %s | 测速范围 %s | 节点数 %d", subName, scope, len(nodes)),
 		"ip", clientIP,
@@ -2924,7 +2946,7 @@ func apiTestAirportNodes(w http.ResponseWriter, r *http.Request) {
 	resultChan := make(chan service.SpeedTestResult)
 
 	// 3. 异步启动测速任务
-	go service.GlobalMihomo.RunBatchTest(ctx, nodes, resultChan)
+	go service.GlobalMihomo.RunBatchTestWithMode(ctx, nodes, resultChan, mode)
 
 	// 4. 死循环监听管道，来一个结果发一个给前端 (流式推送)
 	resultCount := 0
@@ -2943,12 +2965,396 @@ func apiTestAirportNodes(w http.ResponseWriter, r *http.Request) {
 		"sub_id", subID,
 		"sub_name", subName,
 		"node_id", nodeID,
+		"mode", mode,
 		"result_count", resultCount,
 		"error_count", errorCount,
 		"changes", fmt.Sprintf("订阅名称 %s | 测速结束 | 返回结果 %d 条 | 错误 %d 条", subName, resultCount, errorCount),
 		"ip", clientIP,
 		"path", reqPath,
 	)
+}
+
+func runAirportSpeedTestJob(ctx context.Context, job *airportSpeedJob, history database.AirportSpeedTestHistory, nodes []database.AirportNode, mode string) {
+	resultChan := make(chan service.SpeedTestResult)
+	go service.GlobalMihomo.RunBatchTestWithMode(ctx, nodes, resultChan, mode)
+	nodeNameByID := make(map[string]string, len(nodes))
+	for _, n := range nodes {
+		nodeNameByID[n.ID] = n.Name
+	}
+
+	resultCount := 0
+	errorCount := 0
+	for res := range resultChan {
+		resultCount++
+		if strings.EqualFold(res.Type, "error") {
+			errorCount++
+		}
+
+		if err := database.DB.Create(&database.AirportSpeedTestResult{
+			HistoryID:  history.ID,
+			TaskKey:    history.TaskKey,
+			SubID:      history.SubID,
+			NodeID:     res.NodeID,
+			NodeName:   nodeNameByID[res.NodeID],
+			ResultType: res.Type,
+			ResultText: res.Text,
+		}).Error; err != nil {
+			logger.Log.Warn("写入机场测速详细结果失败", "history_id", history.ID, "node_id", res.NodeID, "error", err)
+		}
+
+		if err := database.DB.Model(&database.AirportSpeedTestHistory{}).Where("id = ?", history.ID).Updates(map[string]interface{}{
+			"result_count": resultCount,
+			"error_count":  errorCount,
+		}).Error; err != nil {
+			logger.Log.Warn("更新机场测速历史统计失败", "history_id", history.ID, "error", err)
+		}
+
+		if job != nil {
+			job.mu.Lock()
+			if job.Results == nil {
+				job.Results = make(map[string]map[string]service.SpeedTestResult)
+			}
+			if _, ok := job.Results[res.NodeID]; !ok {
+				job.Results[res.NodeID] = make(map[string]service.SpeedTestResult)
+			}
+			resultType := strings.TrimSpace(strings.ToLower(res.Type))
+			if resultType == "" {
+				resultType = "unknown"
+			}
+			job.Results[res.NodeID][resultType] = res
+			job.Done = resultCount
+			job.Errors = errorCount
+			job.mu.Unlock()
+		}
+	}
+
+	now := time.Now()
+	finalStatus := "completed"
+	if ctx.Err() != nil {
+		finalStatus = "stopped"
+	}
+
+	database.DB.Model(&database.AirportSpeedTestHistory{}).Where("id = ?", history.ID).Updates(map[string]interface{}{
+		"status":       finalStatus,
+		"result_count": resultCount,
+		"error_count":  errorCount,
+		"finished_at":  &now,
+	})
+
+	if finalStatus == "completed" {
+		go service.SendBatchSpeedTestNotification(history.SubName, history.TaskKey, finalStatus, len(nodes), resultCount, errorCount, history.StartedAt, now)
+	}
+
+	airportSpeedJobsMu.Lock()
+	if job, ok := airportSpeedJobsByID[history.ID]; ok {
+		delete(airportSpeedJobsByID, history.ID)
+		if job.SubID != "" {
+			delete(airportSpeedJobsBySub, job.SubID)
+		}
+	}
+	airportSpeedJobsMu.Unlock()
+}
+
+// apiStartAirportSpeedTest 启动后台测速任务并保存历史记录
+func apiStartAirportSpeedTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SubID  string `json:"sub_id"`
+		NodeID string `json:"node_id"`
+		Mode   string `json:"mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+
+	req.SubID = strings.TrimSpace(req.SubID)
+	req.NodeID = strings.TrimSpace(req.NodeID)
+	req.Mode = service.NormalizeSpeedTestMode(req.Mode)
+
+	if req.SubID == "" {
+		sendJSON(w, "error", "仅支持整组测速记录历史，请选择订阅后执行一键测速")
+		return
+	}
+	if req.NodeID != "" {
+		sendJSON(w, "error", "单节点测速不写入历史记录，请使用节点测速按钮")
+		return
+	}
+
+	if !service.GlobalMihomo.IsCoreReady() {
+		sendJSON(w, "error", "请先在设置中下载 Mihomo 核心")
+		return
+	}
+
+	var nodes []database.AirportNode
+	subName := ""
+	database.DB.Where("sub_id = ?", req.SubID).Find(&nodes)
+	var sub database.AirportSub
+	if err := database.DB.Where("id = ?", req.SubID).First(&sub).Error; err == nil {
+		subName = sub.Name
+	}
+
+	if len(nodes) == 0 {
+		sendJSON(w, "error", "未找到可测速节点")
+		return
+	}
+
+	airportSpeedJobsMu.Lock()
+	if req.SubID != "" {
+		if running, ok := airportSpeedJobsBySub[req.SubID]; ok {
+			airportSpeedJobsMu.Unlock()
+			sendJSON(w, "success", map[string]interface{}{
+				"message":   "测速任务已在运行",
+				"record_id": running.HistoryID,
+				"task_key":  running.TaskKey,
+				"mode":      running.Mode,
+				"running":   true,
+			})
+			return
+		}
+	}
+	airportSpeedJobsMu.Unlock()
+
+	history := database.AirportSpeedTestHistory{
+		SubID:      req.SubID,
+		SubName:    subName,
+		Status:     "running",
+		TotalCount: len(nodes),
+		StartedAt:  time.Now(),
+	}
+	if err := database.DB.Create(&history).Error; err != nil {
+		sendJSON(w, "error", "保存测速记录失败")
+		return
+	}
+
+	jobCtx, cancel := context.WithCancel(context.Background())
+	job := &airportSpeedJob{HistoryID: history.ID, TaskKey: history.TaskKey, SubID: req.SubID, Mode: req.Mode, Cancel: cancel, Total: len(nodes), Results: make(map[string]map[string]service.SpeedTestResult)}
+
+	airportSpeedJobsMu.Lock()
+	airportSpeedJobsByID[history.ID] = job
+	if req.SubID != "" {
+		airportSpeedJobsBySub[req.SubID] = job
+	}
+	airportSpeedJobsMu.Unlock()
+
+	go runAirportSpeedTestJob(jobCtx, job, history, nodes, req.Mode)
+
+	sendJSON(w, "success", map[string]interface{}{
+		"message":   "测速任务已启动",
+		"record_id": history.ID,
+		"task_key":  history.TaskKey,
+		"mode":      req.Mode,
+		"running":   true,
+	})
+}
+
+func apiStopAirportSpeedTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		RecordID string `json:"record_id"`
+		SubID    string `json:"sub_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+
+	req.RecordID = strings.TrimSpace(req.RecordID)
+	req.SubID = strings.TrimSpace(req.SubID)
+
+	airportSpeedJobsMu.Lock()
+	defer airportSpeedJobsMu.Unlock()
+
+	var job *airportSpeedJob
+	if req.SubID != "" {
+		job = airportSpeedJobsBySub[req.SubID]
+	}
+	if job == nil && req.RecordID != "" {
+		job = airportSpeedJobsByID[req.RecordID]
+	}
+
+	if job == nil {
+		sendJSON(w, "success", "当前无运行中的测速任务")
+		return
+	}
+
+	job.Cancel()
+	sendJSON(w, "success", "测速任务已停止")
+}
+
+func apiAirportSpeedRunning(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	airportSpeedJobsMu.Lock()
+	runningDetail := make([]map[string]interface{}, 0, len(airportSpeedJobsByID))
+	for _, job := range airportSpeedJobsByID {
+		job.mu.RLock()
+		results := make(map[string]map[string]service.SpeedTestResult, len(job.Results))
+		for nodeID, byType := range job.Results {
+			copiedByType := make(map[string]service.SpeedTestResult, len(byType))
+			for resultType, result := range byType {
+				copiedByType[resultType] = result
+			}
+			results[nodeID] = copiedByType
+		}
+		runningDetail = append(runningDetail, map[string]interface{}{
+			"record_id":    job.HistoryID,
+			"task_key":     job.TaskKey,
+			"sub_id":       job.SubID,
+			"mode":         job.Mode,
+			"total":        job.Total,
+			"done":         job.Done,
+			"error_count":  job.Errors,
+			"result_count": job.Done,
+			"results":      results,
+		})
+		job.mu.RUnlock()
+	}
+	airportSpeedJobsMu.Unlock()
+
+	sendJSON(w, "success", map[string]interface{}{"running": runningDetail})
+}
+
+func apiAirportSpeedHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	subID := strings.TrimSpace(r.URL.Query().Get("sub_id"))
+	q := database.DB.Model(&database.AirportSpeedTestHistory{})
+	if subID != "" {
+		q = q.Where("sub_id = ?", subID)
+	}
+
+	var records []database.AirportSpeedTestHistory
+	if err := q.Order("created_at desc").Limit(200).Find(&records).Error; err != nil {
+		sendJSON(w, "error", "读取测速历史失败")
+		return
+	}
+
+	sendJSON(w, "success", map[string]interface{}{"records": records})
+}
+
+func apiAirportSpeedHistoryResults(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	historyID := strings.TrimSpace(r.URL.Query().Get("id"))
+	if historyID == "" {
+		sendJSON(w, "error", "缺少历史记录ID")
+		return
+	}
+
+	var history database.AirportSpeedTestHistory
+	if err := database.DB.Where("id = ?", historyID).First(&history).Error; err != nil {
+		sendJSON(w, "error", "历史记录不存在")
+		return
+	}
+
+	var rows []database.AirportSpeedTestResult
+	if err := database.DB.Where("history_id = ?", historyID).Order("created_at desc").Find(&rows).Error; err != nil {
+		sendJSON(w, "error", "读取详细结果失败")
+		return
+	}
+
+	latestByNodeType := make(map[string]database.AirportSpeedTestResult)
+	for _, row := range rows {
+		typeKey := strings.TrimSpace(strings.ToLower(row.ResultType))
+		if typeKey == "" {
+			typeKey = "unknown"
+		}
+		key := row.NodeID + "|" + typeKey
+		if _, ok := latestByNodeType[key]; !ok {
+			latestByNodeType[key] = row
+		}
+	}
+
+	typeRank := func(t string) int {
+		switch strings.TrimSpace(strings.ToLower(t)) {
+		case "ping":
+			return 1
+		case "tcp":
+			return 2
+		case "speed":
+			return 3
+		case "error":
+			return 4
+		default:
+			return 99
+		}
+	}
+
+	results := make([]database.AirportSpeedTestResult, 0, len(latestByNodeType))
+	for _, row := range latestByNodeType {
+		results = append(results, row)
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].NodeName == results[j].NodeName {
+			ri := typeRank(results[i].ResultType)
+			rj := typeRank(results[j].ResultType)
+			if ri != rj {
+				return ri < rj
+			}
+			if results[i].NodeID == results[j].NodeID {
+				return results[i].ResultType < results[j].ResultType
+			}
+			return results[i].NodeID < results[j].NodeID
+		}
+		return results[i].NodeName < results[j].NodeName
+	})
+
+	sendJSON(w, "success", map[string]interface{}{
+		"history": history,
+		"results": results,
+	})
+}
+
+func apiAirportSpeedHistoryDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+	req.ID = strings.TrimSpace(req.ID)
+	if req.ID == "" {
+		sendJSON(w, "error", "缺少记录ID")
+		return
+	}
+
+	airportSpeedJobsMu.Lock()
+	_, running := airportSpeedJobsByID[req.ID]
+	airportSpeedJobsMu.Unlock()
+	if running {
+		sendJSON(w, "error", "运行中的记录不能删除")
+		return
+	}
+
+	if err := database.DB.Where("id = ?", req.ID).Delete(&database.AirportSpeedTestHistory{}).Error; err != nil {
+		sendJSON(w, "error", "删除历史记录失败")
+		return
+	}
+	sendJSON(w, "success", "已删除")
 }
 
 // apiGetTrafficLandingNodes 返回用于流量统计的落地节点列表

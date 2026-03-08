@@ -230,6 +230,66 @@ func (n *AirportNode) BeforeCreate(tx *gorm.DB) (err error) {
 	return
 }
 
+// AirportSpeedTestHistory 机场测速历史任务（仅记录每次整组测试的概要）
+type AirportSpeedTestHistory struct {
+	ID          string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	SubID       string     `gorm:"index;type:varchar(36);not null" json:"sub_id"`
+	SubName     string     `gorm:"type:varchar(128)" json:"sub_name"`
+	TaskKey     string     `gorm:"index;type:varchar(64);not null" json:"task_key"`
+	Status      string     `gorm:"index;type:varchar(32)" json:"status"` // running | completed | stopped | failed
+	TotalCount  int        `gorm:"default:0" json:"total_count"`
+	ResultCount int        `gorm:"default:0" json:"result_count"`
+	ErrorCount  int        `gorm:"default:0" json:"error_count"`
+	StartedAt   time.Time  `gorm:"column:started_at" json:"started_at"`
+	FinishedAt  *time.Time `gorm:"column:finished_at" json:"finished_at,omitempty"`
+	CreatedAt   time.Time  `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at" json:"updated_at"`
+
+	Sub     AirportSub               `gorm:"foreignKey:SubID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	Results []AirportSpeedTestResult `gorm:"foreignKey:HistoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+}
+
+func (AirportSpeedTestHistory) TableName() string {
+	return "airport_speed_test_histories"
+}
+
+func (h *AirportSpeedTestHistory) BeforeCreate(tx *gorm.DB) (err error) {
+	if h.ID == "" {
+		h.ID = uuid.New().String()
+	}
+	if strings.TrimSpace(h.TaskKey) == "" {
+		h.TaskKey = time.Now().Format("200601021504")
+	}
+	return
+}
+
+// AirportSpeedTestResult 机场测速详细结果（每个节点一条记录，按历史任务外键关联）
+type AirportSpeedTestResult struct {
+	ID         string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	HistoryID  string    `gorm:"index;type:varchar(36);not null" json:"history_id"`
+	TaskKey    string    `gorm:"index;type:varchar(64);not null" json:"task_key"`
+	SubID      string    `gorm:"index;type:varchar(36);not null" json:"sub_id"`
+	NodeID     string    `gorm:"index;type:varchar(36);not null" json:"node_id"`
+	NodeName   string    `gorm:"type:text" json:"node_name"`
+	ResultType string    `gorm:"column:result_type;index;type:varchar(32)" json:"result_type"` // ping | tcp | speed | error
+	ResultText string    `gorm:"column:result_text;type:text" json:"result_text"`
+	CreatedAt  time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at" json:"updated_at"`
+
+	History AirportSpeedTestHistory `gorm:"foreignKey:HistoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+}
+
+func (AirportSpeedTestResult) TableName() string {
+	return "airport_speed_test_results"
+}
+
+func (r *AirportSpeedTestResult) BeforeCreate(tx *gorm.DB) (err error) {
+	if r.ID == "" {
+		r.ID = uuid.New().String()
+	}
+	return
+}
+
 // ------------------- 数据库初始化 -------------------
 
 // openSQLite 打开 SQLite 数据库连接
@@ -296,6 +356,8 @@ func autoMigrateAll(db *gorm.DB) error {
 		&SysConfig{},
 		&AirportSub{},
 		&AirportNode{},
+		&AirportSpeedTestHistory{},
+		&AirportSpeedTestResult{},
 	)
 }
 
@@ -549,6 +611,16 @@ func MigrateToPostgres(pgCfg DBConfig) error {
 	// 4.5 迁移 AirportNode
 	if err := migrateTable[AirportNode](srcDB, dstDB, "airport_nodes"); err != nil {
 		return fmt.Errorf("迁移 airport_nodes 失败: %w", err)
+	}
+
+	// 4.6 迁移 AirportSpeedTestHistory
+	if err := migrateTable[AirportSpeedTestHistory](srcDB, dstDB, "airport_speed_test_histories"); err != nil {
+		return fmt.Errorf("迁移 airport_speed_test_histories 失败: %w", err)
+	}
+
+	// 4.7 迁移 AirportSpeedTestResult
+	if err := migrateTable[AirportSpeedTestResult](srcDB, dstDB, "airport_speed_test_results"); err != nil {
+		return fmt.Errorf("迁移 airport_speed_test_results 失败: %w", err)
 	}
 
 	// 5. 修正 PostgreSQL 自增序列，避免后续写入撞主键

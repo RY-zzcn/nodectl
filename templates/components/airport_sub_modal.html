@@ -152,6 +152,7 @@
     /* ----- 左侧栏：订阅列表 ----- */
     .air-sidebar {
         width: var(--air-sidebar-width);
+        flex-shrink: 0;
         background: #fafbfc;
         border-right: 1px solid var(--air-border);
         display: flex;
@@ -393,6 +394,7 @@
     /* ----- 右侧栏：节点内容 ----- */
     .air-main {
         flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         background: #fff;
@@ -410,6 +412,7 @@
 
     .air-search {
         flex: 1;
+        min-width: 0;
         padding: 8px 12px;
         border: 1px solid #e1e1e8;
         border-radius: 8px;
@@ -447,6 +450,80 @@
         color: var(--air-text-sub);
         display: none;
         white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .air-header-tools:has(.air-speed-mode-wrapper.global.active) .air-traffic-text,
+    .air-header-tools:has(.air-speed-mode-wrapper.global.active) .air-history-btn {
+        display: none !important;
+    }
+
+    .air-speed-mode-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-shrink: 0;
+    }
+
+    .air-speed-mode-wrapper.node {
+        height: 28px;
+    }
+
+    .air-speed-mode-wrapper.global {
+        height: 32px;
+    }
+
+    .air-speed-mode-capsule {
+        display: flex;
+        align-items: center;
+        background: #f5f5f7;
+        border-radius: 20px;
+        padding: 0;
+        margin-right: 0;
+        overflow: hidden;
+        max-width: 0;
+        opacity: 0;
+        white-space: nowrap;
+        pointer-events: none;
+        transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .air-speed-mode-wrapper.active .air-speed-mode-capsule {
+        max-width: 260px;
+        opacity: 1;
+        margin-right: 6px;
+        padding: 2px;
+        pointer-events: auto;
+    }
+
+    .air-speed-mode-item {
+        border: none;
+        background: transparent;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 16px;
+        cursor: pointer;
+        white-space: nowrap;
+        color: var(--air-text-sub);
+        transition: all 0.2s;
+    }
+
+    .air-speed-mode-item:hover {
+        background: #e5e5ea;
+        color: #333;
+    }
+
+    .air-speed-mode-item[data-mode="ping_only"] {
+        color: #0284c7;
+    }
+
+    .air-speed-mode-item[data-mode="ping_speed"] {
+        color: #2563eb;
+    }
+
+    .air-speed-mode-item[data-mode="all"] {
+        color: #a16207;
     }
 
     .air-global-test-btn {
@@ -467,6 +544,144 @@
     .air-global-test-btn:hover {
         background: var(--air-primary-light);
         border-color: var(--air-primary);
+    }
+
+    .air-global-test-btn.stop-mode {
+        color: #ef4444;
+        border-color: #ef4444;
+        background: #fff5f5;
+    }
+
+    .air-history-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #e1e1e8;
+        background: #fff;
+        color: #666;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: color 0.2s, background 0.2s, border-color 0.2s;
+        flex-shrink: 0;
+    }
+
+    .air-history-btn:hover,
+    .air-history-btn.active {
+        color: var(--air-primary);
+        border-color: var(--air-primary);
+        background: var(--air-primary-light);
+    }
+
+    .air-sub-testing-icon {
+        color: var(--air-success);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        animation: airTestFlash 1s ease-in-out infinite;
+        flex-shrink: 0;
+    }
+
+    @keyframes airTestFlash {
+        0%, 100% {
+            transform: scale(1);
+            opacity: 0.75;
+        }
+
+        50% {
+            transform: scale(1.2);
+            opacity: 1;
+        }
+    }
+
+    .air-history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .air-history-item {
+        border: 1px solid #e5e7eb;
+        background: #fbfdff;
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .air-history-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .air-history-main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .air-history-title {
+        font-size: 12px;
+        color: #1d1d1f;
+        font-weight: 600;
+        word-break: break-all;
+    }
+
+    .air-history-meta {
+        font-size: 11px;
+        color: #6b7280;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .air-history-del {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        background: #fff5f5;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .air-history-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .air-history-view {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+        background: #eff6ff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .air-history-view:hover {
+        background: #dbeafe;
+    }
+
+
+    .air-history-del:hover {
+        background: #fee2e2;
     }
 
     .air-node-count-badge {
@@ -515,6 +730,57 @@
 
     .air-empty-state {
         animation: airFadeIn 0.2s ease-out forwards;
+    }
+
+    .air-history-empty {
+        margin: 20px 0;
+        border: 1px dashed #c7ddff;
+        background: linear-gradient(180deg, #f8fbff 0%, #f3f8ff 100%);
+        border-radius: 12px;
+        padding: 26px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        text-align: center;
+        color: #4b5563;
+    }
+
+    .air-history-empty svg {
+        color: #3b82f6;
+        opacity: 0.9;
+    }
+
+    .air-history-empty-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1d4ed8;
+    }
+
+    .air-history-empty-desc {
+        font-size: 12px;
+        color: #6b7280;
+        max-width: 420px;
+        line-height: 1.6;
+    }
+
+    .air-history-empty-btn {
+        margin-top: 4px;
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid #93c5fd;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .air-history-empty-btn:hover {
+        background: #dbeafe;
+        border-color: #60a5fa;
     }
 
     /* 节点行及测速、分组布局重构 */
@@ -634,7 +900,7 @@
     .air-routing-wrapper {
         display: flex;
         align-items: center;
-        flex-direction: row-reverse;
+        justify-content: flex-end;
     }
 
     /* 核心：反向排列，使得按钮固定在右侧 */
@@ -643,22 +909,22 @@
         align-items: center;
         background: #f5f5f7;
         border-radius: 20px;
-        padding: 2px;
+        padding: 0;
+        margin-right: 0;
         overflow: hidden;
         max-width: 0;
         opacity: 0;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        white-space: nowrap;
         pointer-events: none;
-        margin-right: 0;
-        /* 边距改为控制右侧 */
+        transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .air-routing-wrapper.active .air-routing-capsule {
         max-width: 200px;
         opacity: 1;
-        pointer-events: auto;
         margin-right: 6px;
-        /* 展开时，向左侧推开并留出间距 */
+        padding: 2px;
+        pointer-events: auto;
     }
 
     .air-capsule-item {
@@ -819,6 +1085,18 @@
             gap: 4px;
         }
 
+        /* 手机端在展开节点测速或路由模式时，隐藏节点名称以节省空间，保持大屏布局 */
+        .air-node-row:has(.air-speed-mode-wrapper.active) .air-node-name,
+        .air-node-row:has(.air-routing-wrapper.active) .air-node-name {
+            display: none;
+        }
+
+        .air-node-row:has(.air-speed-mode-wrapper.active) .air-node-actions,
+        .air-node-row:has(.air-routing-wrapper.active) .air-node-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+
         .air-speed-tags {
             flex-direction: column;
             align-items: flex-end;
@@ -830,7 +1108,33 @@
             width: 100%;
             justify-content: space-between;
             margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
+
+        .air-speed-mode-capsule {
+            max-width: 0;
+            overflow: hidden;
+        }
+
+        .air-speed-mode-wrapper.active .air-speed-mode-capsule {
+            overflow-x: auto;
+            max-width: 100vw;
+        }
+
+        .air-history-item {
+            padding: 8px;
+            gap: 8px;
+        }
+
+        .air-history-head {
+            align-items: flex-start;
+        }
+
+        .air-history-meta {
+            gap: 6px;
+        }
+
     }
 </style>
 
@@ -900,13 +1204,27 @@
 
                     <div class="air-header-tools">
                         <div class="air-traffic-text" id="airTrafficText"></div>
-                        <button class="air-global-test-btn" id="btn-test-all" title="一键测速该订阅全部节点"
-                            onclick="testAllAirNodes()">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        <button class="air-history-btn" id="btn-test-history" title="测速历史" onclick="toggleAirSpeedHistory()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3v5h5"></path>
+                                <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"></path>
+                                <path d="M12 7v5l3 2"></path>
                             </svg>
                         </button>
+                        <div class="air-speed-mode-wrapper global" id="air-global-speed-mode">
+                            <div class="air-speed-mode-capsule">
+                                <button class="air-speed-mode-item" data-mode="ping_only" onclick="startCurrentSubBackgroundTest('ping_only', event)">仅 Ping</button>
+                                <button class="air-speed-mode-item" data-mode="ping_speed" onclick="startCurrentSubBackgroundTest('ping_speed', event)">Ping + 带宽</button>
+                                <button class="air-speed-mode-item" data-mode="all" onclick="startCurrentSubBackgroundTest('all', event)">全面测试</button>
+                            </div>
+                            <button class="air-global-test-btn" id="btn-test-all" title="一键测速该订阅全部节点"
+                                onclick="testAllAirNodes(event)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="air-node-count-badge" id="airNodeCountBadge" style="display: none;">
@@ -941,7 +1259,11 @@
         currentSubId: null,
         editingSubId: null,
         deleteTimers: {},
-        isMobile: window.innerWidth <= 768
+        isMobile: window.innerWidth <= 768,
+        isHistoryMode: false,
+        runningTests: {},
+        runningDetails: {},
+        runningPollTimer: null
     };
 
     window.addEventListener('resize', () => {
@@ -958,6 +1280,9 @@
         if (!e.target.closest('.air-routing-wrapper')) {
             document.querySelectorAll('.air-routing-wrapper').forEach(el => el.classList.remove('active'));
         }
+        if (!e.target.closest('.air-speed-mode-wrapper')) {
+            closeAirSpeedModePanel();
+        }
     });
 
     function formatBytes(bytes) {
@@ -973,17 +1298,90 @@
         return (bytes / 1024).toFixed(2) + ' KB';
     }
 
+    function escapeAirHtml(input) {
+        return String(input ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function normalizeAirSpeedTestMode(rawMode) {
+        const raw = String(rawMode || '').trim();
+        if (raw === 'ping_only' || raw === 'all' || raw === 'ping_speed') return raw;
+        return 'ping_speed';
+    }
+
+    function speedTypeRank(type) {
+        const t = String(type || '').toLowerCase();
+        if (t === 'ping') return 1;
+        if (t === 'tcp') return 2;
+        if (t === 'speed') return 3;
+        if (t === 'error') return 4;
+        return 99;
+    }
+
+    function buildSpeedTagsHtmlFromTypeMap(typeMap) {
+        if (!typeMap || typeof typeMap !== 'object') {
+            return { key: '__empty__', html: '<span class="air-tag" style="background:#f5f5f7; color:#999;">未测试</span>' };
+        }
+
+        const entries = Object.keys(typeMap)
+            .map(type => {
+                const item = typeMap[type];
+                if (!item) return null;
+                const text = String(item.text || item.result_text || '').trim();
+                if (!text) return null;
+                const normalizedType = String(item.type || item.result_type || type || '').trim().toLowerCase();
+                return { type: normalizedType, text };
+            })
+            .filter(Boolean)
+            .sort((a, b) => speedTypeRank(a.type) - speedTypeRank(b.type));
+
+        if (entries.length === 0) {
+            return { key: '__empty__', html: '<span class="air-tag" style="background:#f5f5f7; color:#999;">未测试</span>' };
+        }
+
+        const key = entries.map(it => `${it.type}:${it.text}`).join('|');
+        const html = entries.map(it => {
+            const cls = it.type ? `air-tag ${it.type}` : 'air-tag';
+            return `<span class="${cls}">${escapeAirHtml(it.text)}</span>`;
+        }).join('');
+
+        return { key, html };
+    }
+
+    function isRunningTestsChanged(next) {
+        const prev = airState.runningTests || {};
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(next || {});
+        if (prevKeys.length !== nextKeys.length) return true;
+        for (const k of nextKeys) {
+            if ((prev[k] || '') !== (next[k] || '')) return true;
+        }
+        return false;
+    }
+
     // ================= 弹窗开关 =================
     function openAirportSubModal() {
         document.getElementById('airportModal').classList.add('active');
         document.body.style.overflow = 'hidden';
-        resetForm(); loadAirSubs();
+        resetForm();
+        loadAirSubs();
+        loadRunningTestsAndRefresh();
+        if (airState.runningPollTimer) clearInterval(airState.runningPollTimer);
+        airState.runningPollTimer = setInterval(loadRunningTestsAndRefresh, 1000);
     }
 
     function closeAirModal() {
         document.getElementById('airportModal').classList.remove('active');
         document.body.style.overflow = '';
         airState.deleteTimers = {}; resetForm();
+        if (airState.runningPollTimer) {
+            clearInterval(airState.runningPollTimer);
+            airState.runningPollTimer = null;
+        }
         if (typeof stopSpeedTest === 'function') stopSpeedTest(); // 彻底切断可能的后台测速连接
     }
 
@@ -1011,6 +1409,285 @@
         toggleAirAddForm(false);
     }
 
+    async function loadRunningTestsAndRefresh() {
+        try {
+            const res = await fetch('/api/airport/test/running');
+            const data = await res.json();
+            const next = {};
+            const details = {};
+            if (data.status === 'success' && Array.isArray(data.running)) {
+                data.running.forEach(it => {
+                    if (it && it.sub_id) next[it.sub_id] = it.record_id || '';
+                    if (it && it.sub_id) details[it.sub_id] = it;
+                });
+            }
+            const changed = isRunningTestsChanged(next);
+            airState.runningTests = next;
+            airState.runningDetails = details;
+            if (changed) {
+                renderAirSubs();
+            }
+            refreshGlobalTestButtonState();
+            applyRunningProgressToCurrentSub();
+        } catch (_) { }
+    }
+
+    function applyRunningProgressToCurrentSub() {
+        if (!airState.currentSubId || airState.isHistoryMode) return;
+        const detail = airState.runningDetails[airState.currentSubId];
+        if (!detail) return;
+
+        const resultMap = detail.results || {};
+        airState.nodes.forEach(node => {
+            const el = document.getElementById(`speed-tags-${node.id}`);
+            if (!el) return;
+            const nodeTypeMap = resultMap[node.id];
+            if (nodeTypeMap && typeof nodeTypeMap === 'object') {
+                const render = buildSpeedTagsHtmlFromTypeMap(nodeTypeMap);
+                if (el.dataset.rtKey === render.key) return;
+                el.dataset.rtKey = render.key;
+                el.innerHTML = render.html;
+            } else {
+                const key = '__waiting__';
+                if (el.dataset.rtKey === key) return;
+                el.dataset.rtKey = key;
+                el.innerHTML = '<span class="air-tag" style="background:#f5f5f7; color:#999;">等待...</span>';
+            }
+        });
+    }
+
+    function refreshGlobalTestButtonState() {
+        const btnAll = document.getElementById('btn-test-all');
+        if (!btnAll) return;
+        const isRunning = !!(airState.currentSubId && airState.runningTests[airState.currentSubId]);
+        if (isRunning) {
+            btnAll.classList.add('stop-mode');
+            btnAll.title = '停止后台测速';
+            btnAll.onclick = stopCurrentSubBackgroundTest;
+            btnAll.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6" fill="#ef4444"></rect></svg>`;
+        } else {
+            btnAll.classList.remove('stop-mode');
+            btnAll.title = '一键后台测速该订阅全部节点';
+            btnAll.onclick = (event) => openAllSpeedModePicker(event);
+            btnAll.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+        }
+    }
+
+    async function startCurrentSubBackgroundTest(mode, event) {
+        if (event) event.stopPropagation();
+        if (!airState.currentSubId) return;
+        closeAirSpeedModePanel();
+        const selectedMode = normalizeAirSpeedTestMode(mode);
+        if (!airState.isHistoryMode) {
+            airState.nodes.forEach(n => {
+                const el = document.getElementById(`speed-tags-${n.id}`);
+                if (el) {
+                    el.dataset.rtKey = '__waiting__';
+                    el.innerHTML = '<span class="air-tag" style="background:#f5f5f7; color:#999;">等待...</span>';
+                }
+            });
+        }
+        try {
+            const res = await fetch('/api/airport/test/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sub_id: airState.currentSubId, mode: selectedMode })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                showAirSaveStatus('测速任务已加入后台');
+                await loadRunningTestsAndRefresh();
+                if (airState.isHistoryMode) loadAirSpeedHistory();
+            } else {
+                showAirSaveStatus(data.message || '启动测速失败', true);
+            }
+        } catch (_) {
+            showAirSaveStatus('启动测速失败', true);
+        }
+    }
+
+    async function stopCurrentSubBackgroundTest() {
+        if (!airState.currentSubId) return;
+        try {
+            const recordId = airState.runningTests[airState.currentSubId] || '';
+            const res = await fetch('/api/airport/test/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sub_id: airState.currentSubId, record_id: recordId })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                showAirSaveStatus('测速任务已停止');
+                await loadRunningTestsAndRefresh();
+                if (airState.isHistoryMode) loadAirSpeedHistory();
+            } else {
+                showAirSaveStatus(data.message || '停止失败', true);
+            }
+        } catch (_) {
+            showAirSaveStatus('停止失败', true);
+        }
+    }
+
+    function toggleAirSpeedHistory() {
+        airState.isHistoryMode = !airState.isHistoryMode;
+        const btn = document.getElementById('btn-test-history');
+        if (btn) btn.classList.toggle('active', airState.isHistoryMode);
+        if (airState.currentSubId) {
+            if (airState.isHistoryMode) loadAirSpeedHistory();
+            else {
+                renderAirNodes(airState.nodes, 'airDesktopNodesList');
+                applyRunningProgressToCurrentSub();
+            }
+        }
+    }
+
+    function quickStartAirHistoryTest() {
+        if (!airState.currentSubId) return;
+        airState.isHistoryMode = false;
+        const btn = document.getElementById('btn-test-history');
+        if (btn) btn.classList.remove('active');
+        renderAirNodes(airState.nodes, 'airDesktopNodesList');
+        startCurrentSubBackgroundTest();
+    }
+
+    async function loadAirSpeedHistory() {
+        const container = document.getElementById('airDesktopNodesList');
+        if (!container) return;
+        if (!airState.currentSubId) {
+            container.innerHTML = '<div class="air-empty-state" style="padding:20px;">请先选择订阅</div>';
+            return;
+        }
+
+        container.innerHTML = '<div class="air-empty-state" style="padding:20px;">历史记录加载中...</div>';
+        try {
+            const res = await fetch(`/api/airport/test/history?sub_id=${encodeURIComponent(airState.currentSubId)}`);
+            const data = await res.json();
+            if (data.status !== 'success') {
+                container.innerHTML = '<div class="air-empty-state" style="padding:20px; color:#d74242;">加载历史失败</div>';
+                return;
+            }
+
+            const records = Array.isArray(data.records) ? data.records : [];
+            if (records.length === 0) {
+                container.innerHTML = `
+                    <div class="air-empty-state air-history-empty">
+                        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2v4"></path>
+                            <path d="M12 18v4"></path>
+                            <path d="M4.93 4.93l2.83 2.83"></path>
+                            <path d="M16.24 16.24l2.83 2.83"></path>
+                            <path d="M2 12h4"></path>
+                            <path d="M18 12h4"></path>
+                            <path d="M4.93 19.07l2.83-2.83"></path>
+                            <path d="M16.24 7.76l2.83-2.83"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <div class="air-history-empty-title">暂无测速历史记录</div>
+                        <div class="air-history-empty-desc">当前订阅还没有整组测速任务。你可以立即发起一次测速，系统会自动记录历史并支持后续结果回放。</div>
+                        <button class="air-history-empty-btn" onclick="quickStartAirHistoryTest()">立即开始整组测速</button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `<div class="air-history-list">${records.map(r => {
+                const t = r.created_at ? new Date(r.created_at).toLocaleString() : '-';
+                const st = r.status || 'unknown';
+                return `
+                    <div class="air-history-item">
+                        <div class="air-history-head">
+                            <div class="air-history-main">
+                                <div class="air-history-title">${escapeAirHtml(r.sub_name || '未命名订阅')} · 任务 ${escapeAirHtml(r.task_key || '-')}</div>
+                                <div class="air-history-meta">
+                                    <span>时间: ${escapeAirHtml(t)}</span>
+                                    <span>状态: ${escapeAirHtml(st)}</span>
+                                    <span>结果: ${Number(r.result_count || 0)}</span>
+                                    <span>错误: ${Number(r.error_count || 0)}</span>
+                                </div>
+                            </div>
+                            <div class="air-history-actions">
+                                <button class="air-history-view" title="查看该次测速结果（切换到节点列表）" onclick="viewAirSpeedHistoryResult('${r.id}')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                                <button class="air-history-del" title="删除记录" onclick="deleteAirSpeedHistoryRecord('${r.id}')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}</div>`;
+        } catch (_) {
+            container.innerHTML = '<div class="air-empty-state" style="padding:20px; color:#d74242;">加载历史失败</div>';
+        }
+    }
+
+    async function viewAirSpeedHistoryResult(id) {
+        if (!airState.currentSubId || !id) return;
+        airState.isHistoryMode = false;
+        const btn = document.getElementById('btn-test-history');
+        if (btn) btn.classList.remove('active');
+
+        renderAirNodes(airState.nodes, 'airDesktopNodesList');
+        try {
+            const res = await fetch(`/api/airport/test/history/results?id=${encodeURIComponent(id)}`);
+            const data = await res.json();
+            if (data.status !== 'success') {
+                showAirSaveStatus(data.message || '加载历史测速结果失败', true);
+                return;
+            }
+
+            const details = Array.isArray(data.results) ? data.results : [];
+            const mapByNodeName = {};
+            details.forEach(item => {
+                if (!item) return;
+                const nameKey = String(item.node_name || '').trim();
+                if (!nameKey) return;
+                const type = String(item.result_type || '').trim().toLowerCase() || 'unknown';
+                if (!mapByNodeName[nameKey]) mapByNodeName[nameKey] = {};
+                if (!mapByNodeName[nameKey][type]) mapByNodeName[nameKey][type] = item;
+            });
+
+            airState.nodes.forEach(node => {
+                const el = document.getElementById(`speed-tags-${node.id}`);
+                if (!el) return;
+                const rowTypeMap = mapByNodeName[String(node.name || '').trim()];
+                if (!rowTypeMap) {
+                    el.dataset.rtKey = '__history_empty__';
+                    el.innerHTML = '<span class="air-tag" style="background:#f5f5f7; color:#999;">未测试</span>';
+                    return;
+                }
+                const render = buildSpeedTagsHtmlFromTypeMap(rowTypeMap);
+                el.dataset.rtKey = `history|${render.key}`;
+                el.innerHTML = render.html;
+            });
+
+            const taskKey = (data.history && data.history.task_key) ? data.history.task_key : '-';
+            showAirSaveStatus(`已载入历史任务 ${taskKey} 的测速结果`);
+        } catch (_) {
+            showAirSaveStatus('加载历史测速结果失败', true);
+        }
+    }
+
+    async function deleteAirSpeedHistoryRecord(id) {
+        try {
+            const res = await fetch('/api/airport/test/history/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                showAirSaveStatus('历史记录已删除');
+                loadAirSpeedHistory();
+            } else {
+                showAirSaveStatus(data.message || '删除失败', true);
+            }
+        } catch (_) {
+            showAirSaveStatus('删除失败', true);
+        }
+    }
+
     // ================= 核心逻辑 =================
 
     async function loadAirSubs() {
@@ -1020,6 +1697,7 @@
             if (data.status === 'success') {
                 airState.subs = data.data || [];
                 renderAirSubs();
+                refreshGlobalTestButtonState();
                 if (!airState.isMobile && airState.subs.length > 0 && !airState.currentSubId) {
                     selectAirSub(airState.subs[0].id);
                 }
@@ -1066,6 +1744,7 @@
                     <div class="air-sub-name-wrap">
                         <div class="air-sub-name-header">
                             <span class="air-sub-name">${sub.name}</span>
+                            ${airState.runningTests[sub.id] ? `<span class="air-sub-testing-icon" title="测速中"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>` : ''}
                             ${trafficInlineTxt}
                         </div>
                         ${trafficHtml}
@@ -1097,6 +1776,7 @@
         document.querySelectorAll('.air-sub-card').forEach(el => el.classList.remove('active'));
         const activeCard = document.getElementById(`sub-card-${id}`);
         if (activeCard) activeCard.classList.add('active');
+        refreshGlobalTestButtonState();
 
         // 更新头部流量文本
         const currentSub = airState.subs.find(s => s.id === id);
@@ -1132,7 +1812,12 @@
 
                 if (container && !airState.isMobile) { container.style.opacity = '1'; container.style.pointerEvents = 'auto'; }
 
-                renderAirNodes(airState.nodes, containerId);
+                if (!airState.isMobile && airState.isHistoryMode) {
+                    loadAirSpeedHistory();
+                } else {
+                    renderAirNodes(airState.nodes, containerId);
+                    applyRunningProgressToCurrentSub();
+                }
 
                 if (airState.isMobile && activeCard) {
                     setTimeout(() => { const sidebar = document.querySelector('.air-sidebar'); sidebar.scrollTo({ top: activeCard.offsetTop, behavior: 'auto' }); }, 100);
@@ -1194,7 +1879,7 @@
             let iconColor = node.routing_type === 1 ? 'var(--air-primary)' : (node.routing_type === 2 ? 'var(--air-warning)' : 'var(--air-danger)');
 
             // --- 新增：根据当前测试状态动态渲染按钮图标 ---
-            let testBtnAction = `testSingleAirNode('${node.id}')`;
+            let testBtnAction = `openNodeSpeedModePicker('${node.id}', event)`;
             let testBtnTitle = "测速";
             let testBtnIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
             if (typeof activeTestTarget !== 'undefined' && (activeTestTarget === node.id || activeTestTarget === 'all')) {
@@ -1209,19 +1894,26 @@
                 <div class="air-node-actions">
                     <div class="air-speed-tags" id="speed-tags-${node.id}"></div>
                     
-                    <button class="air-circle-btn" id="btn-test-${node.id}" title="${testBtnTitle}" onclick="${testBtnAction}">
-                        ${testBtnIcon}
-                    </button>
+                    <div class="air-speed-mode-wrapper node" id="speed-mode-${node.id}">
+                        <div class="air-speed-mode-capsule">
+                            <button class="air-speed-mode-item" data-mode="ping_only" onclick="testSingleAirNode('${node.id}', 'ping_only', event)">仅 Ping</button>
+                            <button class="air-speed-mode-item" data-mode="ping_speed" onclick="testSingleAirNode('${node.id}', 'ping_speed', event)">Ping + 带宽</button>
+                            <button class="air-speed-mode-item" data-mode="all" onclick="testSingleAirNode('${node.id}', 'all', event)">全面测试</button>
+                        </div>
+                        <button class="air-circle-btn" id="btn-test-${node.id}" title="${testBtnTitle}" onclick="${testBtnAction}">
+                            ${testBtnIcon}
+                        </button>
+                    </div>
 
                     <div class="air-routing-wrapper" id="dropdown-${node.id}">
-                        <button class="air-circle-btn" title="修改分组" onclick="toggleRoutingMenu('${node.id}', event)" style="color: ${iconColor}; border-color: ${node.routing_type === 0 ? 'var(--air-border)' : iconColor};">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
-                        </button>
                         <div class="air-routing-capsule">
                             <button class="air-capsule-item ${node.routing_type === 0 ? 'active' : ''}" data-val="0" onclick="setAirNodeRouting('${node.id}', 0, '${containerId}', event)">禁用</button>
                             <button class="air-capsule-item ${node.routing_type === 1 ? 'active' : ''}" data-val="1" onclick="setAirNodeRouting('${node.id}', 1, '${containerId}', event)">直连</button>
                             <button class="air-capsule-item ${node.routing_type === 2 ? 'active' : ''}" data-val="2" onclick="setAirNodeRouting('${node.id}', 2, '${containerId}', event)">落地</button>
                         </div>
+                        <button class="air-circle-btn" title="修改分组" onclick="toggleRoutingMenu('${node.id}', event)" style="color: ${iconColor}; border-color: ${node.routing_type === 0 ? 'var(--air-border)' : iconColor};">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+                        </button>
                     </div>
                 </div>
             `;
@@ -1233,6 +1925,7 @@
 
     function toggleRoutingMenu(nodeId, event) {
         event.stopPropagation();
+        closeAirSpeedModePanel();
         const wrapper = document.getElementById(`dropdown-${nodeId}`);
         const isActive = wrapper.classList.contains('active');
         document.querySelectorAll('.air-routing-wrapper').forEach(el => el.classList.remove('active'));
@@ -1260,6 +1953,33 @@
     let activeEventSource = null;
     let activeTestTarget = null; // 记录当前在测速的目标 ('all' 或 node.id)
 
+    function closeAirSpeedModePanel(exceptId = '') {
+        document.querySelectorAll('.air-speed-mode-wrapper.active').forEach(el => {
+            if (!exceptId || el.id !== exceptId) el.classList.remove('active');
+        });
+    }
+
+    function openNodeSpeedModePicker(nodeId, event) {
+        if (event) event.stopPropagation();
+        document.querySelectorAll('.air-routing-wrapper').forEach(el => el.classList.remove('active'));
+        const wrapper = document.getElementById(`speed-mode-${nodeId}`);
+        if (!wrapper) return;
+        const willOpen = !wrapper.classList.contains('active');
+        closeAirSpeedModePanel();
+        if (willOpen) wrapper.classList.add('active');
+    }
+
+    function openAllSpeedModePicker(event) {
+        if (event) event.stopPropagation();
+        if (!airState.currentSubId) return;
+        document.querySelectorAll('.air-routing-wrapper').forEach(el => el.classList.remove('active'));
+        const wrapper = document.getElementById('air-global-speed-mode');
+        if (!wrapper) return;
+        const willOpen = !wrapper.classList.contains('active');
+        closeAirSpeedModePanel();
+        if (willOpen) wrapper.classList.add('active');
+    }
+
     function appendSpeedTag(nodeId, type, text) {
         const container = document.getElementById(`speed-tags-${nodeId}`);
         if (!container) return;
@@ -1272,21 +1992,15 @@
     // 重置所有测试按钮回默认的 "开始测速" 图标
     function resetTestButtons() {
         const playIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
-        const globalPlayIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
-
-        const btnAll = document.getElementById('btn-test-all');
-        if (btnAll) {
-            btnAll.innerHTML = globalPlayIcon;
-            btnAll.onclick = testAllAirNodes;
-            btnAll.title = "一键测速该订阅全部节点";
-        }
 
         document.querySelectorAll('.air-circle-btn[id^="btn-test-"]').forEach(btn => {
             const nodeId = btn.id.replace('btn-test-', '');
             btn.innerHTML = playIcon;
-            btn.onclick = () => testSingleAirNode(nodeId);
+            btn.onclick = (event) => openNodeSpeedModePicker(nodeId, event);
             btn.title = "测速";
         });
+
+        refreshGlobalTestButtonState();
     }
 
     // 将指定目标的测试按钮切换为 "红点停止" 图标
@@ -1313,6 +2027,7 @@
 
     // 核心主动停止函数：关闭流并释放资源，后端会自动感应并杀死核心进程
     function stopSpeedTest() {
+        closeAirSpeedModePanel();
         if (activeEventSource) {
             activeEventSource.close();
             activeEventSource = null;
@@ -1384,14 +2099,16 @@
         };
     }
 
-    function testSingleAirNode(nodeId) {
+    function testSingleAirNode(nodeId, mode, event) {
+        if (event) event.stopPropagation();
         // ✨ 取消在这里提前渲染 HTML，移交到 startSpeedTestStream 中去统一排队执行
-        startSpeedTestStream(`/api/airport/test-nodes?node_id=${nodeId}`, false, nodeId);
+        const selectedMode = normalizeAirSpeedTestMode(mode);
+        closeAirSpeedModePanel();
+        startSpeedTestStream(`/api/airport/test-nodes?node_id=${encodeURIComponent(nodeId)}&mode=${encodeURIComponent(selectedMode)}`, false, nodeId);
     }
 
-    function testAllAirNodes() {
-        if (!airState.currentSubId || airState.nodes.length === 0) return;
-        startSpeedTestStream(`/api/airport/test-nodes?sub_id=${airState.currentSubId}`, true, 'all');
+    function testAllAirNodes(event) {
+        openAllSpeedModePicker(event);
     }
 
     // ================= CRUD 逻辑 =================
