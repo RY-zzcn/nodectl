@@ -906,9 +906,10 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name        string `json:"name"`
-		RoutingType int    `json:"routing_type"`
-		ResetDay    int    `json:"reset_day"`
+		Name         string `json:"name"`
+		RoutingType  int    `json:"routing_type"`
+		ResetDay     int    `json:"reset_day"`
+		TrafficLimit int64  `json:"traffic_limit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
@@ -923,10 +924,17 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 补充更新 reset_day 和 traffic_limit
+	updates := map[string]interface{}{}
 	if req.ResetDay > 0 {
-		if err := database.DB.Model(&database.NodePool{}).Where("uuid = ?", node.UUID).Update("reset_day", req.ResetDay).Error; err != nil {
-			logger.Log.Error("补充更新重置日失败", "uuid", node.UUID, "error", err)
-			// 即使这个失败了，节点也算创建成功，只记录日志即可
+		updates["reset_day"] = req.ResetDay
+	}
+	if req.TrafficLimit > 0 {
+		updates["traffic_limit"] = req.TrafficLimit
+	}
+	if len(updates) > 0 {
+		if err := database.DB.Model(&database.NodePool{}).Where("uuid = ?", node.UUID).Updates(updates).Error; err != nil {
+			logger.Log.Error("补充更新节点属性失败", "uuid", node.UUID, "error", err)
 		}
 	}
 

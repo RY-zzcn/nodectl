@@ -161,6 +161,77 @@
         text-align: center;
     }
 
+    /* 流量限额输入组 */
+    .add-traffic-input-group {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        border: 1px solid #d1d1d6;
+        border-radius: 8px;
+        background: #fafbfc;
+        transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+        overflow: hidden;
+        height: 100%;
+    }
+
+    .add-traffic-input-group:focus-within {
+        border-color: #007aff;
+        background: #fff;
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+    }
+
+    .add-traffic-input-group input {
+        flex: 1;
+        min-width: 0;
+        padding: 0 12px;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: #1d1d1f;
+        height: 100%;
+    }
+
+    .add-traffic-input-group input::placeholder {
+        color: #bbb;
+        font-weight: 500;
+    }
+
+    .add-traffic-input-group .add-select-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        border-left: 1px solid #e5e5ea;
+        background: #f4f5f7;
+        height: 100%;
+    }
+
+    .add-traffic-input-group select {
+        appearance: none;
+        -webkit-appearance: none;
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 0 24px 0 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #555;
+        cursor: pointer;
+        height: 100%;
+    }
+
+    .add-traffic-input-group select:hover {
+        color: #1d1d1f;
+    }
+
+    .add-traffic-input-group .add-arrow {
+        position: absolute;
+        right: 8px;
+        color: #888;
+        pointer-events: none;
+    }
+
     /* 表单布局容器 */
     .add-form-group {
         display: flex;
@@ -263,6 +334,23 @@
                         <input type="number" id="nodeResetDayInput" class="add-input add-input-number"
                             placeholder="1-31 (0为不重置)" value="1" min="0" max="31">
                     </div>
+                    <div class="add-row">
+                        <label class="add-label">流量限额</label>
+                        <div class="add-traffic-input-group">
+                            <input type="number" id="nodeTrafficLimitInput" placeholder="0 为不限制" min="0">
+                            <div class="add-select-wrapper">
+                                <select id="nodeTrafficUnitInput">
+                                    <option value="GB">GB</option>
+                                    <option value="TB">TB</option>
+                                </select>
+                                <svg class="add-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -318,18 +406,22 @@
         const indicator = document.getElementById('addNodeIndicator');
         const nodeName = document.getElementById('nodeNameInput').value.trim();
         const routingType = parseInt(document.getElementById('nodeGroupVal').value);
-        const resetDay = parseInt(document.getElementById('nodeResetDayInput').value) || 0; // 新增获取重置日
+        const resetDay = parseInt(document.getElementById('nodeResetDayInput').value) || 0;
+        // 获取流量限额
+        const trafficLimitInput = parseFloat(document.getElementById('nodeTrafficLimitInput').value) || 0;
+        const trafficUnit = document.getElementById('nodeTrafficUnitInput').value;
+        const trafficMultiplier = trafficUnit === 'TB' ? 1099511627776 : 1073741824;
+        const trafficLimit = trafficLimitInput > 0 ? Math.floor(trafficLimitInput * trafficMultiplier) : 0;
 
         btn.disabled = true;
         btn.innerText = '处理中...';
-        indicator.style.opacity = '0'; // 请求前重置状态
+        indicator.style.opacity = '0';
 
         try {
             const response = await fetch('/api/add-node', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // 新增传递 reset_day 参数
-                body: JSON.stringify({ name: nodeName, routing_type: routingType, reset_day: resetDay })
+                body: JSON.stringify({ name: nodeName, routing_type: routingType, reset_day: resetDay, traffic_limit: trafficLimit })
             });
             const data = await response.json();
 
