@@ -907,6 +907,54 @@ func deleteTunnelDNS(accountID, domain, subdomain string) error {
 	return nil
 }
 
+// DeleteCFTunnelDNSHost 删除指定完整主机名的 Tunnel DNS 记录。
+// host 必须是完整域名，例如 vmess-ws.ab12cd.example.com
+func DeleteCFTunnelDNSHost(host string) error {
+	host = strings.TrimSpace(strings.TrimSuffix(host, "."))
+	if host == "" {
+		return nil
+	}
+
+	domain := strings.TrimSpace(getCFConfig("cf_domain"))
+	if domain == "" {
+		return fmt.Errorf("cf_domain 未配置")
+	}
+
+	zoneID, err := getZoneID(domain)
+	if err != nil {
+		return fmt.Errorf("获取 Zone ID 失败: %w", err)
+	}
+
+	checkURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records?type=CNAME&name=%s", zoneID, host)
+	checkResult, err := cfAPIRequest("GET", checkURL, nil)
+	if err != nil {
+		return fmt.Errorf("查询 DNS 记录失败: %w", err)
+	}
+
+	records, ok := checkResult["result"].([]interface{})
+	if !ok || len(records) == 0 {
+		return nil
+	}
+
+	for _, raw := range records {
+		record, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		recordID, _ := record["id"].(string)
+		if recordID == "" {
+			continue
+		}
+		deleteURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", zoneID, recordID)
+		if _, err := cfAPIRequest("DELETE", deleteURL, nil); err != nil {
+			return fmt.Errorf("删除 DNS 记录失败: %w", err)
+		}
+		logger.Log.Info("Tunnel DNS CNAME 已删除", "host", host, "record_id", recordID)
+	}
+
+	return nil
+}
+
 // EnsureCFTunnelDNSHost 确保指定主机名存在指向当前 Tunnel 的 CNAME 记录。
 // host 必须是完整域名，例如 vmess-ws.ab12cd.example.com
 func EnsureCFTunnelDNSHost(host string) error {

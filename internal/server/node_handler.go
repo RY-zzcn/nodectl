@@ -507,16 +507,36 @@ func apiGetTunnelNodeSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	items := make([]map[string]interface{}, 0, len(nodes))
+	globalTunnelName := strings.TrimSpace(service.GetCFConfigPublic("cf_tunnel_name"))
+	globalTunnelID := strings.TrimSpace(service.GetCFConfigPublic("cf_tunnel_id"))
+	tunnelNameByID := loadTunnelNameMap(nodes)
 	for _, n := range nodes {
 		supported := getSupportedTunnelProtocolsForNode(n)
+		tunnelDomain := strings.TrimSpace(n.TunnelDomain)
+		tunnelID := strings.TrimSpace(n.TunnelID)
+		tunnelName := ""
+		if tunnelID != "" {
+			if resolvedName := strings.TrimSpace(tunnelNameByID[tunnelID]); resolvedName != "" {
+				tunnelName = resolvedName
+			} else if globalTunnelID != "" && tunnelID == globalTunnelID && globalTunnelName != "" {
+				tunnelName = globalTunnelName
+			}
+			if tunnelName == "" {
+				tunnelName = "(" + tunnelID[:minInt(8, len(tunnelID))] + "...)"
+			}
+		}
+
+		hosts := getNodeTunnelHosts(n)
 		item := map[string]interface{}{
 			"uuid":                       n.UUID,
 			"install_id":                 n.InstallID,
 			"name":                       n.Name,
 			"region":                     n.Region,
 			"tunnel_enabled":             n.TunnelEnabled,
-			"tunnel_id":                  strings.TrimSpace(n.TunnelID),
-			"tunnel_domain":              strings.TrimSpace(n.TunnelDomain),
+			"tunnel_id":                  tunnelID,
+			"tunnel_name":                tunnelName,
+			"tunnel_domain":              tunnelDomain,
+			"tunnel_hosts":               hosts,
 			"online":                     service.IsNodeOnline(n.InstallID),
 			"supported_tunnel_protocols": supported,
 		}
@@ -524,6 +544,34 @@ func apiGetTunnelNodeSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendJSON(w, "success", map[string]interface{}{"nodes": items})
+}
+
+func loadTunnelNameMap(nodes []database.NodePool) map[string]string {
+	nameByID := make(map[string]string)
+	uniqueIDs := make(map[string]struct{})
+	for _, node := range nodes {
+		tunnelID := strings.TrimSpace(node.TunnelID)
+		if tunnelID == "" {
+			continue
+		}
+		uniqueIDs[tunnelID] = struct{}{}
+	}
+	if len(uniqueIDs) == 0 {
+		return nameByID
+	}
+
+	items, err := service.ListCFTunnelsByPrefix("")
+	if err != nil {
+		logger.Log.Warn("读取 Tunnel 名称映射失败", "error", err)
+		return nameByID
+	}
+	for _, item := range items {
+		if _, ok := uniqueIDs[strings.TrimSpace(item.ID)]; !ok {
+			continue
+		}
+		nameByID[strings.TrimSpace(item.ID)] = strings.TrimSpace(item.Name)
+	}
+	return nameByID
 }
 
 // apiUpdateTunnelNodeSetting 更新单个节点 tunnel 设置
@@ -765,25 +813,15 @@ func apiDeleteTunnelNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var node database.NodePool
-	if err := database.DB.Select("uuid", "install_id", "tunnel_enabled", "tunnel_id", "tunnel_domain").Where("uuid = ?", req.UUID).First(&node).Error; err != nil {
+	if err := database.DB.Select("uuid", "install_id", "links", "disabled_links", "tunnel_enabled", "tunnel_id", "tunnel_domain").Where("uuid = ?", req.UUID).First(&node).Error; err != nil {
 		sendJSON(w, "error", "节点不存在")
 		return
 	}
 
-	tunnelID := strings.TrimSpace(node.TunnelID)
-	shared := false
-	if tunnelID != "" {
-		var usedByOthers int64
-		database.DB.Model(&database.NodePool{}).
-			Where("uuid <> ? AND tunnel_id = ?", node.UUID, tunnelID).
-			Count(&usedByOthers)
-		shared = usedByOthers > 0
-		if !shared {
-			if err := service.DeleteCFTunnelByID(tunnelID); err != nil {
-				sendJSON(w, "error", err.Error())
-				return
-			}
-		}
+	cleanupResult, err := cleanupNodeTunnelResources(node)
+	if err != nil {
+		sendJSON(w, "error", err.Error())
+		return
 	}
 
 	updates := map[string]interface{}{
@@ -797,18 +835,21 @@ func apiDeleteTunnelNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{}
-	if service.IsNodeOnline(node.InstallID) {
-		if commandID, err := service.FireCommandToNode(node.InstallID, "tunnel-stop", map[string]interface{}{}); err == nil {
-			resp["command_id"] = commandID
-		}
+	if cleanupResult.StopCommandID != "" {
+		resp["command_id"] = cleanupResult.StopCommandID
 	}
 
+	tunnelID := strings.TrimSpace(node.TunnelID)
 	if tunnelID == "" {
-		resp["message"] = "节点未绑定 Tunnel，已清理本地配置"
-	} else if shared {
-		resp["message"] = "已解绑当前节点（该 Tunnel 仍被其他节点使用，未删除远端）"
+		if cleanupResult.RemovedDNSCount > 0 {
+			resp["message"] = fmt.Sprintf("节点未绑定 Tunnel，已清理 %d 条 DNS 记录并完成本地清理", cleanupResult.RemovedDNSCount)
+		} else {
+			resp["message"] = "节点未绑定 Tunnel，已清理本地配置"
+		}
+	} else if cleanupResult.SharedTunnel {
+		resp["message"] = fmt.Sprintf("已解绑当前节点并清理 %d 条 DNS 记录（该 Tunnel 仍被其他节点使用，未删除远端）", cleanupResult.RemovedDNSCount)
 	} else {
-		resp["message"] = "已删除远端 Tunnel 并清理节点配置"
+		resp["message"] = fmt.Sprintf("已清理 %d 条 DNS 记录，删除远端 Tunnel 并完成节点配置清理", cleanupResult.RemovedDNSCount)
 	}
 
 	sendJSON(w, "success", resp)
@@ -885,9 +926,16 @@ func buildNodeTunnelCommandPayload(node database.NodePool) (map[string]interface
 		return nil, fmt.Errorf("该节点暂无可通过 Tunnel 加速的协议。")
 	}
 
+	// 获取 Tunnel ID（Agent 端需要用它生成 credentials 文件和 config.yml）
+	tunnelID := strings.TrimSpace(node.TunnelID)
+	if tunnelID == "" {
+		tunnelID = strings.TrimSpace(service.GetCFConfigPublic("cf_tunnel_id"))
+	}
+
 	payload := map[string]interface{}{
 		"base_domain":  baseDomain,
 		"tunnel_token": tunnelToken,
+		"tunnel_id":    tunnelID,
 		"routes":       routes,
 	}
 	return payload, nil
@@ -952,6 +1000,13 @@ func buildTunnelHostForProtocol(baseDomain, protocol string) string {
 	return prefix + "." + base
 }
 
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func isTunnelCompatibleProtocol(protocol string) bool {
 	switch strings.TrimSpace(protocol) {
 	case "vmess_ws", "vmess_http", "vmess_wst", "vmess_hut", "vless_wst", "vless_hut", "trojan_wst", "trojan_hut":
@@ -976,6 +1031,138 @@ func getSupportedTunnelProtocolsForNode(node database.NodePool) []string {
 	}
 	sort.Strings(protos)
 	return protos
+}
+
+func getNodeTunnelHosts(node database.NodePool) []string {
+	baseDomain := strings.TrimSpace(node.TunnelDomain)
+	if baseDomain == "" {
+		return []string{}
+	}
+
+	supported := getSupportedTunnelProtocolsForNode(node)
+	if len(supported) == 0 {
+		return []string{}
+	}
+
+	hostSet := make(map[string]struct{}, len(supported))
+	for _, proto := range supported {
+		host := buildTunnelHostForProtocol(baseDomain, proto)
+		if host == "" {
+			continue
+		}
+		hostSet[host] = struct{}{}
+	}
+
+	hosts := make([]string, 0, len(hostSet))
+	for host := range hostSet {
+		hosts = append(hosts, host)
+	}
+	sort.Strings(hosts)
+	return hosts
+}
+
+// getAllTunnelCompatibleHostsForNode 获取节点所有 Tunnel 兼容协议的域名（含已禁用的）。
+// 用于 DNS 清理场景：确保被禁用协议的 DNS 记录也能被正确删除。
+func getAllTunnelCompatibleHostsForNode(node database.NodePool) []string {
+	baseDomain := strings.TrimSpace(node.TunnelDomain)
+	if baseDomain == "" {
+		return []string{}
+	}
+
+	hostSet := make(map[string]struct{})
+	for proto, link := range node.Links {
+		if strings.TrimSpace(link) == "" {
+			continue
+		}
+		if !isTunnelCompatibleProtocol(proto) {
+			continue
+		}
+		host := buildTunnelHostForProtocol(baseDomain, proto)
+		if host != "" {
+			hostSet[host] = struct{}{}
+		}
+	}
+
+	hosts := make([]string, 0, len(hostSet))
+	for host := range hostSet {
+		hosts = append(hosts, host)
+	}
+	sort.Strings(hosts)
+	return hosts
+}
+
+func cleanupNodeTunnelDNSRecords(node database.NodePool) (int, error) {
+	// 使用包含已禁用协议的完整列表，确保不会遗漏之前创建的 DNS 记录
+	hosts := getAllTunnelCompatibleHostsForNode(node)
+	if len(hosts) == 0 {
+		return 0, nil
+	}
+
+	removed := 0
+	var firstErr error
+	for _, host := range hosts {
+		if err := service.DeleteCFTunnelDNSHost(host); err != nil {
+			logger.Log.Warn("删除 Tunnel DNS 记录失败，继续清理其余记录", "host", host, "error", err)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("删除 DNS 记录失败(%s): %w", host, err)
+			}
+			continue
+		}
+		removed++
+	}
+	return removed, firstErr
+}
+
+type nodeTunnelCleanupResult struct {
+	RemovedDNSCount int
+	SharedTunnel    bool
+	DeletedTunnel   bool
+	StopCommandID   string
+}
+
+func cleanupNodeTunnelResources(node database.NodePool) (nodeTunnelCleanupResult, error) {
+	result := nodeTunnelCleanupResult{}
+	if service.IsNodeOnline(node.InstallID) && (node.TunnelEnabled || strings.TrimSpace(node.TunnelID) != "" || strings.TrimSpace(node.TunnelDomain) != "") {
+		if commandID, err := service.FireCommandToNode(node.InstallID, "tunnel-stop", map[string]interface{}{}); err == nil {
+			result.StopCommandID = commandID
+		} else {
+			logger.Log.Warn("删除前停止节点 Tunnel 失败", "uuid", node.UUID, "install_id", node.InstallID, "error", err)
+		}
+	}
+
+	removedDNSCount, err := cleanupNodeTunnelDNSRecords(node)
+	if err != nil {
+		return result, err
+	}
+	result.RemovedDNSCount = removedDNSCount
+
+	tunnelID := strings.TrimSpace(node.TunnelID)
+	if tunnelID == "" {
+		return result, nil
+	}
+
+	result.SharedTunnel = isTunnelUsedByOtherNodes(node.UUID, tunnelID)
+	if result.SharedTunnel {
+		return result, nil
+	}
+
+	if err := service.DeleteCFTunnelByID(tunnelID); err != nil {
+		return result, err
+	}
+	result.DeletedTunnel = true
+	return result, nil
+}
+
+func isTunnelUsedByOtherNodes(currentUUID, tunnelID string) bool {
+	tunnelID = strings.TrimSpace(tunnelID)
+	if tunnelID == "" {
+		return false
+	}
+	var usedByOthers int64
+	database.DB.Model(&database.NodePool{}).
+		Where("uuid <> ? AND tunnel_id = ?", currentUUID, tunnelID).
+		Count(&usedByOthers)
+	return usedByOthers > 0
 }
 
 func sliceContains(items []string, target string) bool {
@@ -1147,6 +1334,13 @@ func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	cleanupResult, err := cleanupNodeTunnelResources(targetNode)
+	if err != nil {
+		logger.Log.Error("删除节点前清理 Tunnel 资源失败", "error", err, "uuid", req.UUID, "ip", clientIP, "path", reqPath)
+		sendJSON(w, "error", "删除节点前清理 Tunnel 资源失败: "+err.Error())
+		return
+	}
+
 	// 1. 显式删除关联的流量统计数据（不依赖外键级联）
 	if err := database.DB.Where("node_uuid = ?", req.UUID).Delete(&database.NodeTrafficStat{}).Error; err != nil {
 		logger.Log.Error("删除节点流量数据失败", "error", err, "uuid", req.UUID)
@@ -1165,6 +1359,16 @@ func apiDeleteNode(w http.ResponseWriter, r *http.Request) {
 	service.CleanupNodeState(targetNode.InstallID, targetNode.UUID)
 
 	logger.Log.Info("节点已删除", "uuid", req.UUID, "name", targetNode.Name, "ip", clientIP, "path", reqPath)
+	if cleanupResult.RemovedDNSCount > 0 || cleanupResult.DeletedTunnel || cleanupResult.SharedTunnel {
+		msg := fmt.Sprintf("节点已删除；已清理 %d 条 Tunnel DNS 记录", cleanupResult.RemovedDNSCount)
+		if cleanupResult.SharedTunnel {
+			msg += "；共享 Tunnel 已保留"
+		} else if cleanupResult.DeletedTunnel {
+			msg += "；远端 Tunnel 已删除"
+		}
+		sendJSON(w, "success", msg)
+		return
+	}
 	sendJSON(w, "success", "节点已删除")
 }
 
@@ -1333,6 +1537,13 @@ func apiNodeControlResetLinks(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]interface{}{
 		"protocols": protocols,
 	}
+	if node.TunnelEnabled {
+		if tunnelPayload, e := buildNodeTunnelCommandPayload(node); e == nil {
+			payload["tunnel"] = tunnelPayload
+		} else {
+			logger.Log.Warn("重置链接时跳过 Tunnel 刷新", "uuid", req.UUID, "error", e)
+		}
+	}
 
 	commandID, err := service.FireCommandToNode(node.InstallID, "reset-links", payload)
 	if err != nil {
@@ -1345,13 +1556,8 @@ func apiNodeControlResetLinks(w http.ResponseWriter, r *http.Request) {
 		"command_id": commandID,
 		"message":    "命令已下发，正在执行...",
 	}
-
-	if node.TunnelEnabled {
-		if tunnelPayload, e := buildNodeTunnelCommandPayload(node); e == nil {
-			if tunnelCmdID, e2 := service.FireCommandToNode(node.InstallID, "tunnel-prepare", tunnelPayload); e2 == nil {
-				resp["tunnel_command_id"] = tunnelCmdID
-			}
-		}
+	if _, ok := payload["tunnel"]; ok {
+		resp["message"] = "命令已下发，重置完成后会自动刷新 Tunnel 配置"
 	}
 
 	logger.Log.Info("重置链接命令已下发", "uuid", req.UUID, "command_id", commandID)
@@ -1402,6 +1608,13 @@ func apiNodeControlReinstall(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]interface{}{
 		"protocols": protocols,
 	}
+	if node.TunnelEnabled {
+		if tunnelPayload, e := buildNodeTunnelCommandPayload(node); e == nil {
+			payload["tunnel"] = tunnelPayload
+		} else {
+			logger.Log.Warn("重装 sing-box 时跳过 Tunnel 刷新", "uuid", req.UUID, "error", e)
+		}
+	}
 
 	commandID, err := service.FireCommandToNode(node.InstallID, "reinstall-singbox", payload)
 	if err != nil {
@@ -1414,13 +1627,8 @@ func apiNodeControlReinstall(w http.ResponseWriter, r *http.Request) {
 		"command_id": commandID,
 		"message":    "命令已下发，正在执行...",
 	}
-
-	if node.TunnelEnabled {
-		if tunnelPayload, e := buildNodeTunnelCommandPayload(node); e == nil {
-			if tunnelCmdID, e2 := service.FireCommandToNode(node.InstallID, "tunnel-prepare", tunnelPayload); e2 == nil {
-				resp["tunnel_command_id"] = tunnelCmdID
-			}
-		}
+	if _, ok := payload["tunnel"]; ok {
+		resp["message"] = "命令已下发，重装完成后会自动刷新 Tunnel 配置"
 	}
 
 	logger.Log.Info("重装 sing-box 命令已下发", "uuid", req.UUID, "command_id", commandID)

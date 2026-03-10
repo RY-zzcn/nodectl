@@ -508,8 +508,9 @@
                             <button type="button" data-mode="total">总量</button>
                         </div>
                     </div>
-                    <div class="ts-head-right" style="font-size:12px; color:#8d8d98; font-weight:700;">⚗ <span
-                            id="ts-trend-ratio">0.00</span></div>
+                    <div class="ts-head-right" style="font-size:12px; color:#8d8d98; font-weight:700;">
+                        <span id="ts-trend-today">今日: 0 B</span>
+                    </div>
                 </div>
                 <div class="ts-chart-wrap" id="ts-line-wrap">
                     <svg class="ts-svg" id="ts-line-svg" viewBox="0 0 960 250"
@@ -877,9 +878,9 @@
             let limitHTML = '';
             if (limit > 0) {
                 const pct = Math.min(100, (used / limit) * 100).toFixed(2);
-                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; background: #f0f0f5; padding: 2px 8px; border-radius: 6px; letter-spacing: 0;">${fmtBytes(used)} / ${fmtBytes(limit)} (${pct}%)</span>`;
+                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; letter-spacing: 0;">${fmtBytes(used)} / ${fmtBytes(limit)} (${pct}%)</span>`;
             } else if (used > 0) {
-                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; background: #f0f0f5; padding: 2px 8px; border-radius: 6px; letter-spacing: 0;">已用 ${fmtBytes(used)}</span>`;
+                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; letter-spacing: 0;">已用 ${fmtBytes(used)}</span>`;
             }
 
             el.innerHTML = `<span class="dot"></span><span class="ts-node-main">${flagEmoji(node.region)} <span class="ts-node-name">${esc(node.name || '--')}</span>${limitHTML}</span>`;
@@ -1289,8 +1290,13 @@
 
             const rankItems = (state.rank && Array.isArray(state.rank.items)) ? state.rank.items : [];
             const selectedItem = rankItems.find(x => x.uuid === state.selectedNodeUUID);
-            const ratio = selectedItem ? Number(selectedItem.upload_ratio || 0) : 0;
-            document.getElementById('ts-trend-ratio').textContent = ratio.toFixed(2);
+
+            const todayTotal = selectedItem ? Number(selectedItem.total_bytes || 0) : 0;
+            const todayEl = document.getElementById('ts-trend-today');
+            if (todayEl) {
+                todayEl.textContent = `今日: ${fmtBytes(todayTotal)}`;
+            }
+
             setStatus('', false);
         }
 

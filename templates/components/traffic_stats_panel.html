@@ -344,7 +344,7 @@
                     </div>
                 </div>
                 <div class="ts-head-right" style="font-size:12px; color:#8d8d98; font-weight:700;">
-                    ⚗ <span id="ts-trend-ratio">0.00</span>
+                    <span id="ts-trend-today">今日: 0 B</span>
                 </div>
             </div>
 
@@ -456,9 +456,9 @@
             let limitHTML = '';
             if (limit > 0) {
                 const pct = Math.min(100, (used / limit) * 100).toFixed(2);
-                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; background: #f0f0f5; padding: 2px 8px; border-radius: 6px; letter-spacing: 0;">${fmtBytes(used)} / ${fmtBytes(limit)} (${pct}%)</span>`;
+                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; letter-spacing: 0;">${fmtBytes(used)} / ${fmtBytes(limit)} (${pct}%)</span>`;
             } else if (used > 0) {
-                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; background: #f0f0f5; padding: 2px 8px; border-radius: 6px; letter-spacing: 0;">已用 ${fmtBytes(used)}</span>`;
+                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; letter-spacing: 0;">已用 ${fmtBytes(used)}</span>`;
             }
 
             el.innerHTML = `<span class="dot"></span><span>${esc(flagEmoji(region))} ${esc(name)}</span>${limitHTML}`;
@@ -631,9 +631,12 @@
 
             const rankItems = (state.rank && Array.isArray(state.rank.items)) ? state.rank.items : [];
             const selectedItem = rankItems.find(x => x.uuid === state.selectedNodeUUID);
-            const ratioVal = selectedItem ? Number(selectedItem.upload_ratio || 0) : 0;
-            trendRatioEl().textContent = ratioVal.toFixed(2);
 
+            const todayTotal = selectedItem ? Number(selectedItem.total_bytes || 0) : 0;
+            const todayEl = document.getElementById('ts-trend-today');
+            if (todayEl) {
+                todayEl.textContent = `今日: ${fmtBytes(todayTotal)}`;
+            }
             const latest = state.linePoints[state.linePoints.length - 1];
             if (!latest) {
                 setStatus('当前查询范围暂无数据', false);

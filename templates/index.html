@@ -1315,6 +1315,9 @@
                 if (result.status === 'success') {
                     closeDeleteModal();
                     loadNodesList();
+                    if (result.message && result.message !== '节点已删除') {
+                        alert(result.message);
+                    }
                 } else {
                     alert('删除失败: ' + result.message);
                 }
