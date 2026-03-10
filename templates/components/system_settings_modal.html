@@ -453,6 +453,23 @@
         padding: 8px 8px;
     }
 
+    .sys-offline-name-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .sys-offline-flag {
+        width: 16px;
+        height: 12px;
+        object-fit: cover;
+        display: inline-block;
+        border-radius: 2px;
+        box-shadow: 0 0 1px rgba(0, 0, 0, 0.15);
+        flex-shrink: 0;
+    }
+
     .sys-offline-name-text {
         font-weight: 600;
         color: #1d1d1f;
@@ -724,6 +741,17 @@
 
     .sys-pref-row:hover {
         background: #f0f0f5;
+    }
+
+    .sys-pref-traffic-grid {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .sys-pref-traffic-grid .sys-field {
+        flex: 1;
+        margin-bottom: 0;
     }
 
     .sys-tg-group {
@@ -1766,6 +1794,11 @@
     }
 
     @media (max-width: 768px) {
+        .sys-pref-traffic-grid {
+            flex-direction: column;
+            gap: 10px;
+        }
+
         .sys-modal-card {
             max-width: 95%;
             height: 85vh;
@@ -2358,48 +2391,50 @@
                         </div>
                     </div>
 
-                    <div class="sys-field">
-                        <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
-                            流量记录保存时间
-                            <div class="sys-info-tooltip-wrap" tabindex="0">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                </svg>
-                                <div class="sys-tooltip-content">
-                                    <p style="margin: 0; padding-bottom: 4px; font-weight: 600; color: #fff;">参数说明</p>
-                                    <p style="margin: 0; padding-bottom: 4px;">• <b>流量记录最长保存时间:</b> 仅保留最近 N
-                                        天历史数据，超期自动清理。</p>
-                                    <p style="margin: 0;">• <b>节点在线状态:</b> 由 WS 连接实时判定，不再使用全局离线宽限期。</p>
+                    <div class="sys-pref-traffic-grid">
+                        <div class="sys-field">
+                            <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
+                                流量记录保存时间（天）
+                                <div class="sys-info-tooltip-wrap" tabindex="0">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                    <div class="sys-tooltip-content">
+                                        <p style="margin: 0; padding-bottom: 4px; font-weight: 600; color: #fff;">参数说明</p>
+                                        <p style="margin: 0; padding-bottom: 4px;">• <b>流量记录最长保存时间:</b> 仅保留最近 N
+                                            天历史数据，超期自动清理。</p>
+                                        <p style="margin: 0;">• <b>节点在线状态:</b> 由 WS 连接实时判定，不再使用全局离线宽限期。</p>
+                                    </div>
                                 </div>
-                            </div>
-                        </label>
-                        <input type="number" id="sys_pref_traffic_stats_retention_days" class="sys-input"
-                            placeholder="默认: 30" min="1" max="3650" oninput="triggerSysAutoSave()">
-                    </div>
+                            </label>
+                            <input type="number" id="sys_pref_traffic_stats_retention_days" class="sys-input"
+                                placeholder="默认: 30" min="1" max="3650" oninput="triggerSysAutoSave()">
+                        </div>
 
-                    <div class="sys-field">
-                        <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
-                            实时流量落库间隔 (秒)
-                            <div class="sys-info-tooltip-wrap" tabindex="0">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                </svg>
-                                <div class="sys-tooltip-content">
-                                    <p style="margin: 0; padding-bottom: 4px; font-weight: 600; color: #fff;">参数说明</p>
-                                    <p style="margin: 0; padding-bottom: 4px;">• <b>实时累计:</b> Agent 每次上报原始计数器，后端实时累加。
-                                    </p>
-                                    <p style="margin: 0;">• <b>落库间隔:</b> 控制后端将内存累计写入数据库频率，范围 10-3600 秒。</p>
+                        <div class="sys-field">
+                            <label class="sys-label" style="display:flex;align-items:center;gap:4px;">
+                                实时流量落库间隔 (秒)
+                                <div class="sys-info-tooltip-wrap" tabindex="0">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                    <div class="sys-tooltip-content">
+                                        <p style="margin: 0; padding-bottom: 4px; font-weight: 600; color: #fff;">参数说明</p>
+                                        <p style="margin: 0; padding-bottom: 4px;">• <b>实时累计:</b> Agent 每次上报原始计数器，后端实时累加。
+                                        </p>
+                                        <p style="margin: 0;">• <b>落库间隔:</b> 控制后端将内存累计写入数据库频率，范围 10-3600 秒。</p>
+                                    </div>
                                 </div>
-                            </div>
-                        </label>
-                        <input type="number" id="sys_pref_traffic_persist_interval_sec" class="sys-input"
-                            placeholder="默认: 300" min="10" max="3600" oninput="triggerSysAutoSave()">
+                            </label>
+                            <input type="number" id="sys_pref_traffic_persist_interval_sec" class="sys-input"
+                                placeholder="默认: 300" min="10" max="3600" oninput="triggerSysAutoSave()">
+                        </div>
                     </div>
 
                     <div class="sys-field">
@@ -3334,6 +3369,31 @@
         });
     }
 
+    function sysBuildFlagFallbackDataUri(code) {
+        const upper = String(code || '').toUpperCase();
+        const isCountry = /^[A-Z]{2}$/.test(upper);
+        const emoji = isCountry
+            ? String.fromCodePoint(...upper.split('').map(c => 127397 + c.charCodeAt(0)))
+            : '🌐';
+        const label = isCountry ? upper : 'globe';
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 18" role="img" aria-label="${label}">
+                <rect x="0.5" y="0.5" width="23" height="17" rx="2" fill="#ffffff" stroke="#d8dbe3"/>
+                <text x="12" y="12.4" text-anchor="middle" font-size="10.6" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif">${emoji}</text>
+            </svg>`;
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+    function sysBuildServerFlagHtml(regionCode) {
+        const code = String(regionCode || '').trim().toUpperCase();
+        if (!/^[A-Z]{2}$/.test(code)) {
+            const fallback = sysBuildFlagFallbackDataUri('');
+            return `<img src="${fallback}" alt="globe" class="sys-offline-flag">`;
+        }
+        const isoCode = code.toLowerCase();
+        const fallback = sysBuildFlagFallbackDataUri(code);
+        return `<img src="https://flagcdn.com/${isoCode}.svg" loading="lazy" alt="${isoCode}" onerror="this.onerror=null;this.src='${fallback}'" class="sys-offline-flag">`;
+    }
+
     const offlineNotifySelectedUUIDs = new Set();
     let offlineNotifyRows = [];
 
@@ -3372,6 +3432,8 @@
                 const uuid = escapeHtml(n.uuid || '');
                 const enabled = !!n.offline_notify_enabled;
                 const grace = Number(n.offline_notify_grace_sec || 180);
+                const regionCode = n.region || n.country_code || n.country || '';
+                const flagHtml = sysBuildServerFlagHtml(regionCode);
                 const checked = offlineNotifySelectedUUIDs.has(String(n.uuid || ''));
                 const statusText = enabled ? '启用' : '禁用';
                 const statusStyle = enabled
@@ -3384,7 +3446,10 @@
                         <input id="offline_select_${uuid}" type="checkbox" ${checked ? 'checked' : ''} onchange="toggleOfflineNotifyRowSelect('${uuid}', this.checked)">
                     </td>
                     <td class="sys-offline-td-name">
-                        <div class="sys-offline-name-text">${name}</div>
+                        <div class="sys-offline-name-wrap">
+                            ${flagHtml}
+                            <div class="sys-offline-name-text">${name}</div>
+                        </div>
                     </td>
                     <td class="sys-offline-td-status">
                         <span

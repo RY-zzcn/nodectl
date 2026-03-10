@@ -407,7 +407,7 @@ func apiGetOfflineNotifySettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var nodes []database.NodePool
-	if err := database.DB.Select("uuid", "name", "install_id", "offline_notify_enabled", "offline_notify_grace_sec", "offline_last_notify_at", "sort_index", "updated_at").
+	if err := database.DB.Select("uuid", "name", "install_id", "region", "offline_notify_enabled", "offline_notify_grace_sec", "offline_last_notify_at", "sort_index", "updated_at").
 		Order("sort_index ASC, updated_at DESC").
 		Find(&nodes).Error; err != nil {
 		sendJSON(w, "error", "读取离线通知配置失败")
@@ -421,6 +421,7 @@ func apiGetOfflineNotifySettings(w http.ResponseWriter, r *http.Request) {
 			"uuid":                     n.UUID,
 			"install_id":               n.InstallID,
 			"name":                     n.Name,
+			"region":                   n.Region,
 			"offline_notify_enabled":   n.OfflineNotifyEnabled,
 			"offline_notify_grace_sec": grace,
 			"online":                   service.IsNodeOnline(n.InstallID),

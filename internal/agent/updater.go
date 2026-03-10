@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -350,12 +351,16 @@ func (u *Updater) checkAndUpdate(ctx context.Context) {
 	u.state.LastCheck = time.Now().Unix()
 	u.saveState()
 
-	log.Printf("[Updater] 更新完成 %s → %s，将通过 systemd 自动重启生效", localVer, targetVersion)
+	log.Printf("[Updater] 更新完成 %s → %s，准备加载新进程", localVer, targetVersion)
 
-	// 10. 退出进程，依赖 systemd 自动重启以加载新二进制
-	// 使用 SIGTERM 让 runtime 优雅退出
-	p, _ := os.FindProcess(os.Getpid())
-	p.Signal(os.Interrupt)
+	// 10. 就地替换进程镜像，避免依赖 systemd/OpenRC 是否自动拉起
+	// 成功后不会返回，进程将直接以新二进制重新进入 main()
+	execArgs := append([]string{u.selfPath}, os.Args[1:]...)
+	if err := syscall.Exec(u.selfPath, execArgs, os.Environ()); err != nil {
+		log.Printf("[Updater] 就地重启失败: %v，回退为发送中断信号", err)
+		p, _ := os.FindProcess(os.Getpid())
+		_ = p.Signal(os.Interrupt)
+	}
 }
 
 // ============================================================
