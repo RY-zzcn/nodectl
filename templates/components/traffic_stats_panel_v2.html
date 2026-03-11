@@ -105,6 +105,22 @@
         line-height: 1.1;
     }
 
+    .ts-selected-node .ts-node-sub {
+        display: inline-block;
+        margin-left: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #8d8d98;
+        letter-spacing: 0;
+        line-height: 1.1;
+    }
+
+    .ts-trend-metric {
+        font-size: 12px;
+        color: #8d8d98;
+        font-weight: 700;
+    }
+
     .ts-svg {
         width: 100%;
         flex: 1;
@@ -508,8 +524,8 @@
                             <button type="button" data-mode="total">总量</button>
                         </div>
                     </div>
-                    <div class="ts-head-right" style="font-size:12px; color:#8d8d98; font-weight:700;">
-                        <span id="ts-trend-today">今日: 0 B</span>
+                    <div class="ts-head-right">
+                        <span id="ts-trend-usage" class="ts-trend-metric">已用流量: 0 B</span>
                     </div>
                 </div>
                 <div class="ts-chart-wrap" id="ts-line-wrap">
@@ -867,23 +883,34 @@
             if (!el) return;
             const node = state.nodeMap[state.selectedNodeUUID] || {};
 
+            const rankItems = (state.rank && Array.isArray(state.rank.items)) ? state.rank.items : [];
+            const selectedItem = rankItems.find(x => x.uuid === state.selectedNodeUUID);
+            const todayTotal = selectedItem ? Number(selectedItem.total_bytes || 0) : 0;
+            el.innerHTML = `<span class="dot"></span><span class="ts-node-main">${flagEmoji(node.region)} <span class="ts-node-name">${esc(node.name || '--')}</span><span class="ts-node-sub">今日流量: ${fmtBytes(todayTotal)}</span></span>`;
+        }
+
+        function updateTrendUsageMetric() {
+            const el = document.getElementById('ts-trend-usage');
+            if (!el) return;
+
+            const node = state.nodeMap[state.selectedNodeUUID] || {};
             const limit = Number(node.traffic_limit || 0);
             const rankItems = (state.rank && Array.isArray(state.rank.items)) ? state.rank.items : [];
             const selectedItem = rankItems.find(x => x.uuid === state.selectedNodeUUID);
+
             let used = 0;
-            if (selectedItem) {
-                used = Number(selectedItem.traffic_used_bytes || selectedItem.total_bytes || 0);
+            if (selectedItem && selectedItem.traffic_used_bytes !== undefined && selectedItem.traffic_used_bytes !== null) {
+                used = Number(selectedItem.traffic_used_bytes || 0);
+            } else if (selectedItem) {
+                used = Number(selectedItem.total_bytes || 0);
             }
 
-            let limitHTML = '';
             if (limit > 0) {
                 const pct = Math.min(100, (used / limit) * 100).toFixed(2);
-                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; letter-spacing: 0;">${fmtBytes(used)} / ${fmtBytes(limit)} (${pct}%)</span>`;
-            } else if (used > 0) {
-                limitHTML = `<span style="font-size: 13px; font-weight: normal; margin-left: 8px; color: #666; letter-spacing: 0;">已用 ${fmtBytes(used)}</span>`;
+                el.textContent = `${fmtBytes(used)} / ${fmtBytes(limit)} (${pct}%)`;
+            } else {
+                el.textContent = `已用流量: ${fmtBytes(used)}`;
             }
-
-            el.innerHTML = `<span class="dot"></span><span class="ts-node-main">${flagEmoji(node.region)} <span class="ts-node-name">${esc(node.name || '--')}</span>${limitHTML}</span>`;
         }
 
         async function loadLandingNodes() {
@@ -952,6 +979,9 @@
             document.getElementById('ts-rank-total-up').textContent = fmtBytes((state.rank && state.rank.total_up) || 0);
             document.getElementById('ts-rank-total-down').textContent = fmtBytes((state.rank && state.rank.total_down) || 0);
             document.getElementById('ts-rank-total-all').textContent = fmtBytes((state.rank && state.rank.total_bytes) || 0);
+
+            updateSelectedBadge();
+            updateTrendUsageMetric();
         }
 
         function renderRank() {
@@ -982,6 +1012,8 @@
                 state.rank.items = items;
             }
             recalcRankSummaryFromItems(items);
+            updateSelectedBadge();
+            updateTrendUsageMetric();
 
             const maxTotal = Math.max(1, ...items.map(x => Number(x.total_bytes || 0)));
             list.innerHTML = items.map(item => {
@@ -1300,15 +1332,8 @@
 
             renderBar();
             renderLine();
-
-            const rankItems = (state.rank && Array.isArray(state.rank.items)) ? state.rank.items : [];
-            const selectedItem = rankItems.find(x => x.uuid === state.selectedNodeUUID);
-
-            const todayTotal = selectedItem ? Number(selectedItem.total_bytes || 0) : 0;
-            const todayEl = document.getElementById('ts-trend-today');
-            if (todayEl) {
-                todayEl.textContent = `今日: ${fmtBytes(todayTotal)}`;
-            }
+            updateSelectedBadge();
+            updateTrendUsageMetric();
 
             setStatus('', false);
         }
