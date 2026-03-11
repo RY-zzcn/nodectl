@@ -1383,7 +1383,10 @@ setup_agent() {
     fi
 
     if [ -z "$AGENT_WS_URL" ] || [ -z "$INSTALL_ID" ]; then
-        info "未提供 Agent 参数，跳过 agent 安装"
+        warn "未提供 Agent 参数 (可能未在面板【系统设置】中配置 Panel URL)"
+        warn "将跳过 nodectl-agent 的安装，节点无法自动上线及同步流量。"
+        warn "请前往面板【系统设置】->【基础设置】-> 填写正确的 Panel URL，然后重新运行本安装脚本。"
+        echo ""
         return 0
     fi
 

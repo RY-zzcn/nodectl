@@ -308,6 +308,26 @@
         </div>
 
         <div class="script-body">
+            <!-- Panel URL 未配置警告 -->
+            <div id="panelUrlWarning"
+                style="display: none; background: #fff3cd; color: #856404; padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; border: 1px solid #ffeeba; line-height: 1.5;">
+                <b style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                        </path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    注意：未配置 Panel URL
+                </b>
+                系统未配置 <b>Panel URL</b>，如果在公网环境下，将导致 nodectl-agent 安装被跳过（节点无法自动上线和上报流量）。请前往 <a href="#"
+                    onclick="closeScriptModal(); openSystemSettingsModal(); return false;"
+                    style="color: #0056b3; font-weight: 500; text-decoration: underline;">【系统设置】->【基础设置】</a>
+                中填写正确的面板地址后再复制安装命令。
+            </div>
+
             <!-- 协议分组折叠面板，由 JS 动态渲染 -->
             <div class="proto-groups-wrap" id="protocolCheckboxes"></div>
 
@@ -331,8 +351,8 @@
 
 <script>
     const scriptModal = document.getElementById('installScriptModal');
-    const cmdDisplay  = document.getElementById('installCmdDisplay');
-    const groupsWrap  = document.getElementById('protocolCheckboxes');
+    const cmdDisplay = document.getElementById('installCmdDisplay');
+    const groupsWrap = document.getElementById('protocolCheckboxes');
     let currentScriptNode = null;
 
     // ─── 协议分组定义 ───
@@ -340,52 +360,52 @@
         {
             id: 'vless', name: 'VLESS',
             variants: [
-                { key: 'vless',      arg: 'vless',      label: 'Reality' },
-                { key: 'vless_wst',  arg: 'vless-wst',  label: 'WS-TLS' },
-                { key: 'vless_hut',  arg: 'vless-hut',  label: 'HU-TLS' },
+                { key: 'vless', arg: 'vless', label: 'Reality' },
+                { key: 'vless_wst', arg: 'vless-wst', label: 'WS-TLS' },
+                { key: 'vless_hut', arg: 'vless-hut', label: 'HU-TLS' },
             ]
         },
         {
             id: 'vmess', name: 'VMess',
             variants: [
-                { key: 'vmess_tcp',  arg: 'vmess-tcp',  label: 'TCP' },
-                { key: 'vmess_ws',   arg: 'vmess-ws',   label: 'WS' },
+                { key: 'vmess_tcp', arg: 'vmess-tcp', label: 'TCP' },
+                { key: 'vmess_ws', arg: 'vmess-ws', label: 'WS' },
                 { key: 'vmess_http', arg: 'vmess-http', label: 'HTTP' },
                 { key: 'vmess_quic', arg: 'vmess-quic', label: 'QUIC' },
-                { key: 'vmess_wst',  arg: 'vmess-wst',  label: 'WS-TLS' },
-                { key: 'vmess_hut',  arg: 'vmess-hut',  label: 'HU-TLS' },
+                { key: 'vmess_wst', arg: 'vmess-wst', label: 'WS-TLS' },
+                { key: 'vmess_hut', arg: 'vmess-hut', label: 'HU-TLS' },
             ]
         },
         {
             id: 'ss', name: 'Shadowsocks',
             variants: [
-                { key: 'ss',   arg: 'shadowsocks', label: 'Shadowsocks' },
+                { key: 'ss', arg: 'shadowsocks', label: 'Shadowsocks' },
             ]
         },
         {
             id: 'hy2', name: 'Hysteria2',
             variants: [
-                { key: 'hy2',  arg: 'hysteria2',   label: 'Hysteria2' },
+                { key: 'hy2', arg: 'hysteria2', label: 'Hysteria2' },
             ]
         },
         {
             id: 'tuic', name: 'TUIC',
             variants: [
-                { key: 'tuic', arg: 'tuic',         label: 'TUIC' },
+                { key: 'tuic', arg: 'tuic', label: 'TUIC' },
             ]
         },
         {
             id: 'socks5', name: 'Socks5',
             variants: [
-                { key: 'socks5', arg: 'socks5',     label: 'Socks5' },
+                { key: 'socks5', arg: 'socks5', label: 'Socks5' },
             ]
         },
         {
             id: 'trojan', name: 'Trojan',
             variants: [
-                { key: 'trojan',     arg: 'trojan',      label: 'Trojan' },
-                { key: 'trojan_wst', arg: 'trojan-wst',  label: 'WS-TLS' },
-                { key: 'trojan_hut', arg: 'trojan-hut',  label: 'HU-TLS' },
+                { key: 'trojan', arg: 'trojan', label: 'Trojan' },
+                { key: 'trojan_wst', arg: 'trojan-wst', label: 'WS-TLS' },
+                { key: 'trojan_hut', arg: 'trojan-hut', label: 'HU-TLS' },
             ]
         },
     ];
@@ -397,7 +417,7 @@
     function renderGroups(activeSet) {
         groupsWrap.innerHTML = '';
 
-        const multiGroups  = installProtoGroups.filter(g => g.variants.length > 1);
+        const multiGroups = installProtoGroups.filter(g => g.variants.length > 1);
         const singleGroups = installProtoGroups.filter(g => g.variants.length === 1);
 
         // 多变种协议：每组独占一行，左侧显示协议名标签
@@ -477,6 +497,15 @@
             return;
         }
 
+        const warningEl = document.getElementById('panelUrlWarning');
+        if (warningEl) {
+            if (!window.panelUrl) {
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+            }
+        }
+
         // 选择优先级：偏好设置 > 节点当前已启用协议
         const activeSet = new Set();
         const defaultSet = await loadDefaultInstallProtoKeys();
@@ -506,12 +535,12 @@
         const selectedArgs = Array.from(checkedBoxes).map(cb => cb.value);
 
         const protosHtml = selectedArgs.map(p => `<span class="hl-proto">${p}</span>`).join(" ");
-        const protosRaw  = selectedArgs.join(" ");
+        const protosRaw = selectedArgs.join(" ");
 
         const scriptUrl = `${host}/api/public/install-script?id=${currentScriptNode.install_id}`;
 
         const cmdHtml = `<span class="hl-cmd">bash</span> <span class="hl-param">-c</span> <span class="hl-string">"$(curl -fsSL ${scriptUrl})"</span> <span class="hl-param">--</span> ${protosHtml}`;
-        const rawCmd  = `bash -c "$(curl -fsSL ${scriptUrl})" -- ${protosRaw}`;
+        const rawCmd = `bash -c "$(curl -fsSL ${scriptUrl})" -- ${protosRaw}`;
 
         cmdDisplay.innerHTML = cmdHtml;
         cmdDisplay.setAttribute('data-clipboard-text', rawCmd);
