@@ -1805,7 +1805,7 @@ func VerifyCFTokenPermissions(token string) (*CFTokenVerifyResult, error) {
 	}
 	// 添加 Account:Read 权限结果
 	result.Permissions = append(result.Permissions, CFTokenPermission{
-		Name:        "Account",
+		Name:        "Account Settings",
 		Resource:    "Account",
 		Permission:  "Read",
 		Required:    true,
@@ -1829,7 +1829,7 @@ func VerifyCFTokenPermissions(token string) (*CFTokenVerifyResult, error) {
 		}
 	}
 	result.Permissions = append(result.Permissions, CFTokenPermission{
-		Name:        "Zone",
+		Name:        "DNS Settings",
 		Resource:    "Zone",
 		Permission:  "Read",
 		Required:    true,
