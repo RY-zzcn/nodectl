@@ -471,6 +471,10 @@ func (rt *Runtime) applyTunnelConfig(payload tunnelCmdPayload, reply func(Comman
 	// 使用 credentials file 模式（非 token 模式）
 	// 关键区别：token 模式下 cloudflared 从 Cloudflare API 获取 ingress 路由规则（忽略本地 config.yml 的 ingress），
 	// 而 credentials file 模式下 cloudflared 使用本地 config.yml 中的 ingress 规则。
+	logDir := "/var/log/nodectl-tunnel"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		log.Printf("[Agent] 创建 cloudflared 日志目录失败: %v", err)
+	}
 	serviceContent := `[Unit]
 Description=NodeCTL cloudflared tunnel
 After=network-online.target
@@ -478,10 +482,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/cloudflared --config /etc/nodectl-tunnel/config.yml tunnel --no-autoupdate run
+ExecStartPre=/bin/mkdir -p /var/log/nodectl-tunnel
+ExecStart=/usr/local/bin/cloudflared --config /etc/nodectl-tunnel/config.yml --loglevel info --logfile /var/log/nodectl-tunnel/cloudflared.log tunnel --no-autoupdate run
 Restart=always
 RestartSec=3
 User=root
+StandardOutput=append:/var/log/nodectl-tunnel/cloudflared-stdout.log
+StandardError=append:/var/log/nodectl-tunnel/cloudflared-stderr.log
 
 [Install]
 WantedBy=multi-user.target

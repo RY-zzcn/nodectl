@@ -875,7 +875,9 @@ func buildNodeTunnelCommandPayload(node database.NodePool) (map[string]interface
 		}
 
 		host := buildTunnelHostForProtocol(baseDomain, proto)
-		if err := service.EnsureCFTunnelDNSHost(host); err != nil {
+		// 传入节点专属的 TunnelID，确保 DNS CNAME 指向节点自己的 Tunnel 而非面板全局 Tunnel
+		nodeTunnelID := strings.TrimSpace(node.TunnelID)
+		if err := service.EnsureCFTunnelDNSHost(host, nodeTunnelID); err != nil {
 			return nil, fmt.Errorf("绑定 tunnel DNS 失败(%s): %w", host, err)
 		}
 

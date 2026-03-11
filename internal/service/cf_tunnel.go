@@ -1069,16 +1069,24 @@ func DeleteCFTunnelDNSHost(host string) error {
 	return nil
 }
 
-// EnsureCFTunnelDNSHost 确保指定主机名存在指向当前 Tunnel 的 CNAME 记录。
+// EnsureCFTunnelDNSHost 确保指定主机名存在指向指定 Tunnel 的 CNAME 记录。
 // host 必须是完整域名，例如 vmess-ws.ab12cd.example.com
-func EnsureCFTunnelDNSHost(host string) error {
+// nodeTunnelID 为节点专属 Tunnel ID；若为空则回退读取全局 cf_tunnel_id。
+func EnsureCFTunnelDNSHost(host string, nodeTunnelID ...string) error {
 	host = strings.TrimSpace(strings.TrimSuffix(host, "."))
 	if host == "" {
 		return fmt.Errorf("host 不能为空")
 	}
 
 	domain := strings.TrimSpace(getCFConfig("cf_domain"))
-	tunnelID := strings.TrimSpace(getCFConfig("cf_tunnel_id"))
+	// 优先使用调用方传入的节点专属 Tunnel ID，回退到全局配置
+	tunnelID := ""
+	if len(nodeTunnelID) > 0 {
+		tunnelID = strings.TrimSpace(nodeTunnelID[0])
+	}
+	if tunnelID == "" {
+		tunnelID = strings.TrimSpace(getCFConfig("cf_tunnel_id"))
+	}
 	if domain == "" {
 		return fmt.Errorf("cf_domain 未配置")
 	}
