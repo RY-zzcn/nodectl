@@ -24,7 +24,8 @@ import (
 
 // apiAgentInitConfig 获取 Agent 初始化配置
 // GET /api/agent/init-config?install_id={INSTALL_ID}
-// Agent 首次启动时从后端拉取协议配置
+// Agent 首次启动时从后端拉取协议配置（启用列表 + 端口映射）
+// 密钥/密码/UUID 等凭据由 Agent 本地生成，面板不负责下发
 func apiAgentInitConfig(w http.ResponseWriter, r *http.Request) {
 	installID := strings.TrimSpace(r.URL.Query().Get("install_id"))
 	if installID == "" {
@@ -44,6 +45,7 @@ func apiAgentInitConfig(w http.ResponseWriter, r *http.Request) {
 	panelURL := loadSysConfigValue("panel_url")
 
 	// 构造协议配置（从节点当前链接推导启用的协议列表）
+	// 面板内部使用下划线格式（如 vmess_tcp, vless_wst），需要转换为 Agent 端的连字符格式（如 vmess-tcp, vless-wst）
 	enabledProtocols := make([]string, 0)
 	if node.Links != nil {
 		disabledSet := make(map[string]bool)
@@ -52,7 +54,7 @@ func apiAgentInitConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		for proto := range node.Links {
 			if !disabledSet[proto] {
-				enabledProtocols = append(enabledProtocols, proto)
+				enabledProtocols = append(enabledProtocols, normalizeProtoKeyForAgent(proto))
 			}
 		}
 	}
@@ -69,15 +71,39 @@ func apiAgentInitConfig(w http.ResponseWriter, r *http.Request) {
 		wsURL = fmt.Sprintf("%s://%s/api/callback/traffic/ws", wsScheme, host)
 	}
 
+	// 🆕 构造端口映射（从节点的 LinkPorts 获取每个协议的端口配置）
+	// Agent 使用这些端口配置来启动 sing-box 对应的 inbound
+	// 同样需要将 key 转换为 Agent 端格式
+	ports := make(map[string]int)
+	if node.LinkPorts != nil {
+		for proto, port := range node.LinkPorts {
+			if port > 0 {
+				ports[normalizeProtoKeyForAgent(proto)] = port
+			}
+		}
+	}
+
 	sendJSON(w, "success", map[string]interface{}{
 		"data": map[string]interface{}{
 			"protocols": map[string]interface{}{
 				"enabled": enabledProtocols,
 			},
+			"ports":     ports,
 			"panel_url": panelURL,
 			"ws_url":    wsURL,
 		},
 	})
+}
+
+// normalizeProtoKeyForAgent 将面板内部的协议 key 转换为 Agent 端使用的格式
+// 面板格式（下划线）→ Agent 格式（连字符），特殊映射 "vless" → "reality"
+func normalizeProtoKeyForAgent(panelKey string) string {
+	// 特殊映射：面板端 "vless" 对应 Agent 端 "reality"（VLESS+Reality）
+	if panelKey == "vless" {
+		return "reality"
+	}
+	// 通用规则：下划线转连字符（vmess_tcp → vmess-tcp, vless_wst → vless-wst 等）
+	return strings.ReplaceAll(panelKey, "_", "-")
 }
 
 // ============================================================

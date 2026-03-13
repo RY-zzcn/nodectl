@@ -4,11 +4,13 @@ package agent
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -218,7 +220,8 @@ func (rt *Runtime) createSingboxManager() *singbox.Manager {
 // 配置加载优先级：
 //  1. Config.Protocols（主配置文件中的协议配置）
 //  2. protocols.json 缓存文件
-//  3. 首次启动无配置 → 等待后端下发
+//  3. 🆕 主动从面板拉取初始化配置（使用 install_id）
+//  4. 等待后端通过 WS 下发（最终兜底）
 func (rt *Runtime) initSingBox(ctx context.Context) {
 	cfgMgr := rt.singboxMgr.GetConfigManager()
 
@@ -232,14 +235,26 @@ func (rt *Runtime) initSingBox(ctx context.Context) {
 		}
 	} else {
 		// 优先级 2：尝试从缓存加载协议配置
-		if err := cfgMgr.LoadFromCache(); err != nil {
-			log.Printf("[Agent] 协议缓存不存在或加载失败: %v（等待后端下发配置）", err)
-			return
+		if err := cfgMgr.LoadFromCache(); err == nil {
+			log.Printf("[Agent] 已加载协议缓存，启用的协议: %v", cfgMgr.Protocols.EnabledProtocolList())
+			// 将缓存中的协议配置同步到主配置（运行时引用）
+			rt.cfg.Protocols = cfgMgr.Protocols
+		} else {
+			// 优先级 3：🆕 主动从面板拉取初始化配置
+			log.Printf("[Agent] 协议缓存不存在或加载失败: %v，尝试从面板拉取初始化配置...", err)
+			pc, fetchErr := rt.fetchAndBuildProtocolConfig(ctx)
+			if fetchErr != nil {
+				log.Printf("[Agent] 从面板拉取初始化配置失败: %v（等待后端通过 WS 下发）", fetchErr)
+				return
+			}
+			cfgMgr.Protocols = pc
+			rt.cfg.Protocols = pc
+			log.Printf("[Agent] 已从面板拉取初始化配置，启用的协议: %v", pc.EnabledProtocolList())
+			// 持久化到缓存
+			if err := cfgMgr.SaveToCache(); err != nil {
+				log.Printf("[Agent] 保存协议缓存失败: %v", err)
+			}
 		}
-		log.Printf("[Agent] 已加载协议缓存，启用的协议: %v", cfgMgr.Protocols.EnabledProtocolList())
-
-		// 将缓存中的协议配置同步到主配置（运行时引用）
-		rt.cfg.Protocols = cfgMgr.Protocols
 	}
 
 	// 确保自签证书存在
@@ -270,6 +285,311 @@ func (rt *Runtime) initSingBox(ctx context.Context) {
 	}
 
 	log.Printf("[Agent] sing-box 已启动")
+}
+
+// initConfigResponse 面板 /api/agent/init-config 的响应结构
+type initConfigResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Protocols struct {
+			Enabled []string `json:"enabled"`
+		} `json:"protocols"`
+		Ports    map[string]int `json:"ports"`
+		PanelURL string         `json:"panel_url"`
+		WSURL    string         `json:"ws_url"`
+	} `json:"data"`
+}
+
+// fetchAndBuildProtocolConfig 🆕 从面板拉取初始化配置并构建完整的 ProtocolConfig
+// 面板返回启用的协议列表和端口映射，Agent 本地生成密钥/密码/UUID 等凭据
+func (rt *Runtime) fetchAndBuildProtocolConfig(ctx context.Context) (*singbox.ProtocolConfig, error) {
+	// 1. 构造面板 init-config API 地址
+	panelURL := rt.cfg.PanelURL
+	if panelURL == "" {
+		// 从 ws_url 反向推导 panel_url
+		panelURL = DerivePanelURL(rt.cfg.WSURL)
+	}
+	if panelURL == "" {
+		return nil, fmt.Errorf("无法确定面板地址（panel_url 和 ws_url 均为空）")
+	}
+
+	apiURL := fmt.Sprintf("%s/api/agent/init-config?install_id=%s",
+		strings.TrimRight(panelURL, "/"), rt.cfg.InstallID)
+
+	log.Printf("[Agent] 正在从面板拉取初始化配置: %s", apiURL)
+
+	// 2. 发起 HTTP 请求（带超时，跳过自签证书验证）
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败: %w", err)
+	}
+	req.Header.Set("User-Agent", "nodectl-agent/"+AgentVersion)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求面板失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("面板返回非 200: %d, body=%s", resp.StatusCode, string(body))
+	}
+
+	// 3. 解析响应
+	// 面板 sendJSON(w, "success", map[string]interface{}{"data": {...}}) 会将 map 合并到顶层
+	// 实际返回格式: {"status":"success","data":{"protocols":{"enabled":[...]},"ports":{...},...}}
+	var apiResp struct {
+		Status  string `json:"status"`
+		Message string `json:"message,omitempty"` // 错误时为字符串
+		Data    struct {
+			Protocols struct {
+				Enabled []string `json:"enabled"`
+			} `json:"protocols"`
+			Ports    map[string]int `json:"ports"`
+			PanelURL string         `json:"panel_url"`
+			WSURL    string         `json:"ws_url"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil, fmt.Errorf("解析响应 JSON 失败: %w", err)
+	}
+
+	if apiResp.Status != "success" {
+		return nil, fmt.Errorf("面板返回错误: status=%s, message=%s", apiResp.Status, apiResp.Message)
+	}
+
+	enabledProtocols := apiResp.Data.Protocols.Enabled
+	ports := apiResp.Data.Ports
+
+	if len(enabledProtocols) == 0 {
+		return nil, fmt.Errorf("面板返回的启用协议列表为空（节点可能尚未配置协议）")
+	}
+
+	log.Printf("[Agent] 面板返回: 启用协议=%v, 端口=%v", enabledProtocols, ports)
+
+	// 4. 构建完整的 ProtocolConfig（端口来自面板，凭据本地生成）
+	pc := singbox.DefaultProtocolConfig()
+
+	// 设置启用的协议
+	for _, proto := range enabledProtocols {
+		pc.SetEnabled(proto, true)
+	}
+
+	// 为每个启用的协议生成凭据并设置端口
+	for _, proto := range enabledProtocols {
+		port := ports[proto]
+		if err := rt.generateProtocolCredentials(pc, proto, port); err != nil {
+			log.Printf("[Agent] 生成协议 %s 凭据失败: %v", proto, err)
+			// 不阻断其他协议，继续处理
+		}
+	}
+
+	return pc, nil
+}
+
+// generateProtocolCredentials 为指定协议生成凭据并设置端口
+// 面板端只下发「启用哪些协议 + 端口」，密钥/密码等敏感凭据均由 Agent 本地生成
+func (rt *Runtime) generateProtocolCredentials(pc *singbox.ProtocolConfig, proto string, port int) error {
+	switch proto {
+	case singbox.ProtoSS:
+		if port > 0 {
+			pc.SS.Port = port
+		}
+		if pc.SS.Password == "" {
+			pwd, err := singbox.GeneratePassword(22)
+			if err != nil {
+				return err
+			}
+			pc.SS.Password = pwd
+		}
+
+	case singbox.ProtoHY2:
+		if port > 0 {
+			pc.HY2.Port = port
+		}
+		if pc.HY2.Password == "" {
+			pwd, err := singbox.GeneratePassword(16)
+			if err != nil {
+				return err
+			}
+			pc.HY2.Password = pwd
+		}
+
+	case singbox.ProtoTUIC:
+		if port > 0 {
+			pc.TUIC.Port = port
+		}
+		if pc.TUIC.UUID == "" {
+			uuid, err := singbox.GenerateUUID()
+			if err != nil {
+				return err
+			}
+			pc.TUIC.UUID = uuid
+		}
+		if pc.TUIC.Password == "" {
+			pwd, err := singbox.GeneratePassword(16)
+			if err != nil {
+				return err
+			}
+			pc.TUIC.Password = pwd
+		}
+
+	case singbox.ProtoReality:
+		if port > 0 {
+			pc.Reality.Port = port
+		}
+		if pc.Reality.UUID == "" {
+			uuid, err := singbox.GenerateUUID()
+			if err != nil {
+				return err
+			}
+			pc.Reality.UUID = uuid
+		}
+		if pc.Reality.PrivateKey == "" {
+			keyPair, err := singbox.GenerateRealityKeyPair()
+			if err != nil {
+				return err
+			}
+			pc.Reality.PrivateKey = keyPair.PrivateKey
+			pc.Reality.PublicKey = keyPair.PublicKey
+		}
+		if pc.Reality.ShortID == "" {
+			shortID, err := singbox.GenerateShortID()
+			if err != nil {
+				return err
+			}
+			pc.Reality.ShortID = shortID
+		}
+
+	case singbox.ProtoSocks5:
+		if port > 0 {
+			pc.Socks5.Port = port
+		}
+		if pc.Socks5.Username == "" {
+			pc.Socks5.Username = "nodectl"
+		}
+		if pc.Socks5.Password == "" {
+			pwd, err := singbox.GeneratePassword(16)
+			if err != nil {
+				return err
+			}
+			pc.Socks5.Password = pwd
+		}
+
+	case singbox.ProtoTrojan:
+		if port > 0 {
+			pc.Trojan.Port = port
+		}
+		if pc.Trojan.Password == "" {
+			pwd, err := singbox.GeneratePassword(16)
+			if err != nil {
+				return err
+			}
+			pc.Trojan.Password = pwd
+		}
+
+	// VMess 族
+	case singbox.ProtoVmessTCP:
+		if port > 0 {
+			pc.VMess.TCPPort = port
+		}
+		rt.ensureVMessUUID(pc)
+	case singbox.ProtoVmessWS:
+		if port > 0 {
+			pc.VMess.WSPort = port
+		}
+		rt.ensureVMessUUID(pc)
+	case singbox.ProtoVmessHTTP:
+		if port > 0 {
+			pc.VMess.HTTPPort = port
+		}
+		rt.ensureVMessUUID(pc)
+	case singbox.ProtoVmessQUIC:
+		if port > 0 {
+			pc.VMess.QUICPort = port
+		}
+		rt.ensureVMessUUID(pc)
+	case singbox.ProtoVmessWST:
+		if port > 0 {
+			pc.VMess.WSTPort = port
+		}
+		rt.ensureVMessUUID(pc)
+	case singbox.ProtoVmessHUT:
+		if port > 0 {
+			pc.VMess.HUTPort = port
+		}
+		rt.ensureVMessUUID(pc)
+
+	// VLESS-TLS 族
+	case singbox.ProtoVlessWST:
+		if port > 0 {
+			pc.VlessTLS.WSTPort = port
+		}
+		rt.ensureVlessTLSUUID(pc)
+	case singbox.ProtoVlessHUT:
+		if port > 0 {
+			pc.VlessTLS.HUTPort = port
+		}
+		rt.ensureVlessTLSUUID(pc)
+
+	// Trojan-TLS 族
+	case singbox.ProtoTrojanWST:
+		if port > 0 {
+			pc.TrojanTLS.WSTPort = port
+		}
+		rt.ensureTrojanTLSPassword(pc)
+	case singbox.ProtoTrojanHUT:
+		if port > 0 {
+			pc.TrojanTLS.HUTPort = port
+		}
+		rt.ensureTrojanTLSPassword(pc)
+	}
+
+	return nil
+}
+
+// ensureVMessUUID 确保 VMess 族共用 UUID 已生成
+func (rt *Runtime) ensureVMessUUID(pc *singbox.ProtocolConfig) {
+	if pc.VMess.UUID == "" {
+		uuid, err := singbox.GenerateUUID()
+		if err != nil {
+			log.Printf("[Agent] 生成 VMess UUID 失败: %v", err)
+			return
+		}
+		pc.VMess.UUID = uuid
+	}
+}
+
+// ensureVlessTLSUUID 确保 VLESS-TLS 族共用 UUID 已生成
+func (rt *Runtime) ensureVlessTLSUUID(pc *singbox.ProtocolConfig) {
+	if pc.VlessTLS.UUID == "" {
+		uuid, err := singbox.GenerateUUID()
+		if err != nil {
+			log.Printf("[Agent] 生成 VLESS-TLS UUID 失败: %v", err)
+			return
+		}
+		pc.VlessTLS.UUID = uuid
+	}
+}
+
+// ensureTrojanTLSPassword 确保 Trojan-TLS 族共用密码已生成
+func (rt *Runtime) ensureTrojanTLSPassword(pc *singbox.ProtocolConfig) {
+	if pc.TrojanTLS.Password == "" {
+		pwd, err := singbox.GeneratePassword(16)
+		if err != nil {
+			log.Printf("[Agent] 生成 Trojan-TLS 密码失败: %v", err)
+			return
+		}
+		pc.TrojanTLS.Password = pwd
+	}
 }
 
 // reportNodeOnline 🆕 通过 WS 上报节点上线信息
