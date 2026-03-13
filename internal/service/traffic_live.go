@@ -1228,7 +1228,13 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 			}
 		}
 		if changed {
-			updates["links"] = node.Links
+			// GORM .Updates(map) 会跳过模型 serializer，需手动序列化为 JSON 字符串
+			linksJSON, err := json.Marshal(node.Links)
+			if err == nil {
+				updates["links"] = string(linksJSON)
+			} else {
+				logger.Log.Warn("node_online: 序列化 links 失败", "error", err, "install_id", installID)
+			}
 		}
 	}
 
@@ -1280,7 +1286,13 @@ func (h *TrafficHub) handleLinksUpdate(msg wsMessage, clientIP string) {
 			node.Links[proto] = link
 		}
 
-		if err := database.DB.Model(&database.NodePool{}).Where("install_id = ?", installID).Update("links", node.Links).Error; err != nil {
+		// GORM .Update() 对 map 类型不会自动调用 serializer，需手动序列化为 JSON 字符串
+		linksJSON, err := json.Marshal(node.Links)
+		if err != nil {
+			logger.Log.Error("links_update: 序列化 links 失败", "error", err, "install_id", installID)
+			return
+		}
+		if err := database.DB.Model(&database.NodePool{}).Where("install_id = ?", installID).Update("links", string(linksJSON)).Error; err != nil {
 			logger.Log.Error("links_update: 更新链接失败", "error", err, "install_id", installID)
 		} else {
 			nodeName := strings.TrimSpace(node.Name)

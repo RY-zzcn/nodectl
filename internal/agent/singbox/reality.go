@@ -69,8 +69,9 @@ func GenerateUUID() (string, error) {
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16]), nil
 }
 
-// GeneratePassword 生成随机密码（用于 SS/HY2/Trojan 等协议）
+// GeneratePassword 生成随机密码（用于 HY2/Trojan/TUIC/Socks5 等协议）
 // 返回指定长度的 base64url 编码字符串（无填充）。
+// 注意：SS 2022 协议请使用 GenerateSSPassword，因为 sing-box 要求标准 base64。
 func GeneratePassword(length int) (string, error) {
 	if length <= 0 {
 		length = 16
@@ -86,4 +87,31 @@ func GeneratePassword(length int) (string, error) {
 		encoded = encoded[:length]
 	}
 	return encoded, nil
+}
+
+// GenerateSSPassword 生成 Shadowsocks 2022 系列协议的 PSK 密钥。
+// sing-box 要求 PSK 为**标准 base64 编码**（使用 +/ 字符集，带 = 填充），
+// 且原始密钥长度必须与加密方法匹配：
+//   - 2022-blake3-aes-128-gcm → 16 字节 → base64 编码后 24 字符（含 == 填充）
+//   - 2022-blake3-aes-256-gcm → 32 字节 → base64 编码后 44 字符（含 = 填充）
+//   - 2022-blake3-chacha20-poly1305 → 32 字节
+func GenerateSSPassword(method string) (string, error) {
+	// 根据加密方法确定密钥长度
+	var keyLen int
+	switch method {
+	case "2022-blake3-aes-128-gcm":
+		keyLen = 16
+	case "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305":
+		keyLen = 32
+	default:
+		// 非 2022 系列方法，回退到普通密码生成
+		return GeneratePassword(16)
+	}
+
+	keyBytes := make([]byte, keyLen)
+	if _, err := rand.Read(keyBytes); err != nil {
+		return "", fmt.Errorf("生成 SS 密钥失败: %w", err)
+	}
+	// 使用标准 base64 编码（带填充），这是 sing-box 解析 PSK 所要求的格式
+	return base64.StdEncoding.EncodeToString(keyBytes), nil
 }

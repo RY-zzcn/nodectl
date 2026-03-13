@@ -404,7 +404,7 @@ func (rt *Runtime) generateProtocolCredentials(pc *singbox.ProtocolConfig, proto
 			pc.SS.Port = port
 		}
 		if pc.SS.Password == "" {
-			pwd, err := singbox.GeneratePassword(22)
+			pwd, err := singbox.GenerateSSPassword(pc.SS.Method)
 			if err != nil {
 				return err
 			}

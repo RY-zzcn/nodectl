@@ -114,7 +114,7 @@ func (h *ResetHandler) regenerateCredentials(protocol string) error {
 
 	switch protocol {
 	case singbox.ProtoSS:
-		password, err := singbox.GeneratePassword(22)
+		password, err := singbox.GenerateSSPassword(pc.SS.Method)
 		if err != nil {
 			return err
 		}
