@@ -178,8 +178,8 @@ func apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			if k == "pref_traffic_point_persist_interval_sec" {
 				v = strings.TrimSpace(v)
 				seconds, err := strconv.Atoi(v)
-				if err != nil || seconds < 10 || seconds > 3600 {
-					sendJSON(w, "error", "实时流量点数据落库间隔无效，仅支持 10-3600 秒")
+				if err != nil || seconds < 0 || (seconds > 0 && seconds < 10) || seconds > 3600 {
+					sendJSON(w, "error", "实时流量点数据落库间隔无效，仅支持 0 (关闭) 或 10-3600 秒")
 					return
 				}
 				v = strconv.Itoa(seconds)

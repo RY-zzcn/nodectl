@@ -209,6 +209,9 @@ func GetTrafficHub() *TrafficHub {
 }
 
 func normalizeTrafficPersistIntervalSec(v int) int {
+	if v == 0 {
+		return 0 // 0 表示关闭历史点落库
+	}
 	if v < 10 {
 		return 10
 	}
@@ -232,11 +235,11 @@ func loadTrafficTotalPersistIntervalSec() int {
 func loadTrafficPointPersistIntervalSec() int {
 	var cfg database.SysConfig
 	if err := database.DB.Where("key = ?", "pref_traffic_point_persist_interval_sec").First(&cfg).Error; err != nil {
-		return 600
+		return 0 // 默认关闭
 	}
 	parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Value))
 	if err != nil {
-		return 600
+		return 0 // 默认关闭
 	}
 	return normalizeTrafficPersistIntervalSec(parsed)
 }
@@ -267,6 +270,11 @@ func (h *TrafficHub) runTotalPersistLoop() {
 func (h *TrafficHub) runPointPersistLoop() {
 	for {
 		interval := loadTrafficPointPersistIntervalSec()
+		if interval == 0 {
+			// 落库已关闭，每 30 秒重新检查配置是否变更
+			time.Sleep(30 * time.Second)
+			continue
+		}
 		now := time.Now()
 		intervalDur := time.Duration(interval) * time.Second
 		next := now.Truncate(intervalDur).Add(intervalDur)
