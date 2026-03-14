@@ -3524,6 +3524,16 @@
     const sysModal = document.getElementById("systemSettingsModal");
     const sysModalCard = document.getElementById("sysModalCard");
     let hasCheckedGeo = false;
+
+    // 点击遮罩层关闭
+    sysModal.addEventListener('click', function(e) {
+        if (e.target === sysModal) closeSystemSettingsModal();
+    });
+
+    // ESC 键关闭
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sysModal.classList.contains('active')) closeSystemSettingsModal();
+    });
     let geoState = "checking";
     let hasCheckedMihomo = false;
     let mihomoState = "checking";

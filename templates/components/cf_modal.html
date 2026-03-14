@@ -2605,6 +2605,16 @@
 <script>
     // ============== Cloudflare 管理弹窗 ==============
 
+    // 点击遮罩层关闭
+    document.getElementById('cfTunnelModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCFTunnelModal();
+    });
+
+    // ESC 键关闭
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('cfTunnelModal').classList.contains('active')) closeCFTunnelModal();
+    });
+
     let cftAutoSaveTimer = null;
     let cftSecuritySaveTimer = null;
 

@@ -418,6 +418,16 @@
     const cmdDisplay = document.getElementById("installCmdDisplay");
     let currentScriptNode = null;
 
+    // 点击遮罩层关闭
+    scriptModal.addEventListener('click', function(e) {
+        if (e.target === scriptModal) closeScriptModal();
+    });
+
+    // ESC 键关闭
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && scriptModal.classList.contains('active')) closeScriptModal();
+    });
+
     // ─── 加载 Tunnel 子域名 ───
     async function loadTunnelSubdomainFromBackend() {
         try {

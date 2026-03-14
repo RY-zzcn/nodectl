@@ -1026,6 +1026,16 @@
     const editModalEl = document.getElementById('editNodeModal');
     const editModalCard = document.getElementById('editModalCard');
 
+    // 点击遮罩层关闭
+    editModalEl.addEventListener('click', function(e) {
+        if (e.target === editModalEl) closeEditModal();
+    });
+
+    // ESC 键关闭
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && editModalEl.classList.contains('active')) closeEditModal();
+    });
+
     let originalRoutingType = 1;
     let isInitializingEdit = false;
 

@@ -913,6 +913,16 @@
     const gsModal = document.getElementById('globalSettingsModal');
     const gsModalCard = document.getElementById('gsModalCard');
 
+    // 点击遮罩层关闭
+    gsModal.addEventListener('click', function(e) {
+        if (e.target === gsModal) closeGlobalSettingsModal();
+    });
+
+    // ESC 键关闭
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && gsModal.classList.contains('active')) closeGlobalSettingsModal();
+    });
+
     function selectGsProto(protoId, cardElement) {
         const isAlreadyActive = cardElement.classList.contains('active');
         const isMobile = window.innerWidth <= 768;

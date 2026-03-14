@@ -1363,6 +1363,16 @@
         return false;
     }
 
+    // 点击遮罩层关闭
+    document.getElementById('airportModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAirModal();
+    });
+
+    // ESC 键关闭
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('airportModal').classList.contains('active')) closeAirModal();
+    });
+
     // ================= 弹窗开关 =================
     function openAirportSubModal() {
         document.getElementById('airportModal').classList.add('active');
