@@ -970,6 +970,12 @@ func (rt *Runtime) executePushConfig(cmd ServerCommand, reply func(CommandResult
 		return
 	}
 
+	// 🔑 第一时间强制杀死 sing-box，释放所有端口
+	// 用户执行了协议变更操作，必须先停止 sing-box 再进行任何判断，
+	// 否则旧 sing-box 占用的端口会导致端口冲突误报
+	reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
+	rt.singboxMgr.ForceKill()
+
 	cfgMgr := rt.singboxMgr.GetConfigManager()
 	ctx := context.Background()
 
@@ -1112,17 +1118,7 @@ func (rt *Runtime) executePushConfig(cmd ServerCommand, reply func(CommandResult
 		}
 	}
 
-	// 6. 停止旧的 sing-box 实例（如果在运行）
-	// 🔑 关键修改：先停止 sing-box 再检测端口冲突
-	// 用户已经二次确认推送，所以先停止 sing-box 是安全的。
-	// 这样可以避免 sing-box 自身占用的端口被误报为"被系统其他进程占用"，
-	// 尤其是在添加新协议且端口与当前运行的 sing-box 端口一致的场景下。
-	if rt.singboxMgr.IsRunning() {
-		reply(CommandResult{Type: "progress", Stage: "停止旧的 sing-box 实例..."})
-		rt.singboxMgr.Stop()
-		// 等待端口完全释放
-		time.Sleep(500 * time.Millisecond)
-	}
+	// 6. sing-box 已在入口处被 ForceKill，无需再次停止
 
 	// 6.5 端口冲突预检测：sing-box 已停止，直接检测端口占用（无需排除端口）
 	reply(CommandResult{Type: "progress", Stage: "检查端口冲突..."})
@@ -1204,6 +1200,10 @@ func (rt *Runtime) executeResetLinks(cmd ServerCommand, reply func(CommandResult
 
 	// 🆕 优先使用内置 sing-box 管理器重置链接（无需外部 shell 脚本）
 	if rt.singboxMgr != nil {
+		// 🔑 第一时间强制杀死 sing-box，释放所有端口
+		reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
+		rt.singboxMgr.ForceKill()
+
 		reply(CommandResult{Type: "progress", Stage: "使用内置管理器重置链接..."})
 
 		cfgMgr := rt.singboxMgr.GetConfigManager()
@@ -1263,13 +1263,13 @@ func (rt *Runtime) executeReinstallSingbox(cmd ServerCommand, reply func(Command
 
 	// 🆕 优先使用内置管理器重新安装
 	if rt.singboxMgr != nil {
+		// 🔑 第一时间强制杀死 sing-box，释放所有端口
+		reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
+		rt.singboxMgr.ForceKill()
+
 		reply(CommandResult{Type: "progress", Stage: "使用内置管理器重新安装..."})
 
 		ctx := context.Background()
-
-		// 1. 停止 sing-box
-		reply(CommandResult{Type: "progress", Stage: "停止 sing-box..."})
-		rt.singboxMgr.Stop()
 
 		// 2. 重新下载 sing-box
 		reply(CommandResult{Type: "progress", Stage: "下载 sing-box..."})

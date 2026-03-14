@@ -255,8 +255,8 @@ func (m *Manager) Restart(ctx context.Context) error {
 		log.Printf("[SingBox] 停止 sing-box 出错: %v", err)
 	}
 
-	// 等待一小段时间确保端口释放
-	time.Sleep(500 * time.Millisecond)
+	// 等待端口释放（SIGKILL 后内核回收 socket，800ms 提供安全冗余）
+	time.Sleep(800 * time.Millisecond)
 
 	// 重新启动
 	m.restartCnt++
@@ -406,18 +406,148 @@ func (m *Manager) Shutdown() {
 	}
 }
 
+// ForceKill 立即强制杀死 sing-box 进程（SIGKILL）
+// 不走优雅退出流程，用于用户执行协议变更操作时第一时间释放端口。
+// 同时扫描 agent 子进程树，确保不存在残留的 sing-box 进程。
+// kill 死 singbox 不会有任何副作用（无状态进程）。
+func (m *Manager) ForceKill() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// 重置崩溃计数器，避免 watchProcess 触发自动重启
+	m.restartCounter = m.maxRestarts + 1
+
+	// 1. 如果 Manager 正在管理一个进程，直接 SIGKILL
+	if m.running && m.cmd != nil && m.cmd.Process != nil {
+		pid := m.pid
+		log.Printf("[SingBox] ForceKill: 正在强制终止 sing-box (PID=%d)...", pid)
+
+		// 取消 context，防止 watchProcess 尝试自动重启
+		if m.cancel != nil {
+			m.cancel()
+		}
+
+		// 直接 SIGKILL，不等待优雅退出
+		m.cmd.Process.Kill()
+
+		// 短暂等待进程退出，回收资源
+		done := make(chan struct{})
+		go func() {
+			m.cmd.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			// 2 秒内未退出也无妨，SIGKILL 一定会生效
+		}
+
+		m.running = false
+		m.cmd = nil
+		m.removePID()
+		log.Printf("[SingBox] ForceKill: sing-box (PID=%d) 已被强制终止", pid)
+	}
+
+	// 2. 扫描 agent 子进程树，确保没有残留的 sing-box 进程
+	// （防御场景：Manager 状态与实际进程不一致、遗留进程等）
+	killed := killSingboxChildren()
+	if killed > 0 {
+		log.Printf("[SingBox] ForceKill: 额外清理了 %d 个残留 sing-box 子进程", killed)
+	}
+
+	// 重置崩溃计数器（ForceKill 后会重新启动，不应受之前崩溃影响）
+	m.restartCounter = 0
+
+	// 等待端口释放（内核回收 socket fd、UDP 端口等，800ms 提供安全冗余）
+	time.Sleep(800 * time.Millisecond)
+}
+
+// killSingboxChildren 扫描当前 agent 进程的子进程树，找到所有名为 sing-box 的子进程并 SIGKILL。
+// 确保 agent 子进程中 sing-box 进程永远只有 0 个（在 ForceKill 后）或 1 个（运行中）。
+// 不会误杀 cloudflared 等其他子进程，因为严格匹配进程名。
+// 返回实际杀死的进程数量。
+func killSingboxChildren() int {
+	myPID := os.Getpid()
+	killed := 0
+
+	// 读取 /proc 目录，遍历所有进程
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		log.Printf("[SingBox] killSingboxChildren: 无法读取 /proc: %v", err)
+		return 0
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pid, err := strconv.Atoi(entry.Name())
+		if err != nil || pid <= 0 {
+			continue
+		}
+
+		// 检查是否是当前 agent 的子进程（通过 /proc/<pid>/stat 中的 ppid）
+		statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+		if err != nil {
+			continue
+		}
+
+		// /proc/<pid>/stat 格式: <pid> (<comm>) <state> <ppid> ...
+		// 找到最后一个 ')' 的位置，其后的字段以空格分隔
+		statStr := string(statData)
+		closeParen := strings.LastIndex(statStr, ")")
+		if closeParen < 0 || closeParen+2 >= len(statStr) {
+			continue
+		}
+		fields := strings.Fields(statStr[closeParen+2:])
+		if len(fields) < 2 {
+			continue
+		}
+		// fields[0] = state, fields[1] = ppid
+		ppid, err := strconv.Atoi(fields[1])
+		if err != nil || ppid != myPID {
+			continue // 不是 agent 的子进程
+		}
+
+		// 提取进程名（在括号之间的部分）
+		openParen := strings.Index(statStr, "(")
+		if openParen < 0 || openParen >= closeParen {
+			continue
+		}
+		comm := statStr[openParen+1 : closeParen]
+
+		// 严格匹配进程名为 "sing-box"
+		if comm != "sing-box" {
+			continue
+		}
+
+		// 找到了 agent 子进程中的 sing-box，直接 SIGKILL
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			continue
+		}
+		log.Printf("[SingBox] killSingboxChildren: 发现残留 sing-box 子进程 (PID=%d)，正在 SIGKILL...", pid)
+		proc.Signal(syscall.SIGKILL)
+		killed++
+	}
+
+	return killed
+}
+
 // KillOrphanProcess 检测并终止遗留的 sing-box 子进程
 // 场景：Agent 通过 execve 就地更新后，旧 sing-box 子进程仍在运行（PID 不变但 Agent 内存状态全部重置）。
 // 新 Agent 不知道旧 sing-box 的存在，直接启动新的 sing-box 会导致端口冲突，进而断网。
 //
-// 检测策略：
-//  1. 读取 PID 文件中记录的旧 sing-box PID
-//  2. 验证该 PID 的进程是否仍存活（发送 signal 0）
-//  3. 验证该进程的 cmdline 是否包含 "sing-box"（避免误杀其他进程）
-//  4. 向该进程发送 SIGTERM，等待其优雅退出；超时则 SIGKILL
-//  5. 等待端口释放后删除 PID 文件
+// 检测策略（双重保险）：
+//  1. 通过 PID 文件查找遗留进程 → 验证 cmdline 包含 "sing-box" → SIGKILL
+//  2. 通过 killSingboxChildren() 扫描 agent 子进程树做兜底（防止 PID 文件丢失/损坏）
+//  3. 等待端口释放
 //
-// 返回 true 表示确实终止了一个遗留进程
+// 使用 SIGKILL 而非 SIGTERM，因为：
+// - sing-box 是无状态进程，SIGKILL 没有任何副作用
+// - 旧版使用 SIGTERM + 10 秒超时太慢，延迟了 Agent 启动
+//
+// 返回 true 表示确实终止了一个或多个遗留进程
 func (m *Manager) KillOrphanProcess() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -427,77 +557,49 @@ func (m *Manager) KillOrphanProcess() bool {
 		return false
 	}
 
-	// 1. 读取 PID 文件
+	killedAny := false
+
+	// 策略 1：通过 PID 文件查找遗留进程
 	pidData, err := os.ReadFile(m.pidPath)
-	if err != nil {
-		return false // PID 文件不存在，无遗留进程
-	}
-
-	pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))
-	if err != nil || pid <= 0 {
-		m.removePID() // PID 文件内容无效，清理
-		return false
-	}
-
-	// 2. 检查进程是否存活（发送 signal 0 不会实际发送信号，仅检测进程是否存在）
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		m.removePID()
-		return false
-	}
-	if err := proc.Signal(syscall.Signal(0)); err != nil {
-		// 进程不存在
-		m.removePID()
-		return false
-	}
-
-	// 3. 验证该进程确实是 sing-box（通过 /proc/<pid>/cmdline 检查）
-	cmdline, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
-	if err != nil {
-		// 无法读取 cmdline（可能无权限或进程已退出），不冒险 kill
-		m.removePID()
-		return false
-	}
-	// cmdline 以 NUL 分隔，检查是否包含 "sing-box"
-	if !strings.Contains(string(cmdline), "sing-box") {
-		// PID 已被其他进程复用，不是 sing-box，清理 PID 文件
-		log.Printf("[SingBox] PID %d 不是 sing-box 进程 (cmdline: %q)，清理 PID 文件", pid, string(cmdline))
-		m.removePID()
-		return false
-	}
-
-	// 4. 确认是遗留的 sing-box 进程，发送 SIGTERM 优雅终止
-	log.Printf("[SingBox] 检测到遗留 sing-box 进程 (PID=%d)，正在终止...", pid)
-	proc.Signal(syscall.SIGTERM)
-
-	// 等待进程退出（最多 10 秒）
-	done := make(chan struct{})
-	go func() {
-		// 轮询检测进程是否退出
-		for i := 0; i < 100; i++ { // 100 * 100ms = 10s
-			time.Sleep(100 * time.Millisecond)
-			if err := proc.Signal(syscall.Signal(0)); err != nil {
-				close(done)
-				return
+	if err == nil {
+		pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))
+		if err == nil && pid > 0 {
+			// 检查进程是否存活
+			proc, err := os.FindProcess(pid)
+			if err == nil {
+				if err := proc.Signal(syscall.Signal(0)); err == nil {
+					// 进程存活，验证是否确实是 sing-box
+					cmdline, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+					if err == nil && strings.Contains(string(cmdline), "sing-box") {
+						// 确认是遗留 sing-box 进程，直接 SIGKILL（不走优雅退出）
+						log.Printf("[SingBox] 检测到遗留 sing-box 进程 (PID=%d)，直接 SIGKILL...", pid)
+						proc.Signal(syscall.SIGKILL)
+						killedAny = true
+					} else if err == nil {
+						log.Printf("[SingBox] PID %d 不是 sing-box 进程 (cmdline: %q)，清理 PID 文件", pid, string(cmdline))
+					}
+				}
 			}
 		}
-		// 超时，强制 kill
-		log.Printf("[SingBox] 遗留 sing-box 进程 (PID=%d) 未在 10 秒内退出，强制终止", pid)
-		proc.Signal(syscall.SIGKILL)
-		time.Sleep(500 * time.Millisecond)
-		close(done)
-	}()
-
-	<-done
-
-	// 5. 等待端口释放
-	time.Sleep(500 * time.Millisecond)
+	}
 
 	// 清理 PID 文件
 	m.removePID()
 
-	log.Printf("[SingBox] 遗留 sing-box 进程 (PID=%d) 已终止", pid)
-	return true
+	// 策略 2：扫描 agent 子进程树做兜底（防止 PID 文件丢失/损坏的场景）
+	extraKilled := killSingboxChildren()
+	if extraKilled > 0 {
+		log.Printf("[SingBox] 通过子进程扫描额外清理了 %d 个遗留 sing-box 进程", extraKilled)
+		killedAny = true
+	}
+
+	if killedAny {
+		// 等待端口释放（SIGKILL 后内核回收 socket，800ms 提供安全冗余）
+		time.Sleep(800 * time.Millisecond)
+		log.Printf("[SingBox] 遗留 sing-box 进程已全部终止")
+	}
+
+	return killedAny
 }
 
 // PortConflict 端口冲突信息
