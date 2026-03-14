@@ -312,7 +312,7 @@ func apiResetProtocol(w http.ResponseWriter, r *http.Request) {
 // loadSysConfigValue 从 sys_config 表读取单个配置值
 func loadSysConfigValue(key string) string {
 	var cfg database.SysConfig
-	if err := database.DB.Where("key = ?", key).First(&cfg).Error; err != nil {
+	if err := database.DB.Where("key = ?", key).Take(&cfg).Error; err != nil {
 		return ""
 	}
 	return strings.TrimSpace(cfg.Value)

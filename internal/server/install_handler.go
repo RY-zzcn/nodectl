@@ -107,7 +107,8 @@ check_root() {
     fi
 }
 
-# 解析命令行参数
+# 解析命令行参数（兼容 bash -c "script" --report-url URL 调用方式，$0 也可能携带参数）
+set -- "$0" "$@"
 REPORT_URL=""
 while [[ $# -gt 0 ]]; do
     case "$1" in

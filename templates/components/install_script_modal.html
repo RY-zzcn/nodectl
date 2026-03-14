@@ -561,8 +561,8 @@
 
         if (useTunnel) {
             // 使用 Tunnel 回调地址时，追加 --report-url 参数
-            cmdHtml = `<span class="hl-cmd">bash</span> <span class="hl-param">-c</span> <span class="hl-string">"$(curl -fsSL ${installScriptUrl})"</span> <span class="hl-param">--</span> <span class="hl-param">--report-url</span> <span class="hl-string">${host}</span>`;
-            rawCmd = `bash -c "$(curl -fsSL ${installScriptUrl})" -- --report-url ${host}`;
+            cmdHtml = `<span class="hl-cmd">bash</span> <span class="hl-param">-c</span> <span class="hl-string">"$(curl -fsSL ${installScriptUrl})"</span> <span class="hl-param">--report-url</span> <span class="hl-string">${host}</span>`;
+            rawCmd = `bash -c "$(curl -fsSL ${installScriptUrl})" --report-url ${host}`;
         } else {
             // 基础用法：极简，无需任何额外参数
             cmdHtml = `<span class="hl-cmd">bash</span> <span class="hl-param">-c</span> <span class="hl-string">"$(curl -fsSL ${installScriptUrl})"</span>`;

@@ -40,7 +40,7 @@ func initBasicSettings() {
 		{Key: "panel_url", Value: "", Description: "面板外部访问地址"},
 		{Key: "sub_token", Value: defaultToken, Description: "订阅访问 Token"},
 		// 初始化 Clash 分流规则的存储 Key
-		{Key: "clash_active_modules", Value: "", Description: "Clash 分流规则启用列表"},
+		{Key: "clash_active_modules", Value: "Telegram,Google,GoogleFCM,YouTube,Netflix,Twitter(X),GitHub,OpenAI,Spotify,Discord,Microsoft,TikTok", Description: "Clash 分流规则启用列表"},
 		{Key: "pref_use_emoji_flag", Value: "true", Description: "订阅节点是否添加国旗前缀"},
 		{Key: "pref_force_protocol_prefix", Value: "false", Description: "强制节点名称加上协议前缀"},
 		{Key: "sub_custom_name", Value: "NodeCTL", Description: "自定义订阅名称"},
@@ -104,6 +104,10 @@ func initBasicSettings() {
 		{Key: "cf_ipopt_default_speed_url_id", Value: "", Description: "定时优选默认使用的测速地址ID"},
 		{Key: "cf_ipopt_manual_ips", Value: "[]", Description: "手动优选IP列表（JSON数组）"},
 		{Key: "cf_ipopt_manual_priority", Value: "disabled", Description: "手动优选IP优先级（disabled/preferred）"},
+		// Cloudflare Tunnel (cloudflared) 自动更新
+		{Key: "cf_tunnel_auto_update", Value: "false", Description: "是否启用 cloudflared 自动更新"},
+		// Cloudflare IP 优选 (CloudflareST) 自动更新
+		{Key: "cf_ipopt_auto_update", Value: "false", Description: "是否启用 CloudflareST 自动更新"},
 	}
 
 	for _, config := range defaultConfigs {

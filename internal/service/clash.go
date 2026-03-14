@@ -89,11 +89,21 @@ func SaveCustomClashModules(modules []ClashModuleDef) error {
 	return nil
 }
 
+// defaultRecommendedModules 是"常用推荐"预设的模块列表，用于首次初始化兜底
+var defaultRecommendedModules = []string{
+	"Telegram", "Google", "GoogleFCM", "YouTube", "Netflix",
+	"Twitter(X)", "GitHub", "OpenAI", "Spotify", "Discord",
+	"Microsoft", "TikTok",
+}
+
 func GetActiveClashModules() []string {
 	var conf database.SysConfig
 	database.DB.Where("key = ?", "clash_active_modules").Limit(1).Find(&conf)
 	if conf.Value == "" {
-		return []string{}
+		// 兜底：当数据库中值为空时（旧用户从未设置过），自动填充为"常用推荐"预设并持久化
+		logger.Log.Info("Clash 分流规则为空，自动应用常用推荐预设")
+		_ = SaveActiveClashModules(defaultRecommendedModules)
+		return defaultRecommendedModules
 	}
 	return strings.Split(conf.Value, ",")
 }

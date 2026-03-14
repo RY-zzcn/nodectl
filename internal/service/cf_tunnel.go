@@ -2326,3 +2326,87 @@ func OneClickSetupCFTunnel(token, subdomain, domain, tunnelName string, progress
 
 	return nil
 }
+
+// ===================== cloudflared 远程版本检查与自动更新 =====================
+
+// GetCloudflaredRemoteVersion 从 GitHub API 获取 cloudflared 最新版本号
+func GetCloudflaredRemoteVersion() (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/cloudflare/cloudflared/releases/latest", nil)
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "nodectl")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("GitHub API 返回 HTTP %d", resp.StatusCode)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	return strings.TrimSpace(release.TagName), nil
+}
+
+// GetCloudflaredVersionStatus 获取 cloudflared 版本状态（供前端版本检测用）
+// 返回: localVersion, remoteVersion, state ("latest"/"update_available"/"not_found"/"error")
+func GetCloudflaredVersionStatus() (localVer, remoteVer, state string) {
+	exists, local := CheckCloudflaredBinary()
+	if !exists {
+		localVer = ""
+	} else {
+		localVer = local
+	}
+
+	remote, err := GetCloudflaredRemoteVersion()
+	if err != nil {
+		logger.Log.Warn("获取 cloudflared 远程版本失败", "error", err)
+		remoteVer = ""
+		if localVer == "" {
+			state = "not_found"
+		} else {
+			state = "error"
+		}
+		return
+	}
+	remoteVer = remote
+
+	if localVer == "" {
+		state = "not_found"
+		return
+	}
+
+	// 版本比较：去掉前缀后对比
+	cleanLocal := strings.TrimSpace(localVer)
+	cleanRemote := strings.TrimSpace(strings.TrimPrefix(remoteVer, "v"))
+	cleanRemote = strings.TrimPrefix(cleanRemote, "v")
+
+	if cleanLocal == cleanRemote {
+		state = "latest"
+	} else {
+		state = "update_available"
+	}
+	return
+}
+
+// ForceUpdateCloudflared 强制下载最新版 cloudflared（覆盖现有）
+func ForceUpdateCloudflared() error {
+	logger.Log.Info("开始强制更新 cloudflared...")
+	err := DownloadCloudflared(nil)
+	if err != nil {
+		return fmt.Errorf("下载 cloudflared 失败: %w", err)
+	}
+	logger.Log.Info("cloudflared 更新完成")
+	return nil
+}
