@@ -1376,7 +1376,7 @@
                                 class="cft-btn cft-btn-primary"
                                 onclick="cftVerifyToken()"
                                 id="cft-verify-btn"
-                                style="flex-shrink: 0"
+                                style="flex-shrink: 0; display: none"
                             >
                                 验证权限
                             </button>
@@ -4620,6 +4620,9 @@
             if (json.status === "success" && json.data) {
                 const record = json.data;
                 if (record && record.result) {
+                    // 有历史验证记录，显示"验证权限"按钮
+                    const verifyBtn = document.getElementById("cft-verify-btn");
+                    if (verifyBtn) verifyBtn.style.display = "";
                     // 渲染校验结果
                     cftRenderTokenResult(record.result);
                     // 显示上次校验时间横幅
@@ -4873,6 +4876,9 @@
                 cftShowMsg("cft-token-msg", "success", "✅ Token 已保存");
                 cftShowSaveIndicator("success", "Token 已保存");
                 if (json.data) cftRenderTokenResult(json.data);
+                // 保存成功后显示"验证权限"按钮
+                const verifyBtn = document.getElementById("cft-verify-btn");
+                if (verifyBtn) verifyBtn.style.display = "";
                 cftLoadSettings();
                 cftLoadSecuritySettings();
                 document.getElementById("cft-token-input").value = "";
