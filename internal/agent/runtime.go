@@ -632,18 +632,23 @@ func (rt *Runtime) reportNodeOnline(ctx context.Context) {
 	cfgMgr := rt.singboxMgr.GetConfigManager()
 	pc := cfgMgr.Protocols
 
-	// 获取公网 IP
-	publicIP := api.GetPublicIP()
+	// 获取公网 IPv4 和 IPv6
+	publicIPv4 := api.GetPublicIP()
+	publicIPv6 := api.GetPublicIPv6()
 
 	// 获取 hostname
 	hostname, _ := os.Hostname()
 
-	// 生成链接
+	// 生成链接（使用 IPv4 作为主 IP）
+	linkIP := publicIPv4
+	if linkIP == "" {
+		linkIP = publicIPv6
+	}
 	suffix := pc.HostSuffix
 	if suffix == "" {
 		suffix = hostname
 	}
-	gen := links.NewGenerator(publicIP, suffix, pc)
+	gen := links.NewGenerator(linkIP, suffix, pc)
 	linksMap := gen.GenerateAllMap()
 
 	// 获取 sing-box 版本
@@ -656,7 +661,8 @@ func (rt *Runtime) reportNodeOnline(ctx context.Context) {
 	// 构造节点上线消息
 	payload := &reporter.NodeOnlinePayload{
 		Hostname:  hostname,
-		IPv4:      publicIP, // 当前仅获取 IPv4
+		IPv4:      publicIPv4,
+		IPv6:      publicIPv6,
 		Protocols: pc.EnabledProtocolList(),
 		Links:     linksMap,
 		AgentVer:  AgentVersion,
@@ -673,7 +679,7 @@ func (rt *Runtime) reportNodeOnline(ctx context.Context) {
 	if err := rt.reporter.SendMessage(ctx, msg); err != nil {
 		log.Printf("[Agent] 上报节点上线失败: %v", err)
 	} else {
-		log.Printf("[Agent] 节点上线已上报，协议: %v", payload.Protocols)
+		log.Printf("[Agent] 节点上线已上报，IPv4=%s, IPv6=%s, 协议: %v", publicIPv4, publicIPv6, payload.Protocols)
 	}
 }
 
@@ -686,16 +692,21 @@ func (rt *Runtime) reportLinksUpdate(ctx context.Context, action string, protoco
 	cfgMgr := rt.singboxMgr.GetConfigManager()
 	pc := cfgMgr.Protocols
 
-	// 获取公网 IP
-	publicIP := api.GetPublicIP()
+	// 获取公网 IPv4 和 IPv6
+	publicIPv4 := api.GetPublicIP()
+	publicIPv6 := api.GetPublicIPv6()
 	hostname, _ := os.Hostname()
 	suffix := pc.HostSuffix
 	if suffix == "" {
 		suffix = hostname
 	}
 
-	// 生成链接
-	gen := links.NewGenerator(publicIP, suffix, pc)
+	// 生成链接（使用 IPv4 作为主 IP）
+	linkIP := publicIPv4
+	if linkIP == "" {
+		linkIP = publicIPv6
+	}
+	gen := links.NewGenerator(linkIP, suffix, pc)
 	linksMap := gen.GenerateAllMap()
 
 	msg := &reporter.Message{
@@ -706,6 +717,8 @@ func (rt *Runtime) reportLinksUpdate(ctx context.Context, action string, protoco
 			Action:    action,
 			Protocols: protocols,
 			Links:     linksMap,
+			IPv4:      publicIPv4,
+			IPv6:      publicIPv6,
 		},
 	}
 

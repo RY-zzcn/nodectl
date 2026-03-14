@@ -1155,6 +1155,8 @@ type wsLinksUpdatePayload struct {
 	Action    string            `json:"action"` // reset / add / remove / reinstall
 	Protocols []string          `json:"protocols"`
 	Links     map[string]string `json:"links"`
+	IPv4      string            `json:"ipv4,omitempty"`
+	IPv6      string            `json:"ipv6,omitempty"`
 }
 
 // handleNewMessageType 🆕 处理新增的 WebSocket 消息类型
@@ -1211,7 +1213,7 @@ func (h *TrafficHub) handleNewMessageType(data []byte, msgType string, clientIP 
 }
 
 // handleNodeOnline 🆕 处理节点上线消息
-// 更新数据库中的节点 IP、协议列表、链接、版本等信息
+// 更新数据库中的节点 IP（IPv4+IPv6）、地区（Region）、协议列表、链接、版本等信息
 func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 	var payload wsNodeOnlinePayload
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
@@ -1231,21 +1233,26 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 	// 更新节点信息
 	updates := map[string]interface{}{}
 
+	// 更新 IPv4
 	if payload.IPv4 != "" && payload.IPv4 != node.IPV4 {
 		updates["ipv4"] = payload.IPv4
 	}
+	// 更新 IPv6
 	if payload.IPv6 != "" && payload.IPv6 != node.IPV6 {
 		updates["ipv6"] = payload.IPv6
 	}
 
-	// 更新地区信息
+	// 使用 GeoIP 解析 Region（国家 ISO Code，如 US、CN）
+	// 优先使用 IPv4 查询地区，IPv4 为空时使用 IPv6
 	newRegion := ""
-	checkIP := payload.IPv4
-	if checkIP == "" {
-		checkIP = payload.IPv6
-	}
-	if checkIP != "" {
-		newRegion = GlobalGeoIP.GetCountryIsoCode(checkIP)
+	if GlobalGeoIP != nil {
+		checkIP := payload.IPv4
+		if checkIP == "" {
+			checkIP = payload.IPv6
+		}
+		if checkIP != "" {
+			newRegion = GlobalGeoIP.GetCountryIsoCode(checkIP)
+		}
 	}
 	if newRegion != "" && newRegion != node.Region {
 		updates["region"] = newRegion
@@ -1292,6 +1299,8 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 				"install_id", installID,
 				"node_name", nodeName,
 				"ipv4", payload.IPv4,
+				"ipv6", payload.IPv6,
+				"region", newRegion,
 				"protocols", payload.Protocols,
 				"agent_version", payload.AgentVer,
 				"singbox_version", payload.SBVersion,
@@ -1301,7 +1310,7 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 }
 
 // handleLinksUpdate 🆕 处理链接更新消息
-// 更新数据库中的节点链接
+// 更新数据库中的节点链接，同时更新 IP 和 Region
 func (h *TrafficHub) handleLinksUpdate(msg wsMessage, clientIP string) {
 	var payload wsLinksUpdatePayload
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
@@ -1316,6 +1325,30 @@ func (h *TrafficHub) handleLinksUpdate(msg wsMessage, clientIP string) {
 	if err := database.DB.Where("install_id = ?", installID).First(&node).Error; err != nil {
 		logger.Log.Warn("links_update: 节点不存在", "install_id", installID)
 		return
+	}
+
+	updates := map[string]interface{}{}
+
+	// 更新 IPv4 和 IPv6（links_update 也可能携带最新 IP）
+	if payload.IPv4 != "" && payload.IPv4 != node.IPV4 {
+		updates["ipv4"] = payload.IPv4
+	}
+	if payload.IPv6 != "" && payload.IPv6 != node.IPV6 {
+		updates["ipv6"] = payload.IPv6
+	}
+
+	// 使用 GeoIP 解析 Region（国家 ISO Code，如 US、CN）
+	if GlobalGeoIP != nil {
+		checkIP := payload.IPv4
+		if checkIP == "" {
+			checkIP = payload.IPv6
+		}
+		if checkIP != "" {
+			newRegion := GlobalGeoIP.GetCountryIsoCode(checkIP)
+			if newRegion != "" && newRegion != node.Region {
+				updates["region"] = newRegion
+			}
+		}
 	}
 
 	// 更新链接
@@ -1333,8 +1366,13 @@ func (h *TrafficHub) handleLinksUpdate(msg wsMessage, clientIP string) {
 			logger.Log.Error("links_update: 序列化 links 失败", "error", err, "install_id", installID)
 			return
 		}
-		if err := database.DB.Model(&database.NodePool{}).Where("install_id = ?", installID).Update("links", string(linksJSON)).Error; err != nil {
-			logger.Log.Error("links_update: 更新链接失败", "error", err, "install_id", installID)
+		updates["links"] = string(linksJSON)
+	}
+
+	// 批量更新
+	if len(updates) > 0 {
+		if err := database.DB.Model(&database.NodePool{}).Where("install_id = ?", installID).Updates(updates).Error; err != nil {
+			logger.Log.Error("links_update: 更新失败", "error", err, "install_id", installID)
 		} else {
 			nodeName := strings.TrimSpace(node.Name)
 			if nodeName == "" {

@@ -46,6 +46,8 @@ type LinksUpdatePayload struct {
 	Action    string            `json:"action"` // reset / add / remove / reinstall
 	Protocols []string          `json:"protocols"`
 	Links     map[string]string `json:"links"`
+	IPv4      string            `json:"ipv4,omitempty"`
+	IPv6      string            `json:"ipv6,omitempty"`
 }
 
 // TrafficPayload 流量数据载荷（原有，保持兼容）

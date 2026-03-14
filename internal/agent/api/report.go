@@ -151,7 +151,7 @@ func getSuffix(config *singbox.ProtocolConfig) string {
 	return ""
 }
 
-// GetPublicIP 获取节点公网 IP
+// GetPublicIP 获取节点公网 IPv4 地址
 func GetPublicIP() string {
 	urls := []string{
 		"https://api.ipify.org",
@@ -173,6 +173,37 @@ func GetPublicIP() string {
 		}
 		ip := strings.TrimSpace(string(body))
 		if ip != "" {
+			return ip
+		}
+	}
+
+	return ""
+}
+
+// GetPublicIPv6 获取节点公网 IPv6 地址
+// 使用仅支持 IPv6 的 API 端点，若节点无 IPv6 连通性则返回空字符串
+func GetPublicIPv6() string {
+	urls := []string{
+		"https://api6.ipify.org",
+		"https://v6.ident.me",
+		"https://ifconfig.co",
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	for _, u := range urls {
+		resp, err := client.Get(u)
+		if err != nil {
+			continue
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+		ip := strings.TrimSpace(string(body))
+		// 简单校验是否包含冒号（IPv6 地址特征）
+		if ip != "" && strings.Contains(ip, ":") {
 			return ip
 		}
 	}
