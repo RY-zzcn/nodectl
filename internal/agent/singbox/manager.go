@@ -193,6 +193,9 @@ func (m *Manager) Stop() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// 主动停止时重置崩溃计数器，避免之前的崩溃记录影响后续启动
+	m.restartCounter = 0
+
 	return m.stopProcess()
 }
 
@@ -241,6 +244,9 @@ func (m *Manager) stopProcess() error {
 func (m *Manager) Restart(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// 主动重启时重置崩溃计数器，避免之前的崩溃记录影响本次启动
+	m.restartCounter = 0
 
 	// 先停止
 	if err := m.stopProcess(); err != nil {

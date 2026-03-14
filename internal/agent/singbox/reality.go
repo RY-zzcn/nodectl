@@ -18,7 +18,9 @@ type RealityKeyPair struct {
 }
 
 // GenerateRealityKeyPair 生成 Reality 密钥对（X25519）
-// sing-box 使用 base64 编码（非 hex），与 sing-box generate reality-keypair 输出一致。
+// sing-box 内部使用 base64.RawURLEncoding（字符集 -_ 无填充）解码 Reality 密钥，
+// 因此必须使用 RawURLEncoding 编码，不能使用 RawStdEncoding（字符集 +/），
+// 否则当密钥中出现 + 或 / 字符时会触发 "illegal base64 data" 错误。
 func GenerateRealityKeyPair() (*RealityKeyPair, error) {
 	// 生成 32 字节随机私钥
 	var privateKeyBytes [32]byte
@@ -37,9 +39,11 @@ func GenerateRealityKeyPair() (*RealityKeyPair, error) {
 		return nil, fmt.Errorf("计算 X25519 公钥失败: %w", err)
 	}
 
+	// 必须使用 RawURLEncoding（-_ 字符集，无填充），与 sing-box 解码方式一致
+	// sing-box 源码 (common/tls/reality.go) 使用 base64.RawURLEncoding.DecodeString()
 	return &RealityKeyPair{
-		PrivateKey: base64.RawStdEncoding.EncodeToString(privateKeyBytes[:]),
-		PublicKey:  base64.RawStdEncoding.EncodeToString(publicKeyBytes),
+		PrivateKey: base64.RawURLEncoding.EncodeToString(privateKeyBytes[:]),
+		PublicKey:  base64.RawURLEncoding.EncodeToString(publicKeyBytes),
 	}, nil
 }
 

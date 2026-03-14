@@ -28,7 +28,8 @@ const (
 	SingBoxGitHubRepo = "https://github.com/SagerNet/sing-box/releases"
 
 	// DefaultSingBoxVersion 默认安装版本
-	DefaultSingBoxVersion = "1.11.8"
+	// anytls 协议需要 1.12.0+，不要降级到 1.11.x
+	DefaultSingBoxVersion = "1.13.2"
 )
 
 // Installer sing-box 安装器
