@@ -52,13 +52,19 @@ func GenerateRawNodesYAML(routingType int, useFlag bool) (string, error) {
 			continue
 		}
 		enabledProtocolCount := 0
-		for p := range node.Links {
+		for p, l := range node.Links {
+			if strings.TrimSpace(l) == "" {
+				continue
+			}
 			if !contains(node.DisabledLinks, p) && shouldIncludeProtocolInSubscription(*node, p) {
 				enabledProtocolCount++
 			}
 		}
 
 		for proto, link := range node.Links {
+			if strings.TrimSpace(link) == "" {
+				continue // Agent 尚未上报该协议链接，跳过
+			}
 			if contains(node.DisabledLinks, proto) {
 				continue
 			}
@@ -226,13 +232,19 @@ func GenerateV2RaySubBase64(useFlag bool) (string, error) {
 			continue
 		}
 		enabledProtocolCount := 0
-		for p := range node.Links {
+		for p, l := range node.Links {
+			if strings.TrimSpace(l) == "" {
+				continue
+			}
 			if !contains(node.DisabledLinks, p) && shouldIncludeProtocolInSubscription(*node, p) {
 				enabledProtocolCount++
 			}
 		}
 
 		for proto, link := range node.Links {
+			if strings.TrimSpace(link) == "" {
+				continue // Agent 尚未上报该协议链接，跳过
+			}
 			if contains(node.DisabledLinks, proto) {
 				continue
 			}
