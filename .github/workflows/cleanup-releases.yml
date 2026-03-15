@@ -9,8 +9,10 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
+      permissions:
+      contents: write  # 允许删除 Release 和 Git Tag
+      packages: write  # 允许删除 GHCR 中的 Docker 镜像
+      actions: write   # 允许删除旧的 Actions 运行记录
 
     steps:
       # 🌟 先拉取代码，让环境里拥有 .git 仓库上下文
@@ -77,3 +79,14 @@ jobs:
           min-versions-to-keep: 6
           ignore-versions: '^(alpha|latest)$' 
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ==========================================
+      # 阶段 3: 清理旧的 GitHub Actions 运行记录
+      # ==========================================
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1          # 删除 1 天前的记录 (必须设置一个天数作为基础前提)
+          keep_minimum_runs: 10    # ✨ 核心配置：每个 workflow 至少保留最近的 10 条记录（无论是否过期）
