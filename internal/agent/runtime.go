@@ -58,14 +58,7 @@ func NewRuntime(cfg *Config, updater *Updater) *Runtime {
 
 // Run 启动 Agent 主循环（阻塞直到收到退出信号）
 func (rt *Runtime) Run() error {
-	// 🆕 首先执行旧版迁移检测
-	migResult := RunMigration()
-	if migResult.Migrated {
-		log.Printf("[Agent] 旧版安装已迁移: binary=%v, config=%v, cert=%v",
-			migResult.BinaryMigrated, migResult.ConfigMigrated, migResult.CertMigrated)
-	}
-
-	// 🆕 初始化 sing-box 管理器（使用配置中的路径）
+	// 初始化 sing-box 管理器（使用配置中的路径）
 	rt.singboxMgr = rt.createSingboxManager()
 
 	// 初始化采集器
@@ -193,6 +186,17 @@ func (rt *Runtime) Run() error {
 			debug.FreeOSMemory()
 		}
 	}
+}
+
+// ensureSingboxManager 确保 singboxMgr 已初始化，若为 nil 则自动创建
+// Agent 负责管理 sing-box 的完整生命周期（下载、安装、启动、杀死），
+// 当 singboxMgr 未初始化时应主动创建而非要求用户手动部署。
+func (rt *Runtime) ensureSingboxManager() *singbox.Manager {
+	if rt.singboxMgr == nil {
+		log.Printf("[Agent] sing-box 管理器未初始化，正在自动创建...")
+		rt.singboxMgr = rt.createSingboxManager()
+	}
+	return rt.singboxMgr
 }
 
 // createSingboxManager 🆕 根据 Config.Singbox 配置创建 sing-box 管理器
@@ -965,10 +969,8 @@ func (rt *Runtime) executePushConfig(cmd ServerCommand, reply func(CommandResult
 		return
 	}
 
-	if rt.singboxMgr == nil {
-		reply(CommandResult{Type: "result", Status: "error", Message: "sing-box 管理器未初始化，请先完成部署"})
-		return
-	}
+	// 确保 sing-box 管理器已初始化（Agent 负责管理 sing-box 完整生命周期）
+	rt.ensureSingboxManager()
 
 	// 🔑 第一时间强制杀死 sing-box，释放所有端口
 	// 用户执行了协议变更操作，必须先停止 sing-box 再进行任何判断，
@@ -1170,20 +1172,8 @@ func (rt *Runtime) executePushConfig(cmd ServerCommand, reply func(CommandResult
 	reply(CommandResult{Type: "result", Status: "ok", Message: fmt.Sprintf("配置推送完成，已启用 %d 个协议", len(payload.Protocols))})
 }
 
-// deriveScriptURL 从 ws_url 推导安装脚本 URL
-func (rt *Runtime) deriveScriptURL() string {
-	// ws_url 形如 wss://domain:port/api/callback/traffic/ws
-	panelURL := rt.cfg.WSURL
-	panelURL = strings.Replace(panelURL, "wss://", "https://", 1)
-	panelURL = strings.Replace(panelURL, "ws://", "http://", 1)
-	if idx := strings.Index(panelURL, "/api/"); idx > 0 {
-		panelURL = panelURL[:idx]
-	}
-	return fmt.Sprintf("%s/api/public/install-script?id=%s", panelURL, rt.cfg.InstallID)
-}
-
 // executeResetLinks 重置节点链接
-// 🆕 改造：使用内置 Go 代码（api.ResetHandler）替代外部安装脚本执行
+// 使用内置 Go 代码（api.ResetHandler）执行重置
 // 后端下发 payload 中包含 {"protocols": ["ss", "hy2", ...]}
 func (rt *Runtime) executeResetLinks(cmd ServerCommand, reply func(CommandResult)) {
 	var payload struct {
@@ -1198,47 +1188,31 @@ func (rt *Runtime) executeResetLinks(cmd ServerCommand, reply func(CommandResult
 		return
 	}
 
-	// 🆕 优先使用内置 sing-box 管理器重置链接（无需外部 shell 脚本）
-	if rt.singboxMgr != nil {
-		// 🔑 第一时间强制杀死 sing-box，释放所有端口
-		reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
-		rt.singboxMgr.ForceKill()
+	// 确保 sing-box 管理器已初始化（Agent 负责管理 sing-box 完整生命周期）
+	rt.ensureSingboxManager()
 
-		reply(CommandResult{Type: "progress", Stage: "使用内置管理器重置链接..."})
+	// 第一时间强制杀死 sing-box，释放所有端口
+	reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
+	rt.singboxMgr.ForceKill()
 
-		cfgMgr := rt.singboxMgr.GetConfigManager()
+	reply(CommandResult{Type: "progress", Stage: "使用内置管理器重置链接..."})
 
-		// 创建重置处理器
-		publicIP := api.GetPublicIP()
-		apiReporter := api.NewReporter(api.DeriveReportURL(rt.cfg.WSURL), rt.cfg.InstallID)
-		resetHandler := api.NewResetHandler(cfgMgr, rt.singboxMgr, apiReporter, publicIP)
+	cfgMgr := rt.singboxMgr.GetConfigManager()
 
-		// 执行批量重置
-		if err := resetHandler.ResetMultiple(context.Background(), payload.Protocols); err != nil {
-			reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("重置链接失败: %v", err)})
-			return
-		}
+	// 创建重置处理器
+	publicIP := api.GetPublicIP()
+	apiReporter := api.NewReporter(api.DeriveReportURL(rt.cfg.WSURL), rt.cfg.InstallID)
+	resetHandler := api.NewResetHandler(cfgMgr, rt.singboxMgr, apiReporter, publicIP)
 
-		// 🆕 通过 WS 上报链接更新
-		rt.reportLinksUpdate(context.Background(), "reset", payload.Protocols)
-
-		if err := rt.refreshTunnelAfterCoreChange(payload.Tunnel, reply); err != nil {
-			reply(CommandResult{Type: "result", Status: "error", Message: err.Error()})
-			return
-		}
-		reply(CommandResult{Type: "result", Status: "ok", Message: "重置链接完成（内置管理器）"})
-		return
-	}
-
-	// 回退：使用旧版 shell 脚本方式（兼容过渡期）
-	scriptURL := rt.deriveScriptURL()
-	protoArgs := strings.Join(payload.Protocols, " ")
-	shellCmd := fmt.Sprintf(`export SKIP_AGENT_INSTALL=1; curl -fsSL "%s" | bash -s -- %s`, scriptURL, protoArgs)
-
-	if err := rt.runStreamingScript(shellCmd, "重置链接", reply); err != nil {
+	// 执行批量重置
+	if err := resetHandler.ResetMultiple(context.Background(), payload.Protocols); err != nil {
 		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("重置链接失败: %v", err)})
 		return
 	}
+
+	// 通过 WS 上报链接更新
+	rt.reportLinksUpdate(context.Background(), "reset", payload.Protocols)
+
 	if err := rt.refreshTunnelAfterCoreChange(payload.Tunnel, reply); err != nil {
 		reply(CommandResult{Type: "result", Status: "error", Message: err.Error()})
 		return
@@ -1247,7 +1221,7 @@ func (rt *Runtime) executeResetLinks(cmd ServerCommand, reply func(CommandResult
 }
 
 // executeReinstallSingbox 重新安装 sing-box
-// 🆕 改造：使用内置安装器替代外部安装脚本
+// 使用内置安装器执行重装
 func (rt *Runtime) executeReinstallSingbox(cmd ServerCommand, reply func(CommandResult)) {
 	var payload struct {
 		Protocols []string          `json:"protocols"`
@@ -1261,81 +1235,65 @@ func (rt *Runtime) executeReinstallSingbox(cmd ServerCommand, reply func(Command
 		return
 	}
 
-	// 🆕 优先使用内置管理器重新安装
-	if rt.singboxMgr != nil {
-		// 🔑 第一时间强制杀死 sing-box，释放所有端口
-		reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
-		rt.singboxMgr.ForceKill()
+	// 确保 sing-box 管理器已初始化（Agent 负责管理 sing-box 完整生命周期）
+	rt.ensureSingboxManager()
 
-		reply(CommandResult{Type: "progress", Stage: "使用内置管理器重新安装..."})
+	// 第一时间强制杀死 sing-box，释放所有端口
+	reply(CommandResult{Type: "progress", Stage: "强制停止 sing-box，释放端口..."})
+	rt.singboxMgr.ForceKill()
 
-		ctx := context.Background()
+	reply(CommandResult{Type: "progress", Stage: "使用内置管理器重新安装..."})
 
-		// 2. 重新下载 sing-box
-		reply(CommandResult{Type: "progress", Stage: "下载 sing-box..."})
-		installer := rt.singboxMgr.GetInstaller()
-		if err := installer.EnsureInstalled(ctx); err != nil {
-			reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("下载 sing-box 失败: %v", err)})
-			return
-		}
+	ctx := context.Background()
 
-		// 3. 确保证书
-		reply(CommandResult{Type: "progress", Stage: "检查证书..."})
-		cfgMgr := rt.singboxMgr.GetConfigManager()
-		cfgMgr.EnsureCerts("nodectl-agent")
-
-		// 4. 更新协议配置
-		for _, proto := range payload.Protocols {
-			cfgMgr.Protocols.SetEnabled(proto, true)
-		}
-		cfgMgr.SaveToCache()
-
-		// 4.5 端口冲突预检测
-		reply(CommandResult{Type: "progress", Stage: "检查端口冲突..."})
-		portConflicts := singbox.CheckPortConflicts(cfgMgr.Protocols, nil)
-		if len(portConflicts) > 0 {
-			for _, c := range portConflicts {
-				reply(CommandResult{Type: "progress", Stage: fmt.Sprintf("⚠️ 端口冲突: %s", c.Reason)})
-			}
-			reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("重新安装失败: 检测到 %d 个端口冲突，请修改端口后重试", len(portConflicts))})
-			return
-		}
-
-		// 5. 生成配置并启动
-		reply(CommandResult{Type: "progress", Stage: "生成 sing-box 配置..."})
-		if err := cfgMgr.GenerateAndSave(); err != nil {
-			reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("生成配置失败: %v", err)})
-			return
-		}
-		reply(CommandResult{Type: "progress", Stage: "启动 sing-box..."})
-		if err := rt.singboxMgr.StartAndVerify(ctx, 3*time.Second); err != nil {
-			log.Printf("[Agent] reinstall: sing-box 启动验证失败: %v", err)
-			reply(CommandResult{Type: "progress", Stage: fmt.Sprintf("❌ sing-box 启动失败: %v", err)})
-			reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("sing-box 启动失败: %v", err)})
-			return
-		}
-		reply(CommandResult{Type: "progress", Stage: "sing-box 启动成功，进程运行正常"})
-
-		// 6. 上报链接更新
-		rt.reportLinksUpdate(ctx, "reinstall", payload.Protocols)
-
-		if err := rt.refreshTunnelAfterCoreChange(payload.Tunnel, reply); err != nil {
-			reply(CommandResult{Type: "result", Status: "error", Message: err.Error()})
-			return
-		}
-		reply(CommandResult{Type: "result", Status: "ok", Message: "重新安装完成（内置管理器）"})
+	// 1. 重新下载 sing-box
+	reply(CommandResult{Type: "progress", Stage: "下载 sing-box..."})
+	installer := rt.singboxMgr.GetInstaller()
+	if err := installer.EnsureInstalled(ctx); err != nil {
+		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("下载 sing-box 失败: %v", err)})
 		return
 	}
 
-	// 回退：使用旧版 shell 脚本方式
-	scriptURL := rt.deriveScriptURL()
-	protoArgs := strings.Join(payload.Protocols, " ")
-	shellCmd := fmt.Sprintf(`export SKIP_AGENT_INSTALL=1; curl -fsSL "%s" | bash -s -- %s`, scriptURL, protoArgs)
+	// 2. 确保证书
+	reply(CommandResult{Type: "progress", Stage: "检查证书..."})
+	cfgMgr := rt.singboxMgr.GetConfigManager()
+	cfgMgr.EnsureCerts("nodectl-agent")
 
-	if err := rt.runStreamingScript(shellCmd, "重新安装", reply); err != nil {
-		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("重新安装失败: %v", err)})
+	// 3. 更新协议配置
+	for _, proto := range payload.Protocols {
+		cfgMgr.Protocols.SetEnabled(proto, true)
+	}
+	cfgMgr.SaveToCache()
+
+	// 4. 端口冲突预检测
+	reply(CommandResult{Type: "progress", Stage: "检查端口冲突..."})
+	portConflicts := singbox.CheckPortConflicts(cfgMgr.Protocols, nil)
+	if len(portConflicts) > 0 {
+		for _, c := range portConflicts {
+			reply(CommandResult{Type: "progress", Stage: fmt.Sprintf("⚠️ 端口冲突: %s", c.Reason)})
+		}
+		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("重新安装失败: 检测到 %d 个端口冲突，请修改端口后重试", len(portConflicts))})
 		return
 	}
+
+	// 5. 生成配置并启动
+	reply(CommandResult{Type: "progress", Stage: "生成 sing-box 配置..."})
+	if err := cfgMgr.GenerateAndSave(); err != nil {
+		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("生成配置失败: %v", err)})
+		return
+	}
+	reply(CommandResult{Type: "progress", Stage: "启动 sing-box..."})
+	if err := rt.singboxMgr.StartAndVerify(ctx, 3*time.Second); err != nil {
+		log.Printf("[Agent] reinstall: sing-box 启动验证失败: %v", err)
+		reply(CommandResult{Type: "progress", Stage: fmt.Sprintf("❌ sing-box 启动失败: %v", err)})
+		reply(CommandResult{Type: "result", Status: "error", Message: fmt.Sprintf("sing-box 启动失败: %v", err)})
+		return
+	}
+	reply(CommandResult{Type: "progress", Stage: "sing-box 启动成功，进程运行正常"})
+
+	// 6. 上报链接更新
+	rt.reportLinksUpdate(ctx, "reinstall", payload.Protocols)
+
 	if err := rt.refreshTunnelAfterCoreChange(payload.Tunnel, reply); err != nil {
 		reply(CommandResult{Type: "result", Status: "error", Message: err.Error()})
 		return
