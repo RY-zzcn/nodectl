@@ -1241,22 +1241,28 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 	// 更新节点信息
 	updates := map[string]interface{}{}
 
-	// 更新 IPv4
-	if payload.IPv4 != "" && payload.IPv4 != node.IPV4 {
-		updates["ipv4"] = payload.IPv4
+	// 更新 IPv4（去除多余空白和方括号）
+	ipv4 := strings.TrimSpace(strings.Trim(payload.IPv4, "[]"))
+	if ipv4 != "" && ipv4 != node.IPV4 {
+		updates["ipv4"] = ipv4
 	}
-	// 更新 IPv6
-	if payload.IPv6 != "" && payload.IPv6 != node.IPV6 {
-		updates["ipv6"] = payload.IPv6
+	// 更新 IPv6（去除多余空白和方括号，防止超长写入）
+	ipv6 := strings.TrimSpace(strings.Trim(payload.IPv6, "[]"))
+	if len(ipv6) > 45 { // IPv6 最长 45 字符（包含冒号和可能的压缩符号）
+		logger.Log.Warn("node_online: IPv6 地址过长，已截断", "install_id", installID, "raw_ipv6_len", len(ipv6))
+		ipv6 = ipv6[:45]
+	}
+	if ipv6 != "" && ipv6 != node.IPV6 {
+		updates["ipv6"] = ipv6
 	}
 
 	// 使用 GeoIP 解析 Region（国家 ISO Code，如 US、CN）
 	// 优先使用 IPv4 查询地区，IPv4 为空时使用 IPv6
 	newRegion := ""
 	if GlobalGeoIP != nil {
-		checkIP := payload.IPv4
+		checkIP := ipv4
 		if checkIP == "" {
-			checkIP = payload.IPv6
+			checkIP = ipv6
 		}
 		if checkIP != "" {
 			newRegion = GlobalGeoIP.GetCountryIsoCode(checkIP)
@@ -1278,6 +1284,9 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 		}
 		changed := false
 		for proto, link := range payload.Links {
+			if strings.TrimSpace(link) == "" {
+				continue // 跳过空链接
+			}
 			if node.Links[proto] != link {
 				node.Links[proto] = link
 				changed = true
@@ -1337,19 +1346,25 @@ func (h *TrafficHub) handleLinksUpdate(msg wsMessage, clientIP string) {
 
 	updates := map[string]interface{}{}
 
-	// 更新 IPv4 和 IPv6（links_update 也可能携带最新 IP）
-	if payload.IPv4 != "" && payload.IPv4 != node.IPV4 {
-		updates["ipv4"] = payload.IPv4
+	// 更新 IPv4 和 IPv6（links_update 也可能携带最新 IP，去除多余空白和方括号）
+	luIPv4 := strings.TrimSpace(strings.Trim(payload.IPv4, "[]"))
+	if luIPv4 != "" && luIPv4 != node.IPV4 {
+		updates["ipv4"] = luIPv4
 	}
-	if payload.IPv6 != "" && payload.IPv6 != node.IPV6 {
-		updates["ipv6"] = payload.IPv6
+	luIPv6 := strings.TrimSpace(strings.Trim(payload.IPv6, "[]"))
+	if len(luIPv6) > 45 {
+		logger.Log.Warn("links_update: IPv6 地址过长，已截断", "install_id", installID, "raw_ipv6_len", len(luIPv6))
+		luIPv6 = luIPv6[:45]
+	}
+	if luIPv6 != "" && luIPv6 != node.IPV6 {
+		updates["ipv6"] = luIPv6
 	}
 
 	// 使用 GeoIP 解析 Region（国家 ISO Code，如 US、CN）
 	if GlobalGeoIP != nil {
-		checkIP := payload.IPv4
+		checkIP := luIPv4
 		if checkIP == "" {
-			checkIP = payload.IPv6
+			checkIP = luIPv6
 		}
 		if checkIP != "" {
 			newRegion := GlobalGeoIP.GetCountryIsoCode(checkIP)
@@ -1365,6 +1380,9 @@ func (h *TrafficHub) handleLinksUpdate(msg wsMessage, clientIP string) {
 			node.Links = make(map[string]string)
 		}
 		for proto, link := range payload.Links {
+			if strings.TrimSpace(link) == "" {
+				continue // 跳过空链接
+			}
 			node.Links[proto] = link
 		}
 

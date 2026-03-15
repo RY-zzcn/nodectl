@@ -202,8 +202,10 @@ func GetPublicIPv6() string {
 			continue
 		}
 		ip := strings.TrimSpace(string(body))
-		// 简单校验是否包含冒号（IPv6 地址特征）
-		if ip != "" && strings.Contains(ip, ":") {
+		// 去除可能存在的方括号（某些 API 可能返回 [::1] 格式）
+		ip = strings.Trim(ip, "[]")
+		// 简单校验是否包含冒号（IPv6 地址特征）且长度合理（标准 IPv6 最长 45 字符含 zone id）
+		if ip != "" && strings.Contains(ip, ":") && len(ip) <= 45 {
 			return ip
 		}
 	}
