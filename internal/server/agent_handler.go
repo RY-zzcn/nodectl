@@ -189,8 +189,11 @@ func apiNewInstallScript(w http.ResponseWriter, r *http.Request) {
 	isSecure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 	panelURL = getPanelURLForScript(panelURL, r.Host, isSecure)
 
+	// 读取 BBR 优化开关
+	enableBBR := loadSysConfigValue("proxy_enable_bbr") == "true"
+
 	// 生成新版极简安装脚本
-	script := generateMinimalInstallScript(installID, panelURL)
+	script := generateMinimalInstallScript(installID, panelURL, enableBBR)
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write([]byte(script))

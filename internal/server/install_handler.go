@@ -13,9 +13,15 @@ import (
 // 负责：检测系统环境 → 安装依赖 → 下载 agent → 写配置 → 注册系统服务 → 注册 na 快捷命令
 // 支持 Debian/Ubuntu、CentOS/RHEL/Fedora、Alpine Linux 三大系统族
 // 所有复杂逻辑（sing-box 安装、配置生成、证书管理）内置于 Agent 二进制中
-func generateMinimalInstallScript(installID, panelURL string) string {
+func generateMinimalInstallScript(installID, panelURL string, enableBBR bool) string {
 	// 获取当前面板的发布渠道（仅用于下载阶段，确保下载与面板版本匹配的 Agent）
 	channel := string(version.GetChannel())
+
+	// 将布尔值转换为 shell 变量
+	bbrFlag := "false"
+	if enableBBR {
+		bbrFlag = "true"
+	}
 
 	return fmt.Sprintf(`#!/usr/bin/env bash
 # NodeCTL Agent 安装脚本 (新版极简模式)
@@ -28,6 +34,7 @@ set -euo pipefail
 INSTALL_ID="%s"
 PANEL_URL="%s"
 CHANNEL="%s"
+ENABLE_BBR="%s"
 # =========================================
 
 # 彩色输出
@@ -306,6 +313,48 @@ NAEOF
     info "  用法: na help   (查看所有命令)"
 }
 
+# -----------------------
+# BBR 内核加速（从全局设置中的开关控制）
+apply_bbr() {
+    if [ "$ENABLE_BBR" != "true" ]; then
+        info "跳过 BBR 优化（面板全局设置未启用）"
+        return 0
+    fi
+
+    # 容器环境检测：Docker / LXC 容器继承宿主机内核参数，无需也无法修改
+    if [ -f /.dockerenv ] || grep -qsE '(docker|lxc)' /proc/1/cgroup 2>/dev/null; then
+        info "检测到容器环境，拥塞算法默认继承宿主机设置，跳过 BBR 优化"
+        return 0
+    fi
+
+    # 内核参数可写性检测：只读文件系统或权限不足时跳过，防止污染配置文件
+    if [ ! -w /proc/sys/net/ipv4/tcp_congestion_control ]; then
+        warn "内核参数不可写（只读文件系统或权限不足），跳过 BBR 优化"
+        return 0
+    fi
+
+    info "尝试启用 BBR 内核加速..."
+    local kernel_major kernel_minor
+    kernel_major=$(uname -r | cut -d. -f1)
+    kernel_minor=$(uname -r | cut -d. -f2)
+
+    if [ "$kernel_major" -ge 5 ] 2>/dev/null || { [ "$kernel_major" -eq 4 ] && [ "$kernel_minor" -ge 9 ]; } 2>/dev/null; then
+        sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf 2>/dev/null || true
+        sed -i '/net.core.default_qdisc/d' /etc/sysctl.conf 2>/dev/null || true
+        {
+            echo "net.ipv4.tcp_congestion_control = bbr"
+            echo "net.core.default_qdisc = fq"
+        } >> /etc/sysctl.conf
+        if sysctl -p >/dev/null 2>&1; then
+            info "✅ BBR 内核加速已启用"
+        else
+            warn "❌ BBR 参数写入成功但 sysctl -p 执行失败，请手动检查 /etc/sysctl.conf"
+        fi
+    else
+        warn "内核版本 $(uname -r) 过低（需 4.9+），已跳过 BBR 优化"
+    fi
+}
+
 # 主安装逻辑
 main() {
     # 0. 环境检测与准备
@@ -417,7 +466,10 @@ SVCEOF
     # 6. 注册 na 快捷命令
     install_na_command
 
-    # 7. 验证安装
+    # 7. BBR 内核加速优化
+    apply_bbr
+
+    # 8. 验证安装
     sleep 2
     if pidof nodectl-agent >/dev/null 2>&1; then
         info "✅ nodectl-agent 安装完成！(PID: $(pidof nodectl-agent | awk '{print $1}'))"
@@ -434,7 +486,7 @@ SVCEOF
 }
 
 main
-`, installID, panelURL, channel)
+`, installID, panelURL, channel, bbrFlag)
 }
 
 // getPanelURLForScript 获取面板 URL 用于安装脚本生成
