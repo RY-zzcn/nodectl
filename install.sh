@@ -24,6 +24,8 @@ INSTALL_DIR="/opt/nodectl"
 DATA_DIR="${INSTALL_DIR}/data"
 BIN_PATH="${INSTALL_DIR}/nodectl"
 NT_BIN="/usr/local/bin/nt"
+DBCONFIG_PATH="${DATA_DIR}/dbconfig.json"
+DEFAULT_PORT=8080
 
 # ========== 检查 root 权限 ==========
 check_root() {
@@ -144,6 +146,106 @@ select_channel() {
         2) CHANNEL="alpha" ;;
         *) CHANNEL="stable" ;;
     esac
+}
+
+# ========== 选择 Web 端口 ==========
+check_port_available() {
+    local port="$1"
+    # 方法 1: 使用 ss (大多数 Linux 默认自带)
+    if command -v ss >/dev/null 2>&1; then
+        if ss -tlnH 2>/dev/null | grep -qE ":${port}\b"; then
+            return 1
+        fi
+        return 0
+    fi
+    # 方法 2: 使用 netstat
+    if command -v netstat >/dev/null 2>&1; then
+        if netstat -tln 2>/dev/null | grep -qE ":${port}\b"; then
+            return 1
+        fi
+        return 0
+    fi
+    # 方法 3: 尝试用 shell 内置功能探测端口 (不引入新依赖)
+    if (echo >/dev/tcp/127.0.0.1/"$port") 2>/dev/null; then
+        return 1
+    fi
+    return 0
+}
+
+select_port() {
+    echo ""
+    printf "${CYAN}╔══════════════════════════════════════╗${NC}\n"
+    printf "${CYAN}║     设置 Web 服务端口                ║${NC}\n"
+    printf "${CYAN}╠══════════════════════════════════════╣${NC}\n"
+    printf "${CYAN}║                                      ║${NC}\n"
+    printf "${CYAN}║  默认端口: ${GREEN}8080${CYAN}                      ║${NC}\n"
+    printf "${CYAN}║  直接回车使用默认端口                ║${NC}\n"
+    printf "${CYAN}║                                      ║${NC}\n"
+    printf "${CYAN}╚══════════════════════════════════════╝${NC}\n"
+    echo ""
+
+    while true; do
+        printf "请输入 Web 端口 [1-65535] (默认 ${DEFAULT_PORT}): "
+        read -r port_input
+
+        # 空输入使用默认端口
+        if [ -z "$port_input" ]; then
+            port_input="${DEFAULT_PORT}"
+        fi
+
+        # 验证是否为数字
+        case "$port_input" in
+            ''|*[!0-9]*)
+                err "端口必须是数字，请重新输入"
+                continue
+                ;;
+        esac
+
+        # 验证端口范围
+        if [ "$port_input" -lt 1 ] || [ "$port_input" -gt 65535 ]; then
+            err "端口范围必须在 1-65535 之间，请重新输入"
+            continue
+        fi
+
+        # 检查端口是否被占用
+        if ! check_port_available "$port_input"; then
+            err "端口 ${port_input} 已被占用，请更换其他端口"
+            continue
+        fi
+
+        WEB_PORT="$port_input"
+        ok "将使用端口: ${WEB_PORT}"
+        break
+    done
+}
+
+# ========== 写入 Web 端口到 dbconfig.json ==========
+write_port_config() {
+    local port="$1"
+    mkdir -p "${DATA_DIR}"
+
+    if [ -f "${DBCONFIG_PATH}" ]; then
+        # 文件已存在，检查是否已有 web_port 字段
+        if grep -q '"web_port"' "${DBCONFIG_PATH}" 2>/dev/null; then
+            # 已有 web_port，用 sed 替换值（纯 POSIX，不引入 jq 依赖）
+            sed -i "s/\"web_port\"[[:space:]]*:[[:space:]]*[0-9]*/\"web_port\": ${port}/" "${DBCONFIG_PATH}"
+        else
+            # 没有 web_port 字段，在最后一个 } 前插入
+            # 先检查文件是否非空且为合法 JSON 对象
+            if grep -q '}' "${DBCONFIG_PATH}" 2>/dev/null; then
+                sed -i "s/\(.*\)}/\1,\n  \"web_port\": ${port}\n}/" "${DBCONFIG_PATH}"
+            else
+                # 文件损坏或为空，直接重写
+                printf '{\n  "type": "sqlite",\n  "web_port": %d\n}\n' "$port" > "${DBCONFIG_PATH}"
+            fi
+        fi
+    else
+        # 文件不存在，创建新的
+        printf '{\n  "type": "sqlite",\n  "web_port": %d\n}\n' "$port" > "${DBCONFIG_PATH}"
+    fi
+
+    chmod 600 "${DBCONFIG_PATH}"
+    ok "端口配置已写入 ${DBCONFIG_PATH}"
 }
 
 # ========== 停止已有服务 ==========
@@ -311,8 +413,13 @@ load_install_info() {
                 ARCH)     ARCH="${value#\"}";     ARCH="${ARCH%\"}" ;;
                 OS)       OS="${value#\"}";       OS="${OS%\"}" ;;
                 INIT_SYS) INIT_SYS="${value#\"}"; INIT_SYS="${INIT_SYS%\"}" ;;
+                WEB_PORT) WEB_PORT="${value#\"}";  WEB_PORT="${WEB_PORT%\"}" ;;
             esac
         done < "$INSTALL_INFO"
+    fi
+    # 兼容旧版安装（没有 WEB_PORT 字段），默认 8080
+    if [ -z "$WEB_PORT" ]; then
+        WEB_PORT="8080"
     fi
 }
 
@@ -597,6 +704,7 @@ do_status() {
     else
         printf "${CYAN}║  状态: ${RED}%-31s${CYAN}║${NC}\n" "${status}"
     fi
+    printf "${CYAN}║  端口: %-31s║${NC}\n" "${WEB_PORT:-8080}"
     printf "${CYAN}║  目录: %-31s║${NC}\n" "${INSTALL_DIR}"
     printf "${CYAN}║  架构: %-31s║${NC}\n" "${ARCH:-未知}"
     printf "${CYAN}║  系统: %-31s║${NC}\n" "${INIT_SYS}"
@@ -659,6 +767,7 @@ show_menu() {
         printf "${CYAN}║  状态: ${RED}已停止${CYAN}    渠道: %-14s║${NC}\n" "${current_channel}"
     fi
     printf "${CYAN}║  当前: %-31s║${NC}\n" "${ver}"
+    printf "${CYAN}║  端口: %-31s║${NC}\n" "${WEB_PORT:-8080}"
     printf "${CYAN}║  最新: %-31s║${NC}\n" "${latest}${update_hint}"
     printf "${CYAN}╠══════════════════════════════════════╣${NC}\n"
     printf "${CYAN}║                                      ║${NC}\n"
@@ -791,6 +900,7 @@ start_service() {
 save_install_info() {
     local version="$1"
     local channel="$2"
+    local port="$3"
     local install_time
     install_time=$(date '+%Y-%m-%d %H:%M:%S')
     cat > "${INSTALL_DIR}/.install_info" <<EOF
@@ -800,6 +910,7 @@ INSTALL_TIME="${install_time}"
 ARCH="${ARCH}"
 OS="${OS}"
 INIT_SYS="${INIT_SYS}"
+WEB_PORT="${port}"
 EOF
 }
 
@@ -820,6 +931,9 @@ main() {
     # 用户选择版本
     select_channel
 
+    # 用户选择 Web 端口
+    select_port
+
     # 获取最新版本号
     info "正在获取 ${CHANNEL} 最新版本..."
     VERSION=$(get_latest_version "$CHANNEL")
@@ -831,6 +945,9 @@ main() {
     # 下载二进制
     download_binary "$VERSION"
 
+    # 写入端口配置到 dbconfig.json
+    write_port_config "$WEB_PORT"
+
     # 注册系统服务
     install_service
 
@@ -838,12 +955,13 @@ main() {
     install_nt_command
 
     # 保存安装信息
-    save_install_info "$VERSION" "$CHANNEL"
+    save_install_info "$VERSION" "$CHANNEL" "$WEB_PORT"
 
     # 启动服务
     start_service
 
     # 完成提示
+    local access_url="http://你的IP:${WEB_PORT}"
     echo ""
     printf "${GREEN}╔══════════════════════════════════════╗${NC}\n"
     printf "${GREEN}║     NodeCTL 安装完成！               ║${NC}\n"
@@ -852,9 +970,9 @@ main() {
     printf "${GREEN}║  版本: %-31s║${NC}\n" "${VERSION}"
     printf "${GREEN}║  渠道: %-31s║${NC}\n" "${CHANNEL}"
     printf "${GREEN}║  目录: %-31s║${NC}\n" "${INSTALL_DIR}"
-    printf "${GREEN}║  端口: %-31s║${NC}\n" "8080"
+    printf "${GREEN}║  端口: %-31s║${NC}\n" "${WEB_PORT}"
     printf "${GREEN}║                                      ║${NC}\n"
-    printf "${GREEN}║  访问: http://你的IP:8080             ║${NC}\n"
+    printf "${GREEN}║  访问: %-31s║${NC}\n" "${access_url}"
     printf "${GREEN}║  账号: admin / admin                 ║${NC}\n"
     printf "${GREEN}║                                      ║${NC}\n"
     printf "${GREEN}║  管理命令: nt                         ║${NC}\n"
