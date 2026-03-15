@@ -160,7 +160,20 @@ services:
 
 运行 `docker-compose up -d` 即可启动！
 
-部署成功后访问 `http://你的IP:7878`，使用默认账号 `admin` / `admin` 登录。
+### 方式三：二进制脚本安装
+
+适合不想使用 Docker 的用户，支持 Debian/Ubuntu 和 Alpine 系统：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/hobin66/nodectl/main/install.sh)
+```
+
+安装完成后：
+- 二进制文件位于 `/opt/nodectl/nodectl`
+- 数据目录位于 `/opt/nodectl/data`
+- 可执行命令 `nt` 管理服务（如 `nt start`、`nt stop`、`nt status`）
+
+部署成功后访问 `http://你的IP:8080`，使用默认账号 `admin` / `admin` 登录。
 
 ---
 
