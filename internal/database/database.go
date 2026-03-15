@@ -128,6 +128,7 @@ type NodePool struct {
 	ResetDay                int               `gorm:"column:reset_day;default:0" json:"reset_day"`                                          // 每月重置日 (1-31, 0表示不重置)
 	TrafficUpdateAt         *time.Time        `gorm:"column:traffic_update_at" json:"traffic_update_at"`                                    // 流量更新时间
 	AgentVersion            string            `gorm:"column:agent_version;type:varchar(32);default:''" json:"agent_version"`                // Agent 版本号
+	TrafficHistoryCount     *int64            `gorm:"column:traffic_history_count" json:"traffic_history_count"`                            // 历史流量记录条数（写入计数，NULL表示未初始化需查库）
 	TunnelEnabled           bool              `gorm:"column:tunnel_enabled;default:false" json:"tunnel_enabled"`                            // 是否启用 tunnel 加速
 	TunnelID                string            `gorm:"column:tunnel_id;type:varchar(64);default:''" json:"tunnel_id"`                        // 节点绑定的 Tunnel ID
 	TunnelToken             string            `gorm:"column:tunnel_token;type:text;default:''" json:"tunnel_token"`                         // 节点专属 Tunnel Token（每节点独立）

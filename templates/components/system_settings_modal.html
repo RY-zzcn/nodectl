@@ -440,6 +440,10 @@
         width: 66px;
     }
 
+    .sys-offline-col-records {
+        width: 56px;
+    }
+
     .sys-offline-col-grace {
         width: 66px;
     }
@@ -490,13 +494,52 @@
     }
 
     .sys-offline-th-status,
+    .sys-offline-th-records,
     .sys-offline-th-grace,
     .sys-offline-th-threshold,
     .sys-offline-td-status,
+    .sys-offline-td-records,
     .sys-offline-td-grace,
     .sys-offline-td-threshold {
         text-align: center;
         padding: 8px 4px;
+    }
+
+    .sys-offline-records-badge {
+        display: inline-block;
+        min-width: 32px;
+        padding: 3px 7px;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 11px;
+        font-family: monospace;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.15s;
+        color: #0284c7;
+        background: #e0f2fe;
+        border: 1px solid #bae6fd;
+    }
+
+    .sys-offline-records-badge:hover {
+        background: #bae6fd;
+        border-color: #7dd3fc;
+        color: #0369a1;
+    }
+
+    .sys-offline-records-badge.zero {
+        color: #9ca3af;
+        background: #f3f4f6;
+        border-color: #e5e7eb;
+        cursor: default;
+    }
+
+    .sys-offline-records-badge.loading {
+        color: #9ca3af;
+        background: #f9fafb;
+        border-color: #e5e7eb;
+        cursor: default;
+        font-family: inherit;
     }
 
     .sys-offline-status-badge {
@@ -678,9 +721,14 @@
         }
 
         .sys-offline-col-status,
+        .sys-offline-col-records,
         .sys-offline-col-grace,
         .sys-offline-col-threshold {
             width: 56px;
+        }
+
+        .sys-offline-col-records {
+            width: 48px;
         }
 
         .sys-offline-th-select,
@@ -694,13 +742,21 @@
         }
 
         .sys-offline-th-status,
+        .sys-offline-th-records,
         .sys-offline-th-grace,
         .sys-offline-th-threshold,
         .sys-offline-td-status,
+        .sys-offline-td-records,
         .sys-offline-td-grace,
         .sys-offline-td-threshold {
             padding-left: 2px;
             padding-right: 2px;
+        }
+
+        .sys-offline-records-badge {
+            min-width: 28px;
+            padding: 2px 5px;
+            font-size: 10px;
         }
 
         .sys-offline-status-badge {
@@ -2887,6 +2943,7 @@
                                     <col class="sys-offline-col-select" />
                                     <col class="sys-offline-col-name" />
                                     <col class="sys-offline-col-status" />
+                                    <col class="sys-offline-col-records" />
                                     <col class="sys-offline-col-grace" />
                                     <col class="sys-offline-col-threshold" />
                                 </colgroup>
@@ -2905,6 +2962,9 @@
                                         <th class="sys-offline-th-status">
                                             状态
                                         </th>
+                                        <th class="sys-offline-th-records">
+                                            记录
+                                        </th>
                                         <th class="sys-offline-th-grace">
                                             宽限期
                                         </th>
@@ -2915,7 +2975,7 @@
                                 </thead>
                                 <tbody id="sysOfflineNotifyTableBody">
                                     <tr>
-                                        <td colspan="5" style="
+                                        <td colspan="6" style="
                                                 padding: 16px;
                                                 text-align: center;
                                                 color: #999;
@@ -4198,7 +4258,7 @@
         const searchInput = document.getElementById("sysOfflineNodeSearch");
         if (searchInput) searchInput.value = "";
 
-        tbody.innerHTML = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #999;">加载中...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #999;">加载中...</td></tr>`;
         try {
             const res = await fetch("/api/offline-notify/settings");
             const result = await res.json();
@@ -4225,7 +4285,7 @@
 
             renderOfflineNotifyNodes(nodes);
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #d74242;">加载失败，请稍后重试</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #d74242;">加载失败，请稍后重试</td></tr>`;
             updateOfflineNotifySelectAllState();
         }
     }
@@ -4235,7 +4295,7 @@
         if (!tbody) return;
 
         if (!nodes || nodes.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #999;">暂无节点</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #999;">暂无节点</td></tr>`;
             updateOfflineNotifySelectAllState();
             return;
         }
@@ -4247,7 +4307,7 @@
 
         function buildGroupHeader(label, color, count) {
             return `<tr class="sys-offline-group-header" style="border-top:none;">
-                <td colspan="5" style="padding:6px 10px;background:#fafbfc;font-size:12px;font-weight:600;color:${color};border-bottom:1px solid #eef1f5;">
+                <td colspan="6" style="padding:6px 10px;background:#fafbfc;font-size:12px;font-weight:600;color:${color};border-bottom:1px solid #eef1f5;">
                     <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;"></span>
                     ${label} <span style="font-weight:400;color:#999;">(${count})</span>
                 </td>
@@ -4270,6 +4330,9 @@
 
         tbody.innerHTML = html;
         updateOfflineNotifySelectAllState();
+
+        // 渲染完成后，异步加载计数为 -1（NULL）的节点的实际记录数
+        lazyLoadTrafficHistoryCounts(nodes);
     }
 
     function buildOfflineNotifyNodeRow(n) {
@@ -4285,6 +4348,18 @@
         const statusStyle = enabled
             ? "color:#1f8f4a;background:#e8f7ed;border:1px solid #c9ebd6;"
             : "color:#b05700;background:#fff3e6;border:1px solid #ffd7b0;";
+
+        // 历史流量记录条数：-1 表示需要懒加载
+        const historyCount = Number(n.traffic_history_count ?? -1);
+        let recordsBadgeHtml = '';
+        if (historyCount === -1) {
+            // 需要懒加载
+            recordsBadgeHtml = `<span id="records_badge_${uuid}" class="sys-offline-records-badge loading" title="加载中...">...</span>`;
+        } else if (historyCount === 0) {
+            recordsBadgeHtml = `<span id="records_badge_${uuid}" class="sys-offline-records-badge zero" title="无历史流量记录">0</span>`;
+        } else {
+            recordsBadgeHtml = `<span id="records_badge_${uuid}" class="sys-offline-records-badge" title="点击清除历史流量记录" onclick="confirmClearTrafficHistory('${uuid}', '${name}', ${historyCount})">${historyCount}</span>`;
+        }
 
         return `
             <tr style="border-top: 1px solid #f0f2f5;" data-node-name="${name.toLowerCase()}">
@@ -4305,6 +4380,9 @@
                         ${statusText}
                     </span>
                 </td>
+                <td class="sys-offline-td-records">
+                    ${recordsBadgeHtml}
+                </td>
                 <td class="sys-offline-td-grace">
                     <input type="number" min="0" max="86400" value="${grace}" id="offline_grace_${uuid}" class="sys-input sys-offline-grace-input" oninput="queueOfflineNotifyGraceSave('${uuid}')">
                 </td>
@@ -4312,6 +4390,106 @@
                     <input type="number" min="0" max="100" value="${threshold}" id="offline_threshold_${uuid}" class="sys-input sys-offline-threshold-input" oninput="queueOfflineNotifyThresholdSave('${uuid}')">
                 </td>
             </tr>`;
+    }
+
+    // ================= 历史流量记录计数：懒加载 & 清除 =================
+
+    // 渲染完成后，为所有 count=-1（NULL）的节点异步加载实际条数
+    function lazyLoadTrafficHistoryCounts(nodes) {
+        if (!nodes || nodes.length === 0) return;
+        const needLoad = nodes.filter(n => Number(n.traffic_history_count ?? -1) === -1);
+        // 逐个请求，避免并发压力过大
+        needLoad.forEach((n, idx) => {
+            setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/traffic/history-count?uuid=${encodeURIComponent(n.uuid)}`);
+                    const result = await res.json();
+                    if (result.status === 'success') {
+                        const count = Number(result.count || 0);
+                        const badge = document.getElementById('records_badge_' + n.uuid);
+                        if (badge) {
+                            badge.classList.remove('loading');
+                            if (count === 0) {
+                                badge.classList.add('zero');
+                                badge.textContent = '0';
+                                badge.title = '无历史流量记录';
+                                badge.onclick = null;
+                                badge.style.cursor = 'default';
+                            } else {
+                                badge.textContent = String(count);
+                                badge.title = '点击清除历史流量记录';
+                                badge.onclick = function() {
+                                    confirmClearTrafficHistory(n.uuid, n.name || '-', count);
+                                };
+                            }
+                        }
+                        // 同步更新内存中的节点数据
+                        n.traffic_history_count = count;
+                    }
+                } catch (e) {
+                    const badge = document.getElementById('records_badge_' + n.uuid);
+                    if (badge) {
+                        badge.classList.remove('loading');
+                        badge.classList.add('zero');
+                        badge.textContent = '?';
+                        badge.title = '加载失败';
+                    }
+                }
+            }, idx * 200); // 每个请求间隔 200ms，避免并发冲击
+        });
+    }
+
+    // 确认清除历史流量数据
+    function confirmClearTrafficHistory(uuid, nodeName, count) {
+        if (count <= 0) return;
+        const msg = `是否清除该节点的历史流量统计数据？\n\n节点：${nodeName}\n记录数：${count} 条\n\n⚠️ 此操作不影响累计流量统计。`;
+        if (!confirm(msg)) return;
+
+        // 执行清除
+        doClearTrafficHistory(uuid);
+    }
+
+    async function doClearTrafficHistory(uuid) {
+        const badge = document.getElementById('records_badge_' + uuid);
+        if (badge) {
+            badge.textContent = '...';
+            badge.classList.add('loading');
+            badge.classList.remove('zero');
+            badge.onclick = null;
+        }
+
+        try {
+            const res = await fetch('/api/traffic/clear-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uuid }),
+            });
+            const result = await res.json();
+            if (result.status === 'success') {
+                if (badge) {
+                    badge.classList.remove('loading');
+                    badge.classList.add('zero');
+                    badge.textContent = '0';
+                    badge.title = '无历史流量记录';
+                    badge.style.cursor = 'default';
+                }
+                showOfflineNotifySaved();
+            } else {
+                if (badge) {
+                    badge.classList.remove('loading');
+                    badge.textContent = '!';
+                    badge.title = '清除失败: ' + (result.message || '未知错误');
+                }
+                showOfflineNotifySaveFailed();
+            }
+        } catch (e) {
+            if (badge) {
+                badge.classList.remove('loading');
+                badge.textContent = '!';
+                badge.title = '请求失败';
+            }
+            showOfflineNotifySaveFailed();
+        }
     }
 
     function filterOfflineNotifyNodes(keyword) {

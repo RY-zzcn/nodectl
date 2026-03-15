@@ -297,6 +297,8 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/traffic/landing-nodes", withAuthAndSecure(apiGetTrafficLandingNodes))
 	mux.HandleFunc("/api/traffic/series", withAuthAndSecure(apiGetTrafficSeries))
 	mux.HandleFunc("/api/traffic/consumption-rank", withAuthAndSecure(apiGetTrafficConsumptionRank))
+	mux.HandleFunc("/api/traffic/clear-history", withAuthAndSecure(apiClearNodeTrafficHistory))
+	mux.HandleFunc("/api/traffic/history-count", withAuthAndSecure(apiGetNodeTrafficHistoryCount))
 	mux.HandleFunc("/api/update-geoip", withAuthAndSecure(apiUpdateGeoIP))
 	mux.HandleFunc("/api/get-geo-status", withAuthAndSecure(apiGetGeoStatus))
 	// 程序版本更新检查

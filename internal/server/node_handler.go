@@ -540,7 +540,7 @@ func apiGetOfflineNotifySettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var nodes []database.NodePool
-	if err := database.DB.Select("uuid", "name", "install_id", "region", "routing_type", "offline_notify_enabled", "offline_notify_grace_sec", "offline_last_notify_at", "traffic_threshold_enabled", "traffic_threshold_percent", "traffic_threshold_reached", "sort_index", "updated_at").
+	if err := database.DB.Select("uuid", "name", "install_id", "region", "routing_type", "offline_notify_enabled", "offline_notify_grace_sec", "offline_last_notify_at", "traffic_threshold_enabled", "traffic_threshold_percent", "traffic_threshold_reached", "traffic_history_count", "sort_index", "updated_at").
 		Order("routing_type ASC, sort_index ASC, updated_at DESC").
 		Find(&nodes).Error; err != nil {
 		sendJSON(w, "error", "读取离线通知配置失败")
@@ -562,6 +562,12 @@ func apiGetOfflineNotifySettings(w http.ResponseWriter, r *http.Request) {
 			"traffic_threshold_percent": service.NormalizeTrafficThresholdPercent(n.TrafficThresholdPercent),
 			"traffic_threshold_reached": n.TrafficThresholdReached,
 			"online":                    service.IsNodeOnline(n.InstallID),
+		}
+		// 历史流量记录条数：如果为 NULL 则返回 -1 表示需要前端懒加载
+		if n.TrafficHistoryCount != nil {
+			item["traffic_history_count"] = *n.TrafficHistoryCount
+		} else {
+			item["traffic_history_count"] = -1 // NULL，前端需要异步加载
 		}
 		if n.OfflineLastNotifyAt != nil && !n.OfflineLastNotifyAt.IsZero() {
 			item["offline_last_notify_at"] = n.OfflineLastNotifyAt.Format("2006-01-02 15:04:05")

@@ -1199,7 +1199,7 @@ func (h *TrafficHub) handleNewMessageType(data []byte, msgType string, clientIP 
 		if nodeName == "" {
 			nodeName = h.resolveNodeNameByIP(clientIP)
 		}
-		logger.Log.Info("Agent WS 已连接（通过新消息类型识别）",
+		logger.Log.Info("Agent WS 已连接",
 			"ip", clientIP,
 			"install_id", installID,
 			"node_name", nodeName,
@@ -1312,16 +1312,6 @@ func (h *TrafficHub) handleNodeOnline(msg wsMessage, clientIP string) {
 			if nodeName == "" {
 				nodeName = installID
 			}
-			logger.Log.Info("节点上线信息已更新",
-				"install_id", installID,
-				"node_name", nodeName,
-				"ipv4", payload.IPv4,
-				"ipv6", payload.IPv6,
-				"region", newRegion,
-				"protocols", payload.Protocols,
-				"agent_version", payload.AgentVer,
-				"singbox_version", payload.SBVersion,
-			)
 		}
 	}
 }
