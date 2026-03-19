@@ -502,7 +502,7 @@ func HandleAgentWS(w http.ResponseWriter, r *http.Request) {
 			} else if errors.Is(err, context.DeadlineExceeded) || strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
 				logger.Log.Info("Agent WS 读超时，判定离线", "error", err, "ip", clientIP, "install_id", agentInstallID, "node_name", nodeName, "read_timeout", agentReadTimeout.String())
 			} else {
-				logger.Log.Warn("Agent WS 读取异常（可能静默离线）", "error", err, "ip", clientIP, "install_id", agentInstallID, "node_name", nodeName)
+				logger.Log.Debug("Agent WS 读取异常，连接已断开", "error", err, "ip", clientIP, "install_id", agentInstallID, "node_name", nodeName)
 			}
 			// 注销 Agent 连接
 			if agentInstallID != "" {
