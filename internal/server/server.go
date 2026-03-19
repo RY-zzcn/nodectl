@@ -332,7 +332,6 @@ func Start(tmplFS embed.FS) {
 	mux.HandleFunc("/api/node/control/tunnel-stop", withAuthAndSecure(apiNodeControlTunnelStop))              // 远程停止 tunnel
 	mux.HandleFunc("/api/node/control/stream", withAuthAndSecure(apiNodeControlStream))                       // 命令执行 SSE 流
 	mux.HandleFunc("/api/node/online-status", withAuthAndSecure(apiNodeOnlineStatus))                         // 节点在线状态查询
-	mux.HandleFunc("/api/push-agent-interval", withAuthAndSecure(apiPushAgentInterval))                       // 推送 Agent 推送间隔
 
 	// 订阅接口
 	mux.HandleFunc("/sub/clash", withSecure(apiSubClash))
