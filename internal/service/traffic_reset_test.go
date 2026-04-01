@@ -23,6 +23,24 @@ func TestShouldResetNodeTrafficNow_FixedDayFallbackToMonthEnd(t *testing.T) {
 	}
 }
 
+func TestNormalizeTrafficResetMode_BackwardCompatibilityByResetDay(t *testing.T) {
+	if got := NormalizeTrafficResetMode("", 10); got != TrafficResetModeFixedDay {
+		t.Fatalf("expected empty mode + reset_day>0 to map to fixed_day, got=%s", got)
+	}
+	if got := NormalizeTrafficResetMode("", 0); got != TrafficResetModeOff {
+		t.Fatalf("expected empty mode + reset_day<=0 to map to off, got=%s", got)
+	}
+}
+
+func TestNormalizeTrafficResetMode_FixedDayWithZeroDayFallsBackOff(t *testing.T) {
+	if got := NormalizeTrafficResetMode(TrafficResetModeFixedDay, 0); got != TrafficResetModeOff {
+		t.Fatalf("expected fixed_day + reset_day<=0 to map to off, got=%s", got)
+	}
+	if got := NormalizeTrafficResetMode("fixed", -1); got != TrafficResetModeOff {
+		t.Fatalf("expected fixed alias + reset_day<=0 to map to off, got=%s", got)
+	}
+}
+
 func TestShouldResetNodeTrafficNow_FixedDayNotYetDue(t *testing.T) {
 	loc := time.FixedZone("UTC+8", 8*3600)
 	now := tm(loc, 2026, time.April, 15)

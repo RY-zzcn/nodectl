@@ -108,15 +108,20 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	targetNode.IPV4 = req.IPV4
 	targetNode.IPV6 = req.IPV6
 	targetNode.IPMode = req.IPMode
-	targetNode.ResetDay = service.NormalizeNodeTrafficResetDay(req.ResetDay)
-	targetNode.TrafficResetMode = service.NormalizeTrafficResetMode(req.TrafficResetMode, targetNode.ResetDay)
+	rawResetDay := service.NormalizeNodeTrafficResetDay(req.ResetDay)
+	targetNode.TrafficResetMode = service.NormalizeTrafficResetMode(req.TrafficResetMode, rawResetDay)
+	targetNode.ResetDay = rawResetDay
+	if targetNode.TrafficResetMode != service.TrafficResetModeFixedDay {
+		targetNode.ResetDay = 0
+	}
 	targetNode.TrafficResetIntervalDays = service.NormalizeTrafficResetIntervalDays(req.TrafficResetIntervalDays)
 	if anchor, err := service.ParseTrafficResetAnchorDate(req.TrafficResetAnchorDate); err != nil {
 		sendJSON(w, "error", err.Error())
 		return
 	} else if anchor != nil {
 		targetNode.TrafficResetAnchorAt = anchor
-	} else if targetNode.TrafficResetAnchorAt == nil || targetNode.TrafficResetAnchorAt.IsZero() {
+	} else if targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays &&
+		(targetNode.TrafficResetAnchorAt == nil || targetNode.TrafficResetAnchorAt.IsZero()) {
 		a := service.ResolveTrafficResetAnchor(nil, targetNode.CreatedAt, time.Now())
 		targetNode.TrafficResetAnchorAt = &a
 	}
@@ -126,7 +131,22 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 		targetNode.TrafficLimit = service.ParseTrafficLimitInputToBytes(raw)
 	}
 	oldResetMode := service.NormalizeTrafficResetMode(oldNode.TrafficResetMode, oldNode.ResetDay)
-	oldResetIntervalDays := service.NormalizeTrafficResetIntervalDays(oldNode.TrafficResetIntervalDays)
+	oldEffectiveResetDay := 0
+	if oldResetMode == service.TrafficResetModeFixedDay {
+		oldEffectiveResetDay = service.NormalizeNodeTrafficResetDay(oldNode.ResetDay)
+	}
+	newEffectiveResetDay := 0
+	if targetNode.TrafficResetMode == service.TrafficResetModeFixedDay {
+		newEffectiveResetDay = service.NormalizeNodeTrafficResetDay(targetNode.ResetDay)
+	}
+	oldResetIntervalDays := 0
+	if oldResetMode == service.TrafficResetModeIntervalDays {
+		oldResetIntervalDays = service.NormalizeTrafficResetIntervalDays(oldNode.TrafficResetIntervalDays)
+	}
+	newResetIntervalDays := 0
+	if targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays {
+		newResetIntervalDays = service.NormalizeTrafficResetIntervalDays(targetNode.TrafficResetIntervalDays)
+	}
 	oldAnchorDate := ""
 	newAnchorDate := ""
 	if oldNode.TrafficResetAnchorAt != nil && !oldNode.TrafficResetAnchorAt.IsZero() {
@@ -135,10 +155,14 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	if targetNode.TrafficResetAnchorAt != nil && !targetNode.TrafficResetAnchorAt.IsZero() {
 		newAnchorDate = targetNode.TrafficResetAnchorAt.In(time.Local).Format("2006-01-02")
 	}
-	if oldNode.ResetDay != targetNode.ResetDay ||
-		oldResetMode != targetNode.TrafficResetMode ||
-		oldResetIntervalDays != targetNode.TrafficResetIntervalDays ||
+	resetRuleChanged := oldResetMode != targetNode.TrafficResetMode ||
+		oldEffectiveResetDay != newEffectiveResetDay ||
+		oldResetIntervalDays != newResetIntervalDays
+	if (oldResetMode == service.TrafficResetModeIntervalDays || targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays) &&
 		oldAnchorDate != newAnchorDate {
+		resetRuleChanged = true
+	}
+	if resetRuleChanged {
 		if targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays {
 			targetNode.TrafficResetAt = nil
 		} else {
@@ -283,16 +307,16 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	if oldNode.IPMode != targetNode.IPMode {
 		changedDetails = append(changedDetails, fmt.Sprintf("ip_mode: %d -> %d", oldNode.IPMode, targetNode.IPMode))
 	}
-	if oldNode.ResetDay != targetNode.ResetDay {
-		changedDetails = append(changedDetails, fmt.Sprintf("reset_day: %d -> %d", oldNode.ResetDay, targetNode.ResetDay))
+	if oldEffectiveResetDay != newEffectiveResetDay {
+		changedDetails = append(changedDetails, fmt.Sprintf("reset_day: %d -> %d", oldEffectiveResetDay, newEffectiveResetDay))
 	}
 	if oldResetMode != targetNode.TrafficResetMode {
 		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_mode: %s -> %s", oldResetMode, targetNode.TrafficResetMode))
 	}
-	if oldResetIntervalDays != targetNode.TrafficResetIntervalDays {
-		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_interval_days: %d -> %d", oldResetIntervalDays, targetNode.TrafficResetIntervalDays))
+	if oldResetIntervalDays != newResetIntervalDays {
+		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_interval_days: %d -> %d", oldResetIntervalDays, newResetIntervalDays))
 	}
-	if oldAnchorDate != newAnchorDate {
+	if (oldResetMode == service.TrafficResetModeIntervalDays || targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays) && oldAnchorDate != newAnchorDate {
 		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_anchor_date: %s -> %s", oldAnchorDate, newAnchorDate))
 	}
 	if oldNode.TrafficLimit != targetNode.TrafficLimit {
@@ -464,21 +488,26 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 
 	// 补充更新 reset_day 和 traffic_limit
 	updates := map[string]interface{}{}
-	resetDay := service.NormalizeNodeTrafficResetDay(req.ResetDay)
-	resetMode := service.NormalizeTrafficResetMode(req.TrafficResetMode, resetDay)
+	rawResetDay := service.NormalizeNodeTrafficResetDay(req.ResetDay)
+	resetMode := service.NormalizeTrafficResetMode(req.TrafficResetMode, rawResetDay)
+	resetDay := rawResetDay
+	if resetMode != service.TrafficResetModeFixedDay {
+		resetDay = 0
+	}
 	resetIntervalDays := service.NormalizeTrafficResetIntervalDays(req.TrafficResetIntervalDays)
 	updates["reset_day"] = resetDay
 	updates["traffic_reset_mode"] = resetMode
 	updates["traffic_reset_interval_days"] = resetIntervalDays
-	if parsedAnchor != nil {
-		updates["traffic_reset_anchor_at"] = *parsedAnchor
-	} else {
-		a := service.ResolveTrafficResetAnchor(nil, node.CreatedAt, time.Now())
-		updates["traffic_reset_anchor_at"] = a
-	}
 	if resetMode == service.TrafficResetModeIntervalDays {
+		if parsedAnchor != nil {
+			updates["traffic_reset_anchor_at"] = *parsedAnchor
+		} else {
+			a := service.ResolveTrafficResetAnchor(nil, node.CreatedAt, time.Now())
+			updates["traffic_reset_anchor_at"] = a
+		}
 		updates["traffic_reset_at"] = nil
 	} else {
+		updates["traffic_reset_anchor_at"] = nil
 		updates["traffic_reset_at"] = time.Now()
 	}
 	trafficLimit := req.TrafficLimit

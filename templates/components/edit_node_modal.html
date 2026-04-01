@@ -1116,7 +1116,10 @@
     function normalizeClientResetMode(mode, resetDay) {
         const raw = String(mode || '').trim().toLowerCase();
         if (!raw) return Number(resetDay || 0) > 0 ? 'fixed_day' : 'off';
-        if (raw === 'fixed_day' || raw === 'calendar_month' || raw === 'interval_days' || raw === 'off') {
+        if (raw === 'fixed_day') {
+            return Number(resetDay || 0) > 0 ? 'fixed_day' : 'off';
+        }
+        if (raw === 'calendar_month' || raw === 'interval_days' || raw === 'off') {
             return raw;
         }
         if (raw === 'fixed' || raw === 'monthly' || raw === 'day') return Number(resetDay || 0) > 0 ? 'fixed_day' : 'off';
@@ -1727,9 +1730,12 @@
             const name = document.getElementById('editNodeName').value;
             const uiState = parseInt(document.getElementById('editNodeUIState').value);
             const resetMode = document.getElementById('editNodeResetMode').value || 'fixed_day';
-            const resetDay = parseInt(document.getElementById('editNodeResetDay').value) || 0;
-            const resetIntervalDays = parseInt(document.getElementById('editNodeResetIntervalDays').value) || 30;
-            const resetAnchorDate = document.getElementById('editNodeResetAnchorDate').value || '';
+            const resetDayRaw = parseInt(document.getElementById('editNodeResetDay').value) || 0;
+            const resetIntervalDaysRaw = parseInt(document.getElementById('editNodeResetIntervalDays').value) || 30;
+            const resetAnchorDateRaw = document.getElementById('editNodeResetAnchorDate').value || '';
+            const resetDay = resetMode === 'fixed_day' ? resetDayRaw : 0;
+            const resetIntervalDays = resetMode === 'interval_days' ? resetIntervalDaysRaw : 30;
+            const resetAnchorDate = resetMode === 'interval_days' ? resetAnchorDateRaw : '';
             const ipMode = parseInt(document.getElementById('editNodeIPMode').value) || 0;
 
             const trafficLimitRaw = document.getElementById('editNodeTrafficLimit').value;

@@ -494,9 +494,12 @@
         const nodeName = document.getElementById('nodeNameInput').value.trim();
         const routingType = parseInt(document.getElementById('nodeGroupVal').value);
         const resetMode = document.getElementById('nodeResetModeInput').value || 'fixed_day';
-        const resetDay = parseInt(document.getElementById('nodeResetDayInput').value) || 0;
-        const resetIntervalDays = parseInt(document.getElementById('nodeResetIntervalDaysInput').value) || 30;
-        const resetAnchorDate = document.getElementById('nodeResetAnchorDateInput').value || '';
+        const resetDayRaw = parseInt(document.getElementById('nodeResetDayInput').value) || 0;
+        const resetIntervalDaysRaw = parseInt(document.getElementById('nodeResetIntervalDaysInput').value) || 30;
+        const resetAnchorDateRaw = document.getElementById('nodeResetAnchorDateInput').value || '';
+        const resetDay = resetMode === 'fixed_day' ? resetDayRaw : 0;
+        const resetIntervalDays = resetMode === 'interval_days' ? resetIntervalDaysRaw : 30;
+        const resetAnchorDate = resetMode === 'interval_days' ? resetAnchorDateRaw : '';
         const trafficLimitRaw = document.getElementById('nodeTrafficLimitInput').value;
         const trafficLimit = parseTrafficLimitInputToBytes(trafficLimitRaw);
         const trafficLimitType = document.getElementById('nodeTrafficLimitTypeInput').value || 'total';
