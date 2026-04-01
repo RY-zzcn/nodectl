@@ -241,6 +241,7 @@ func Start(tmplFS embed.FS) {
 	//避免空指针报错
 	service.InitMihomo()
 	service.InitTrafficThresholdCache()
+	service.StartTrafficAutoResetLoop()
 	service.StartAutoUpdateScheduler()
 	service.StartOfflineNotifyLoop()
 	service.StartAgentStartupSilentUpdateCheck()

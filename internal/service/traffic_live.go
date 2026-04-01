@@ -994,6 +994,64 @@ func GetAllNodeLiveStates() map[string]*NodeLiveState {
 
 // DispatchCommandToNode 向指定节点下发命令，等待结果（带超时）
 // 返回执行结果；若节点不在线或超时返回 error
+// ResetNodeTrafficLiveState resets in-memory traffic totals for a node.
+// This avoids old in-memory totals writing back to DB after a periodic reset.
+func ResetNodeTrafficLiveState(installID string, nodeUUID string, resetAt time.Time) {
+	installID = strings.TrimSpace(installID)
+	nodeUUID = strings.TrimSpace(nodeUUID)
+	if installID == "" {
+		return
+	}
+	if resetAt.IsZero() {
+		resetAt = time.Now()
+	}
+
+	hub := GetTrafficHub()
+
+	hub.mu.Lock()
+	if st, ok := hub.nodes[installID]; ok && st != nil {
+		st.TotalRXBytes = 0
+		st.TotalTXBytes = 0
+		st.RXRateBps = 0
+		st.TXRateBps = 0
+		st.Dirty = true
+
+		// Reset counter baseline and rebuild on next agent report.
+		st.CounterSeen = false
+		st.CounterBootID = ""
+		st.LastCounterRX = 0
+		st.LastCounterTX = 0
+
+		if nodeUUID == "" && strings.TrimSpace(st.NodeUUID) != "" {
+			nodeUUID = strings.TrimSpace(st.NodeUUID)
+		} else if nodeUUID != "" && strings.TrimSpace(st.NodeUUID) == "" {
+			st.NodeUUID = nodeUUID
+		}
+	}
+	if nodeUUID != "" {
+		hub.idCache[installID] = nodeUUID
+	}
+	hub.mu.Unlock()
+
+	if nodeUUID == "" {
+		nodeUUID = strings.TrimSpace(hub.resolveNodeUUID(installID))
+	}
+	if nodeUUID == "" {
+		return
+	}
+
+	hub.broadcast(nodeUUID, FrontendPushMsg{
+		InstallID:    installID,
+		NodeUUID:     nodeUUID,
+		RXRateBps:    0,
+		TXRateBps:    0,
+		TotalRXBytes: 0,
+		TotalTXBytes: 0,
+		LastLiveAt:   resetAt.Unix(),
+		Offline:      !IsNodeOnlineForStatus(installID),
+	})
+}
+
 func DispatchCommandToNode(installID string, action string, payload interface{}, timeout time.Duration) (*AgentCommandResult, error) {
 	hub := GetTrafficHub()
 

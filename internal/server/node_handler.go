@@ -32,7 +32,8 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		database.NodePool
-		TrafficLimitRaw string `json:"traffic_limit_raw"`
+		TrafficLimitRaw        string `json:"traffic_limit_raw"`
+		TrafficResetAnchorDate string `json:"traffic_reset_anchor_date"`
 		// Add backwards compatibility explicitly if needed, but since we embedded NodePool, it has IPMode and LinkIPModes
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -107,11 +108,43 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	targetNode.IPV4 = req.IPV4
 	targetNode.IPV6 = req.IPV6
 	targetNode.IPMode = req.IPMode
-	targetNode.ResetDay = req.ResetDay
+	targetNode.ResetDay = service.NormalizeNodeTrafficResetDay(req.ResetDay)
+	targetNode.TrafficResetMode = service.NormalizeTrafficResetMode(req.TrafficResetMode, targetNode.ResetDay)
+	targetNode.TrafficResetIntervalDays = service.NormalizeTrafficResetIntervalDays(req.TrafficResetIntervalDays)
+	if anchor, err := service.ParseTrafficResetAnchorDate(req.TrafficResetAnchorDate); err != nil {
+		sendJSON(w, "error", err.Error())
+		return
+	} else if anchor != nil {
+		targetNode.TrafficResetAnchorAt = anchor
+	} else if targetNode.TrafficResetAnchorAt == nil || targetNode.TrafficResetAnchorAt.IsZero() {
+		a := service.ResolveTrafficResetAnchor(nil, targetNode.CreatedAt, time.Now())
+		targetNode.TrafficResetAnchorAt = &a
+	}
 	targetNode.TrafficLimitType = service.NormalizeTrafficLimitType(req.TrafficLimitType)
 	targetNode.TrafficLimit = req.TrafficLimit
 	if raw := strings.TrimSpace(req.TrafficLimitRaw); raw != "" {
 		targetNode.TrafficLimit = service.ParseTrafficLimitInputToBytes(raw)
+	}
+	oldResetMode := service.NormalizeTrafficResetMode(oldNode.TrafficResetMode, oldNode.ResetDay)
+	oldResetIntervalDays := service.NormalizeTrafficResetIntervalDays(oldNode.TrafficResetIntervalDays)
+	oldAnchorDate := ""
+	newAnchorDate := ""
+	if oldNode.TrafficResetAnchorAt != nil && !oldNode.TrafficResetAnchorAt.IsZero() {
+		oldAnchorDate = oldNode.TrafficResetAnchorAt.In(time.Local).Format("2006-01-02")
+	}
+	if targetNode.TrafficResetAnchorAt != nil && !targetNode.TrafficResetAnchorAt.IsZero() {
+		newAnchorDate = targetNode.TrafficResetAnchorAt.In(time.Local).Format("2006-01-02")
+	}
+	if oldNode.ResetDay != targetNode.ResetDay ||
+		oldResetMode != targetNode.TrafficResetMode ||
+		oldResetIntervalDays != targetNode.TrafficResetIntervalDays ||
+		oldAnchorDate != newAnchorDate {
+		if targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays {
+			targetNode.TrafficResetAt = nil
+		} else {
+			now := time.Now()
+			targetNode.TrafficResetAt = &now
+		}
 	}
 
 	// 4. 安全检查：判断是否处于安全环境
@@ -253,6 +286,15 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 	if oldNode.ResetDay != targetNode.ResetDay {
 		changedDetails = append(changedDetails, fmt.Sprintf("reset_day: %d -> %d", oldNode.ResetDay, targetNode.ResetDay))
 	}
+	if oldResetMode != targetNode.TrafficResetMode {
+		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_mode: %s -> %s", oldResetMode, targetNode.TrafficResetMode))
+	}
+	if oldResetIntervalDays != targetNode.TrafficResetIntervalDays {
+		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_interval_days: %d -> %d", oldResetIntervalDays, targetNode.TrafficResetIntervalDays))
+	}
+	if oldAnchorDate != newAnchorDate {
+		changedDetails = append(changedDetails, fmt.Sprintf("traffic_reset_anchor_date: %s -> %s", oldAnchorDate, newAnchorDate))
+	}
 	if oldNode.TrafficLimit != targetNode.TrafficLimit {
 		changedDetails = append(changedDetails, fmt.Sprintf("traffic_limit: %d -> %d", oldNode.TrafficLimit, targetNode.TrafficLimit))
 	}
@@ -391,16 +433,25 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name             string `json:"name"`
-		RoutingType      int    `json:"routing_type"`
-		ResetDay         int    `json:"reset_day"`
-		TrafficLimit     int64  `json:"traffic_limit"`
-		TrafficLimitRaw  string `json:"traffic_limit_raw"`
-		TrafficLimitType string `json:"traffic_limit_type"`
+		Name                     string `json:"name"`
+		RoutingType              int    `json:"routing_type"`
+		ResetDay                 int    `json:"reset_day"`
+		TrafficResetMode         string `json:"traffic_reset_mode"`
+		TrafficResetIntervalDays int    `json:"traffic_reset_interval_days"`
+		TrafficResetAnchorDate   string `json:"traffic_reset_anchor_date"`
+		TrafficLimit             int64  `json:"traffic_limit"`
+		TrafficLimitRaw          string `json:"traffic_limit_raw"`
+		TrafficLimitType         string `json:"traffic_limit_type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Log.Warn("解析 JSON 失败", "error", err, "ip", clientIP, "path", reqPath)
 		sendJSON(w, "error", "请求格式错误")
+		return
+	}
+
+	parsedAnchor, err := service.ParseTrafficResetAnchorDate(req.TrafficResetAnchorDate)
+	if err != nil {
+		sendJSON(w, "error", err.Error())
 		return
 	}
 
@@ -413,8 +464,22 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 
 	// 补充更新 reset_day 和 traffic_limit
 	updates := map[string]interface{}{}
-	if req.ResetDay > 0 {
-		updates["reset_day"] = req.ResetDay
+	resetDay := service.NormalizeNodeTrafficResetDay(req.ResetDay)
+	resetMode := service.NormalizeTrafficResetMode(req.TrafficResetMode, resetDay)
+	resetIntervalDays := service.NormalizeTrafficResetIntervalDays(req.TrafficResetIntervalDays)
+	updates["reset_day"] = resetDay
+	updates["traffic_reset_mode"] = resetMode
+	updates["traffic_reset_interval_days"] = resetIntervalDays
+	if parsedAnchor != nil {
+		updates["traffic_reset_anchor_at"] = *parsedAnchor
+	} else {
+		a := service.ResolveTrafficResetAnchor(nil, node.CreatedAt, time.Now())
+		updates["traffic_reset_anchor_at"] = a
+	}
+	if resetMode == service.TrafficResetModeIntervalDays {
+		updates["traffic_reset_at"] = nil
+	} else {
+		updates["traffic_reset_at"] = time.Now()
 	}
 	trafficLimit := req.TrafficLimit
 	if raw := strings.TrimSpace(req.TrafficLimitRaw); raw != "" {
