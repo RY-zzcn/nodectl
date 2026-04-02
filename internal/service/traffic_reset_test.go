@@ -51,6 +51,54 @@ func TestShouldResetNodeTrafficNow_FixedDayNotYetDue(t *testing.T) {
 	}
 }
 
+func TestResolveTrafficResetAtOnRuleChange_FixedDayFutureTargetAllowsCurrentMonthReset(t *testing.T) {
+	loc := time.FixedZone("UTC+8", 8*3600)
+
+	oldLocal := time.Local
+	time.Local = loc
+	defer func() { time.Local = oldLocal }()
+
+	changedAt := time.Date(2026, time.April, 1, 10, 0, 0, 0, loc)
+	lastReset := ResolveTrafficResetAtOnRuleChange(TrafficResetModeFixedDay, 2, changedAt)
+	if lastReset == nil {
+		t.Fatalf("expected fixed day rule change to initialize last reset reference")
+	}
+
+	now := time.Date(2026, time.April, 2, 0, 1, 0, 0, loc)
+	if !shouldResetNodeTrafficNow(TrafficResetModeFixedDay, 2, 30, lastReset, nil, tm(loc, 2025, time.January, 1), now) {
+		t.Fatalf("expected Apr 1 rule change for day 2 to still reset on Apr 2")
+	}
+}
+
+func TestShouldResetNodeTrafficNow_FixedDaySameMonthBeforeTargetDoesNotCountAsReset(t *testing.T) {
+	loc := time.FixedZone("UTC+8", 8*3600)
+	now := time.Date(2026, time.April, 2, 0, 1, 0, 0, loc)
+	lastReset := time.Date(2026, time.April, 1, 10, 0, 0, 0, loc)
+
+	if !shouldResetNodeTrafficNow(TrafficResetModeFixedDay, 2, 30, ptr(lastReset), nil, tm(loc, 2025, time.January, 1), now) {
+		t.Fatalf("expected same-month timestamp before target day not to block fixed day reset")
+	}
+}
+
+func TestResolveTrafficResetAtOnRuleChange_FixedDayPastTargetDoesNotImmediateCatchUp(t *testing.T) {
+	loc := time.FixedZone("UTC+8", 8*3600)
+
+	oldLocal := time.Local
+	time.Local = loc
+	defer func() { time.Local = oldLocal }()
+
+	changedAt := time.Date(2026, time.April, 3, 10, 0, 0, 0, loc)
+	lastReset := ResolveTrafficResetAtOnRuleChange(TrafficResetModeFixedDay, 2, changedAt)
+	if lastReset == nil {
+		t.Fatalf("expected fixed day rule change to initialize last reset reference")
+	}
+
+	now := time.Date(2026, time.April, 3, 10, 1, 0, 0, loc)
+	if shouldResetNodeTrafficNow(TrafficResetModeFixedDay, 2, 30, lastReset, nil, tm(loc, 2025, time.January, 1), now) {
+		t.Fatalf("expected enabling fixed day after target day not to catch up immediately in same month")
+	}
+}
+
 func TestShouldResetNodeTrafficNow_CalendarMonthCatchUp(t *testing.T) {
 	loc := time.FixedZone("UTC+8", 8*3600)
 	now := tm(loc, 2026, time.April, 2)
@@ -125,5 +173,23 @@ func TestIntervalCycleIndex_DstSafeDayCount(t *testing.T) {
 	}
 	if got := intervalCycleIndex(anchor, twoDaysLater, 1); got != 2 {
 		t.Fatalf("expected interval cycle index=2 across DST, got=%d", got)
+	}
+}
+
+func TestDurationUntilNextMinuteBoundary(t *testing.T) {
+	loc := time.FixedZone("UTC+8", 8*3600)
+
+	now := time.Date(2026, time.April, 2, 15, 12, 56, 0, loc)
+	if got := durationUntilNextMinuteBoundary(now); got != 4*time.Second {
+		t.Fatalf("expected 4s until next minute boundary, got=%s", got)
+	}
+}
+
+func TestDurationUntilNextMinuteBoundary_OnExactMinuteWaitsOneMinute(t *testing.T) {
+	loc := time.FixedZone("UTC+8", 8*3600)
+
+	now := time.Date(2026, time.April, 2, 15, 12, 0, 0, loc)
+	if got := durationUntilNextMinuteBoundary(now); got != time.Minute {
+		t.Fatalf("expected exact minute boundary to wait one full minute, got=%s", got)
 	}
 }

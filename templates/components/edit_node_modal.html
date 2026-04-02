@@ -968,6 +968,21 @@
                                     0 B</div>
                             </div>
                         </div>
+                        <div
+                            style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px;">
+                            <div
+                                style="background: #fff; border: 1px solid #e5e5ea; border-radius: 8px; padding: 8px 10px;">
+                                <div style="font-size: 11px; color: #8e8e93; margin-bottom: 4px;">上次重置时间</div>
+                                <div id="editNodeTrafficResetAt"
+                                    style="font-size: 12px; color: #1d1d1f; font-weight: 600; word-break: break-word;">未重置</div>
+                            </div>
+                            <div
+                                style="background: #fff; border: 1px solid #e5e5ea; border-radius: 8px; padding: 8px 10px;">
+                                <div style="font-size: 11px; color: #8e8e93; margin-bottom: 4px;">流量更新时间</div>
+                                <div id="editNodeTrafficUpdateAt"
+                                    style="font-size: 12px; color: #1d1d1f; font-weight: 600; word-break: break-word;">--</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="edit-section">
@@ -1113,6 +1128,22 @@
         return text.length >= 10 ? text.slice(0, 10) : '';
     }
 
+    function formatDateTimeLabel(raw, fallback = '--') {
+        const text = String(raw || '').trim();
+        if (!text) return fallback;
+        const parsed = new Date(text);
+        if (Number.isNaN(parsed.getTime())) return text;
+        return new Intl.DateTimeFormat('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).format(parsed).replace(/\//g, '-');
+    }
+
     function normalizeClientResetMode(mode, resetDay) {
         const raw = String(mode || '').trim().toLowerCase();
         if (!raw) return Number(resetDay || 0) > 0 ? 'fixed_day' : 'off';
@@ -1209,6 +1240,8 @@
         document.getElementById('editNodeTrafficDownBar').style.width = downPct + '%';
         document.getElementById('editNodeTrafficUpText').innerText = formatBytes(upBytes);
         document.getElementById('editNodeTrafficDownText').innerText = formatBytes(downBytes);
+        document.getElementById('editNodeTrafficResetAt').innerText = formatDateTimeLabel(node.traffic_reset_at, '未重置');
+        document.getElementById('editNodeTrafficUpdateAt').innerText = formatDateTimeLabel(node.traffic_update_at, '--');
 
         // 显示 Agent 版本
         if (node.agent_version) {

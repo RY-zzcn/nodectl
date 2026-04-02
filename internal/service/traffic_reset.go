@@ -114,6 +114,53 @@ func NormalizeTrafficResetMode(raw string, resetDay int) string {
 	}
 }
 
+// ResolveTrafficResetAtOnRuleChange initializes last reset timestamp when the
+// reset rule is created or changed.
+//
+// For fixed-day mode, if the target day in the current month has not arrived
+// yet, we anchor the last reset to the previous month so the upcoming day in
+// this month can still trigger normally. If the target day has already arrived,
+// we treat the current month as already initialized to avoid an immediate
+// catch-up reset right after the rule change.
+func ResolveTrafficResetAtOnRuleChange(mode string, resetDay int, now time.Time) *time.Time {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	now = now.In(time.Local)
+
+	switch NormalizeTrafficResetMode(mode, resetDay) {
+	case TrafficResetModeIntervalDays, TrafficResetModeOff:
+		return nil
+	case TrafficResetModeCalendarMonth:
+		resetAt := dayStartLocal(now)
+		return &resetAt
+	case TrafficResetModeFixedDay:
+		resetDay = NormalizeNodeTrafficResetDay(resetDay)
+		if resetDay <= 0 {
+			return nil
+		}
+
+		targetDay := resetDay
+		if targetDay > lastDayOfMonth(now) {
+			targetDay = lastDayOfMonth(now)
+		}
+		if now.Day() < targetDay {
+			prevMonth := now.AddDate(0, -1, 0)
+			prevTargetDay := resetDay
+			if prevTargetDay > lastDayOfMonth(prevMonth) {
+				prevTargetDay = lastDayOfMonth(prevMonth)
+			}
+			resetAt := time.Date(prevMonth.Year(), prevMonth.Month(), prevTargetDay, 0, 0, 0, 0, now.Location())
+			return &resetAt
+		}
+
+		resetAt := dayStartLocal(now)
+		return &resetAt
+	default:
+		return nil
+	}
+}
+
 // StartTrafficAutoResetLoop starts background traffic reset scheduler once.
 func StartTrafficAutoResetLoop() {
 	trafficResetLoopOnce.Do(func() {
@@ -125,11 +172,28 @@ func runTrafficAutoResetLoop() {
 	// Run once at startup to avoid waiting for the first minute tick.
 	handleTrafficAutoResetTick(time.Now())
 
+	alignTimer := time.NewTimer(durationUntilNextMinuteBoundary(time.Now()))
+	defer alignTimer.Stop()
+	<-alignTimer.C
+	handleTrafficAutoResetTick(time.Now())
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 	for now := range ticker.C {
 		handleTrafficAutoResetTick(now)
 	}
+}
+
+func durationUntilNextMinuteBoundary(now time.Time) time.Duration {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	next := now.Truncate(time.Minute).Add(time.Minute)
+	wait := next.Sub(now)
+	if wait <= 0 {
+		return time.Minute
+	}
+	return wait
 }
 
 func handleTrafficAutoResetTick(now time.Time) {
@@ -185,7 +249,7 @@ func shouldResetNodeTrafficNow(mode string, resetDay int, intervalDays int, last
 		if now.Day() < targetDay {
 			return false
 		}
-		return !wasResetInSameMonth(lastResetAt, now)
+		return !wasResetInCurrentFixedDayCycle(lastResetAt, now, targetDay)
 	case TrafficResetModeIntervalDays:
 		intervalDays = NormalizeTrafficResetIntervalDays(intervalDays)
 
@@ -236,6 +300,14 @@ func wasResetInSameMonth(lastResetAt *time.Time, now time.Time) bool {
 	}
 	last := lastResetAt.In(now.Location())
 	return last.Year() == now.Year() && last.Month() == now.Month()
+}
+
+func wasResetInCurrentFixedDayCycle(lastResetAt *time.Time, now time.Time, targetDay int) bool {
+	if !wasResetInSameMonth(lastResetAt, now) {
+		return false
+	}
+	last := lastResetAt.In(now.Location())
+	return last.Day() >= targetDay
 }
 
 func lastDayOfMonth(t time.Time) int {

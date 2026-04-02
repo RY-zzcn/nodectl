@@ -163,12 +163,11 @@ func apiUpdateNode(w http.ResponseWriter, r *http.Request) {
 		resetRuleChanged = true
 	}
 	if resetRuleChanged {
-		if targetNode.TrafficResetMode == service.TrafficResetModeIntervalDays {
-			targetNode.TrafficResetAt = nil
-		} else {
-			now := time.Now()
-			targetNode.TrafficResetAt = &now
-		}
+		targetNode.TrafficResetAt = service.ResolveTrafficResetAtOnRuleChange(
+			targetNode.TrafficResetMode,
+			targetNode.ResetDay,
+			time.Now(),
+		)
 	}
 
 	// 4. 安全检查：判断是否处于安全环境
@@ -505,11 +504,10 @@ func apiAddNode(w http.ResponseWriter, r *http.Request) {
 			a := service.ResolveTrafficResetAnchor(nil, node.CreatedAt, time.Now())
 			updates["traffic_reset_anchor_at"] = a
 		}
-		updates["traffic_reset_at"] = nil
 	} else {
 		updates["traffic_reset_anchor_at"] = nil
-		updates["traffic_reset_at"] = time.Now()
 	}
+	updates["traffic_reset_at"] = service.ResolveTrafficResetAtOnRuleChange(resetMode, resetDay, time.Now())
 	trafficLimit := req.TrafficLimit
 	if raw := strings.TrimSpace(req.TrafficLimitRaw); raw != "" {
 		trafficLimit = service.ParseTrafficLimitInputToBytes(raw)
